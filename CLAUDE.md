@@ -182,3 +182,14 @@ check, ACH, credit card). This list is managed in settings and referenced
 on journal entries as an optional field. The core engine does not require
 a payment method — it is metadata that aids categorization and reporting
 but has no effect on the accounting equation.
+
+### Validation vs. Advisories
+The core engine distinguishes between hard validation rules and soft
+advisories. Hard rules enforce mathematical correctness and reject entries
+that violate them: minimum two lines, valid account references, positive
+amounts, debits equal credits, date in valid range. Soft advisories warn
+the user about unusual but legal patterns — for example, debiting a
+Revenue account or using a contra account as a primary line. Advisories
+surface in the UI (yellow caution indicators) but do not block posting.
+The engine never rejects a mathematically valid transaction on stylistic
+or preferential grounds.
