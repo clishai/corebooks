@@ -89,3 +89,12 @@ Draft behavior:
   Deletion requires explicit confirmation and cannot be undone.
 - Autosave and manual save both apply to drafts only. Posted entries
   are immutable and cannot be edited or deleted.
+
+### Contra Accounts
+Contra accounts are first-class citizens in CoreBooks. The Account interface
+includes an isContra boolean and an optional contraTo field referencing the
+parent account type. Contra accounts carry a normal balance opposite to their
+parent type. The reporting layer nets contra accounts against their parent
+accounts automatically. The engine never rejects a transaction solely because
+it pushes an account to the opposite side of its normal balance — abnormal
+balances are a valid real-world condition, not an error.
