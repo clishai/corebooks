@@ -1,73 +1,71 @@
-# CoreBooks — Claude Code Context
+# CoreBooks — Claude Code Instructions
 
 ## What This Project Is
 
-CoreBooks is an open-source, self-hosted accounting and bookkeeping application built in TypeScript. It follows Onion Architecture — the innermost layer is a pure accounting engine, and each outer layer adds functionality without touching the core.
+CoreBooks is an open-source, self-hosted, privacy-first accounting application built in TypeScript. It follows Onion Architecture — the innermost layer is a pure double-entry accounting engine with zero external dependencies. Each outer layer adds functionality without ever modifying the core.
+
+Explaining the "why" behind your decisions is as important as the working code itself. Never make a change without explaining what it does and why.
 
 ## Current Phase
 
-Phase 1 — Project Infrastructure
+**Phase 1 — Project Infrastructure**
 
-The repository structure and foundational documents are being established. No application code exists yet. Phase 2 will begin building the core accounting engine.
+Foundation files are in place. Next step is initializing the TypeScript project (package.json and tsconfig.json).
 
-## Architecture Overview
+This file should be updated at the start of each new phase.
 
-Layer 1 (Core):        Pure accounting engine — no external dependencies
-Layer 2 (Structure):   Database, subsidiary ledgers, reporting, UI
-Layer 3 (Integration): Plugin API, webhooks, external integrations
-Layer 4 (Ecosystem):   Community plugins, AI assistant interface
+## Architecture
 
-## Key Principles
+    src/
+      core/         ← Layer 1: Pure accounting engine. Zero external dependencies.
+        types/      ← Interfaces and type definitions
+        engine/     ← Business logic functions
+        validation/ ← Accounting rules and constraints
+      db/           ← Layer 2: Database layer (Prisma + PostgreSQL) — Phase 3
+      api/          ← Layer 3: REST API and plugin system — Phase 4
+      ui/           ← Layer 4: React frontend — Phase 3
+    tests/
+      core/         ← Unit tests for the accounting engine
 
-1. The core is sacred. src/core/ has zero external dependencies. Do not add imports to external libraries in this layer — ever.
-2. Debits must equal credits. Every journal entry must balance. Validation is non-negotiable.
-3. The accounting equation holds. Assets = Liabilities + Equity at all times.
-4. Outer layers wrap inner layers. Never let an inner layer import from an outer layer.
+## The Single Most Important Rule
 
-## Tech Stack
+**Never modify the core to accommodate an outer layer.**
 
-- Language: TypeScript (strict mode)
-- Runtime: Node.js
-- Database: PostgreSQL (Phase 2+)
-- ORM: Prisma (Phase 2+)
-- Frontend: React + Tailwind CSS (Phase 3+)
-- Testing: Vitest
+If a database, API, or UI feature seems to require changing `src/core/`, stop and find a different approach. The core is the accounting engine. It knows nothing about databases, screens, or external services. Everything else adapts to it — never the reverse.
 
-## Developer Context
+## Coding Conventions
 
-Brady (the primary developer) is an accounting professional learning to code. When suggesting code or making changes:
+- TypeScript strict mode is enabled. No `any` types without explicit justification.
+- All functions must have explicit parameter types and return types.
+- Business logic lives in `src/core/engine/`. Data shapes live in `src/core/types/`.
+- Every function in the core must have a corresponding test in `tests/core/`.
+- Commit messages follow Conventional Commits format:
+  - `feat:` new feature
+  - `fix:` bug fix
+  - `docs:` documentation only
+  - `test:` adding or updating tests
+  - `chore:` tooling, config, setup
 
-- Explain what the code does, not just what to type
-- Use accounting analogies when explaining technical concepts
-- Prefer clarity over cleverness
-- Never silently fix something — explain what was wrong and why
+## Accounting Principles Encoded Here
 
-## Planned Folder Structure
-
-src/
-  core/
-    types/       - TypeScript interfaces (Account, JournalEntry, etc.)
-    engine/      - Pure business logic (post, validate, report)
-    validation/  - Accounting rules and constraints
-  db/            - Database layer (Phase 2+)
-  api/           - REST API (Phase 3+)
-  ui/            - React frontend (Phase 3+)
-  plugins/       - Plugin system (Phase 4+)
-tests/
-  core/          - Unit tests for the core engine
-
-## Commit Conventions
-
-Use Conventional Commits format:
-- feat:     new feature
-- fix:      bug fix
-- docs:     documentation
-- test:     tests
-- chore:    maintenance
+- Every journal entry must have at least two lines.
+- Total debits must equal total credits on every entry. No exceptions.
+- Account types: Asset, Liability, Equity, Revenue, Expense.
+- Normal balances: Assets and Expenses carry debit balances. Liabilities, Equity, and Revenue carry credit balances.
+- The accounting equation must hold at all times: Assets = Liabilities + Equity.
 
 ## What NOT to Do
 
-- Do not add external dependencies to src/core/
-- Do not modify the core to accommodate integrations — integrations adapt to the core
-- Do not commit .env files, node_modules/, or build artifacts
-- Do not skip tests for core accounting logic
+- Do not install external packages into `src/core/`. It must remain dependency-free.
+- Do not use `console.log` for error handling — use proper TypeScript error types.
+- Do not skip tests. If a function exists in the core, a test must exist for it.
+- Do not make silent changes. Always explain what changed and why.
+
+## Stack
+
+- Language: TypeScript (strict mode)
+- Runtime: Node.js
+- Database: PostgreSQL with Prisma ORM (Phase 3)
+- Frontend: React with Tailwind CSS (Phase 3)
+- Testing: Vitest (Phase 2)
+- Package manager: npm

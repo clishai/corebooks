@@ -1,0 +1,23 @@
+{
+  "name": "corebooks",
+  "version": "1.0.0",
+  "description": "Open-source, self-hosted accounting and bookkeeping software. Built from first principles.",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/clishai/corebooks.git"
+  },
+  "keywords": [],
+  "author": "clishai",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/clishai/corebooks/issues"
+  },
+  "homepage": "https://github.com/clishai/corebooks#readme",
+  "devDependencies": {
+    "typescript": "^6.0.3"
+  }
+}
