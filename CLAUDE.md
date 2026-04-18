@@ -98,3 +98,10 @@ parent type. The reporting layer nets contra accounts against their parent
 accounts automatically. The engine never rejects a transaction solely because
 it pushes an account to the opposite side of its normal balance — abnormal
 balances are a valid real-world condition, not an error.
+
+### Payment Methods
+Users can define a list of payment methods for their organization (e.g. cash,
+check, ACH, credit card). This list is managed in settings and referenced
+on journal entries as an optional field. The core engine does not require
+a payment method — it is metadata that aids categorization and reporting
+but has no effect on the accounting equation.
