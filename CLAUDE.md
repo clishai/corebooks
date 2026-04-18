@@ -69,3 +69,12 @@ If a database, API, or UI feature seems to require changing `src/core/`, stop an
 - Frontend: React with Tailwind CSS (Phase 3)
 - Testing: Vitest (Phase 2)
 - Package manager: npm
+
+### Journal Entry — Balance Enforcement and Draft State
+The core engine maintains a strict separation between draft and posted entries.
+Draft entries may be unbalanced and saved at any time — they serve as a
+staging area for incomplete work. Drafts are not assigned an official entry
+number, do not appear in any financial reports, and have no effect on account
+balances. An entry is only promoted from draft to posted when debits equal
+credits exactly. Once posted, it is permanent and immutable. The accounting
+engine only operates on posted entries.
