@@ -193,3 +193,13 @@ Revenue account or using a contra account as a primary line. Advisories
 surface in the UI (yellow caution indicators) but do not block posting.
 The engine never rejects a mathematically valid transaction on stylistic
 or preferential grounds.
+
+### Amount Storage — Phase 3 Resolution
+The Phase 2 core stores amounts as standard JavaScript numbers, which are
+IEEE 754 floating-point. This introduces the classic 0.1 + 0.2 !== 0.3
+problem on non-integer values. For Phase 2 (whole-dollar, in-memory only)
+this is acceptable. In Phase 3, when persistence is added, all amounts
+will be stored as integers representing the smallest currency unit (e.g.
+cents for USD). Conversion to and from integer representation occurs at
+the boundary between the engine and the database layer, never inside the
+core engine itself.
