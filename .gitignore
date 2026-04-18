@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+
+# Environment files (never commit secrets)
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# macOS system files
+.DS_Store
+
+# Test coverage output
+coverage/
+
+# TypeScript build info
+*.tsbuildinfo
