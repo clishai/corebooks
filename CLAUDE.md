@@ -6,13 +6,90 @@ CoreBooks is an open-source, self-hosted, privacy-first accounting application b
 
 Explaining the "why" behind your decisions is as important as the working code itself. Never make a change without explaining what it does and why.
 
-## Current Phase
+## Prior Phases
 
 **Phase 1 — Project Infrastructure**
 
 Foundation files are in place. Next step is initializing the TypeScript project (package.json and tsconfig.json).
 
 This file should be updated at the start of each new phase.
+
+## Current Phase
+
+**Phase 2 — Core Accounting Engine**
+
+Phase 1 is complete. The project is a fully configured TypeScript repository
+with documentation, licensing, and contribution guidelines in place.
+
+Phase 2 builds the innermost layer of the onion — the pure accounting engine.
+No database, no UI, no integrations. Everything lives in memory while the
+program runs. Zero external dependencies are permitted in src/core.
+
+### Phase 2 Scope
+
+The following must be built, in this order:
+
+**Types (src/core/types/)**
+- AccountType enum: Asset, Liability, Equity, Revenue, Expense
+- Account interface: id, number, name, type, normalBalance, isContra, contraTo
+- EntryStatus enum: Draft, Posted
+- JournalLine interface: accountId, amount, type (debit/credit), optional memo
+- JournalEntry interface: optional id, date, memo, status, optional payment
+  method, lines array
+
+**Validation (src/core/validation/)**
+- A function that accepts a JournalEntry and determines whether it is eligible
+  to be posted. It must verify:
+  - The entry contains at least two lines
+  - Every line references an account that exists in the chart of accounts
+  - Every amount is a positive number
+  - Total debits equal total credits exactly
+  - The date is valid and not in an implausible range
+- On failure, the function returns a structured error indicating which rule
+  failed. It does not throw exceptions for expected validation failures.
+
+**Engine (src/core/engine/)**
+- A function that saves a draft entry with minimal validation (only that it
+  has at least one line and a date). Drafts receive no ID and do not affect
+  the ledger.
+- A function that posts an entry. It runs full validation first. If validation
+  passes, it assigns a sequential entry ID, marks the status as Posted, and
+  updates the ledger. Posted entries are immutable.
+- A function that reverses a posted entry by creating an equal and opposite
+  entry. The original entry is never deleted or modified.
+
+**Ledger (src/core/engine/)**
+- An in-memory structure keyed by account ID that tracks the running balance
+  of each account. Updated every time an entry is posted.
+- A function that returns the current balance of a given account, respecting
+  its normalBalance (debit accounts are positive when balance > 0 on the
+  debit side, credit accounts are positive when balance > 0 on the credit
+  side).
+
+**Reporting (src/core/engine/)**
+- Trial balance: a list of every account with its current debit or credit
+  balance, plus totals proving debits equal credits across the ledger.
+- Balance sheet: assets, liabilities, and equity as of a given date. Contra
+  accounts net against their parent type automatically.
+- Income statement: revenue minus expenses over a given date range,
+  producing net income.
+
+**Tests (tests/core/)**
+- Every function above must have corresponding tests written with Vitest.
+- Tests must cover: the happy path, every validation failure case, contra
+  account behavior, and the accounting equation remaining in balance after
+  a series of posted entries.
+
+### Phase 2 Constraints
+
+- src/core must remain dependency-free. No npm packages may be imported
+  into any file under src/core.
+- Every file in src/core/types exports interfaces or enums only — no
+  functions, no logic.
+- Every function in src/core/engine and src/core/validation must have
+  explicit parameter and return types.
+- The core must have no knowledge of databases, files, or user interfaces.
+- Tests live in tests/core and mirror the structure of src/core.
 
 ## Architecture
 
