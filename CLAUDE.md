@@ -78,3 +78,14 @@ number, do not appear in any financial reports, and have no effect on account
 balances. An entry is only promoted from draft to posted when debits equal
 credits exactly. Once posted, it is permanent and immutable. The accounting
 engine only operates on posted entries.
+
+Draft behavior:
+- Any unposted entry is automatically saved as a draft if the user closes
+  the tab or navigates away — no work is ever lost silently. A small notification
+  should appear in the corner of the screen to inform the user that the autosave has occurred.
+- A persistent save button is always visible in the left toolbar.
+- Drafts can be deleted by the user via a delete button that triggers a
+  confirmation modal: "Are you sure you want to delete this entry?"
+  Deletion requires explicit confirmation and cannot be undone.
+- Autosave and manual save both apply to drafts only. Posted entries
+  are immutable and cannot be edited or deleted.
