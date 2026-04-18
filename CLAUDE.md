@@ -29,7 +29,7 @@ program runs. Zero external dependencies are permitted in src/core.
 
 The following must be built, in this order:
 
-**Types (src/core/types/)**
+**Types (src/core/types/) — COMPLETE**
 - AccountType enum: Asset, Liability, Equity, Revenue, Expense
 - Account interface: id, number, name, type, normalBalance, isContra, contraTo
 - EntryStatus enum: Draft, Posted
@@ -37,7 +37,7 @@ The following must be built, in this order:
 - JournalEntry interface: optional id, date, memo, status, optional payment
   method, lines array
 
-**Validation (src/core/validation/)**
+**Validation (src/core/validation/) — COMPLETE**
 - A function that accepts a JournalEntry and determines whether it is eligible
   to be posted. It must verify:
   - The entry contains at least two lines
@@ -48,7 +48,7 @@ The following must be built, in this order:
 - On failure, the function returns a structured error indicating which rule
   failed. It does not throw exceptions for expected validation failures.
 
-**Engine (src/core/engine/)**
+**Engine (src/core/engine/) — NEXT**
 - A function that saves a draft entry with minimal validation (only that it
   has at least one line and a date). Drafts receive no ID and do not affect
   the ledger.
