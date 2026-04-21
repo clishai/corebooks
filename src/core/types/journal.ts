@@ -17,4 +17,5 @@ export interface JournalEntry {
   status: EntryStatus;
   paymentMethod?: string;
   lines: JournalLine[];
+  reversalOf?: string;
 }
