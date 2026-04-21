@@ -144,6 +144,16 @@ describe('postEntry', () => {
     }
   });
 
+  it('does not share line references with the input entry', () => {
+    const input = draftEntry();
+    const result = postEntry(input, chart, ledger);
+    if (!result.posted) throw new Error('setup failed');
+    // Mutate the original draft's lines after posting
+    input.lines[0].amount = 9999;
+    // The posted record in the ledger must be unaffected
+    expect(ledger.postedEntries[0].lines[0].amount).toBe(250);
+  });
+
   it('rejects an entry with an unknown account', () => {
     const result = postEntry(
       draftEntry({

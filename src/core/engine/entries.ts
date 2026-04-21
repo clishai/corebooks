@@ -51,10 +51,13 @@ export function postEntry(
     return { posted: false, errors: result.errors };
   }
 
+  // Deep-copy lines so the posted ledger record can't be corrupted by
+  // a caller that mutates their draft entry object after posting.
   const posted: JournalEntry = {
     ...entry,
     id: String(ledger.nextEntryId++),
     status: EntryStatus.Posted,
+    lines: entry.lines.map((line) => ({ ...line })),
   };
 
   ledger.applyEntry(posted);

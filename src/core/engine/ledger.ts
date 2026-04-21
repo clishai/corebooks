@@ -1,5 +1,5 @@
 import { Account } from '../types/account.js';
-import { JournalEntry, JournalLine } from '../types/journal.js';
+import { JournalEntry } from '../types/journal.js';
 
 export interface RawBalance {
   debit: number;
@@ -65,7 +65,7 @@ export class Ledger {
       if (entry.date >= from && entry.date <= to) {
         for (const line of entry.lines) {
           const current = snapshot.get(line.accountId) ?? { debit: 0, credit: 0 };
-          if ((line as JournalLine).type === 'debit') {
+          if (line.type === 'debit') {
             snapshot.set(line.accountId, { debit: current.debit + line.amount, credit: current.credit });
           } else {
             snapshot.set(line.accountId, { debit: current.debit, credit: current.credit + line.amount });
