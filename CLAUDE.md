@@ -40,24 +40,71 @@ Phase 3 adds the database layer (Prisma + PostgreSQL) and a REST API. The
 onion architecture rule applies strictly: the database and API layers adapt
 to the core — the core is never modified to accommodate them.
 
-### Phase 3 Scope (to be detailed at start of Phase 3)
+### Phase 3 Scope
 
-- **Database layer (src/db/)** — Prisma schema mirroring core types.
-  Amount fields stored as integers (cents). Conversion at the boundary.
-- **REST API (src/api/)** — Express or Fastify routes that call core engine
-  functions. The API never contains accounting logic.
-- **UI scaffolding (src/ui/)** — React + Tailwind, Phase 3 or 4.
+Phase 3 adds persistence and a REST API. Build in this order:
 
-### Phase 2 Constraints
+**Database layer (src/db/) — NEXT**
+- Install Prisma and `@prisma/client` as dependencies (these are outer-layer
+  packages; never import them in `src/core/`).
+- Write a Prisma schema (`prisma/schema.prisma`) with models for:
+  - `Account` — mirrors `src/core/types/account.ts`; store `normalBalance` as
+    an enum, `contraTo` as a nullable enum, `isContra` as Boolean.
+  - `JournalEntry` — mirrors `JournalEntry` interface; `status` as enum;
+    `amount` fields are **integers (cents)**, never floats.
+  - `JournalLine` — mirrors `JournalLine` interface; `amount` as Int (cents).
+- Write a mapper layer (`src/db/mappers.ts`) that converts between Prisma
+  model objects and core types. This is the one place where cent↔number
+  conversion happens. The core never sees cents; the DB never sees floats.
+- Do not put any accounting logic in `src/db/`. It maps and persists only.
 
-- src/core must remain dependency-free. No npm packages may be imported
-  into any file under src/core.
-- Every file in src/core/types exports interfaces or enums only — no
+**Repository functions (src/db/repositories/)**
+- `accountRepository.ts` — CRUD for accounts (find, list, create, update).
+- `entryRepository.ts` — persist draft entries; load posted entries into a
+  `Ledger` instance on startup (replay pattern); append new posted entries.
+- Repositories call core engine functions (`postEntry`, `validateEntry`, etc.)
+  and persist the results. They do not re-implement accounting rules.
+
+**REST API (src/api/)**
+- Choose Express or Fastify (Fastify preferred for TypeScript ergonomics).
+- Routes call repositories or engine functions directly. No accounting logic
+  lives here — the API is a thin adapter over the core.
+- Minimum routes for Phase 3:
+  - `GET  /accounts` — list chart of accounts
+  - `POST /accounts` — create account
+  - `GET  /entries` — list posted entries
+  - `POST /entries/draft` — save a draft entry
+  - `POST /entries/post` — post a draft entry (runs full validation)
+  - `POST /entries/:id/reverse` — reverse a posted entry
+  - `GET  /reports/trial-balance` — current trial balance
+  - `GET  /reports/balance-sheet?asOf=YYYY-MM-DD` — balance sheet
+  - `GET  /reports/income-statement?from=...&to=...` — income statement
+
+**Tests (tests/db/, tests/api/)**
+- DB tests use a test PostgreSQL database (never the live DB).
+- API tests use supertest or similar; they should hit real routes with a
+  test DB, not mocked repositories.
+
+**Phase 3 Constraints**
+- The core (`src/core/`) must not change. If a DB or API requirement seems
+  to need a core change, stop and solve it in the adapter layer.
+- All amounts crossing the DB boundary must be converted: multiply by 100
+  (number → cents) on write, divide by 100 (cents → number) on read.
+  Conversion only in `src/db/mappers.ts`.
+- No floating-point amounts in the Prisma schema or database.
+- API responses use the core's TypeScript types (after mapper conversion),
+  not raw Prisma model types.
+
+### Permanent Core Constraints (all phases)
+
+- `src/core` must remain dependency-free. No npm packages may be imported
+  into any file under `src/core/`.
+- Every file in `src/core/types/` exports interfaces or enums only — no
   functions, no logic.
-- Every function in src/core/engine and src/core/validation must have
+- Every function in `src/core/engine/` and `src/core/validation/` must have
   explicit parameter and return types.
 - The core must have no knowledge of databases, files, or user interfaces.
-- Tests live in tests/core and mirror the structure of src/core.
+- Tests for the core live in `tests/core/` and mirror the structure of `src/core/`.
 
 ## Architecture
 
@@ -67,8 +114,8 @@ to the core — the core is never modified to accommodate them.
         engine/     ← Business logic functions
         validation/ ← Accounting rules and constraints
       db/           ← Layer 2: Database layer (Prisma + PostgreSQL) — Phase 3
-      api/          ← Layer 3: REST API and plugin system — Phase 4
-      ui/           ← Layer 4: React frontend — Phase 3
+      api/          ← Layer 3: REST API (Express/Fastify) — Phase 3
+      ui/           ← Layer 4: React + Tailwind frontend — Phase 4
     tests/
       core/         ← Unit tests for the accounting engine
 
@@ -98,6 +145,16 @@ If a database, API, or UI feature seems to require changing `src/core/`, stop an
 - Account types: Asset, Liability, Equity, Revenue, Expense.
 - Normal balances: Assets and Expenses carry debit balances. Liabilities, Equity, and Revenue carry credit balances.
 - The accounting equation must hold at all times: Assets = Liabilities + Equity.
+- Revenue and Expense are **temporary accounts**. In a system with period closing,
+  they close to Retained Earnings at year-end. CoreBooks has no closing-entries
+  step in Phase 2, so the `balanceSheet` function folds current-period net income
+  (Revenue − Expenses) directly into the equity total. This preserves the equation
+  mid-period: `Assets = Liabilities + (Permanent Equity + Net Income)`. Do not
+  add closing-entry logic to the core; it belongs in the API or UI layer.
+- `trialBalance` always reflects the current (live) ledger state and is not
+  date-scoped. `balanceSheet` takes an `asOf: Date`. `incomeStatement` takes
+  `from` and `to` dates. Both rebuild balances by replaying `postedEntries` — 
+  they do not use the live balance map.
 
 ## What NOT to Do
 
