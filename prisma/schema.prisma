@@ -1,0 +1,64 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum AccountType {
+  Asset
+  Liability
+  Equity
+  Revenue
+  Expense
+}
+
+enum NormalBalance {
+  debit
+  credit
+}
+
+enum EntryStatus {
+  Draft
+  Posted
+}
+
+enum LineType {
+  debit
+  credit
+}
+
+model Account {
+  id            String        @id @default(cuid())
+  number        String        @unique
+  name          String
+  type          AccountType
+  normalBalance NormalBalance
+  isContra      Boolean       @default(false)
+  contraTo      AccountType?
+  lines         JournalLine[]
+}
+
+model JournalEntry {
+  id            String        @id @default(cuid())
+  date          DateTime
+  memo          String
+  status        EntryStatus
+  paymentMethod String?
+  reversalOf    String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  lines         JournalLine[]
+}
+
+model JournalLine {
+  id        String       @id @default(cuid())
+  entryId   String
+  accountId String
+  amount    Int
+  type      LineType
+  entry     JournalEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  account   Account      @relation(fields: [accountId], references: [id])
+}
