@@ -4,6 +4,8 @@
 
 CoreBooks is a privacy-first alternative to cloud accounting platforms. Your financial data lives on your machine or server — never in someone else's cloud.
 
+This is a project by a college accounting major. Would love any support on making this the ultimate community-led accounting software. Advancements in artificial intelligence and coding languages have made it possible for non-technical business minds to "speak into existence" the software we have always wanted to use rather than being at the whim of closed-source, proprietary SaaS.
+
 ## Status
 
 🚧 **Early Development** — Phase 3 (Database & API)
