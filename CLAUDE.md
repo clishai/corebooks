@@ -36,54 +36,50 @@ exist in src/core. All 44 tests pass. Key design decisions made in this phase:
 
 Phase 2 is complete. The core accounting engine is fully built and tested.
 
-Phase 3 adds the database layer (Prisma + PostgreSQL) and a REST API. The
+Phase 3 adds the database layer (Prisma + SQLite) and a REST API. The
 onion architecture rule applies strictly: the database and API layers adapt
 to the core — the core is never modified to accommodate them.
 
 ### Phase 3 Scope
 
-Phase 3 adds persistence and a REST API. Build in this order:
+**Database layer (src/db/) — COMPLETE**
+- Prisma 7 with `@prisma/adapter-better-sqlite3` (SQLite default).
+- Schema: `Account`, `JournalEntry`, `JournalLine` models in
+  `prisma/schema.prisma`. Amounts stored as Int (cents).
+- Mapper layer (`src/db/mappers.ts`) is the sole place for cent↔number
+  conversion. Core never sees cents; DB never sees floats.
+- Repositories in `src/db/repositories/` — `accountRepository.ts` for
+  account CRUD, `entryRepository.ts` for draft/post/reverse persistence.
 
-**Database layer (src/db/) — NEXT**
-- Install Prisma and `@prisma/client` as dependencies (these are outer-layer
-  packages; never import them in `src/core/`).
-- Write a Prisma schema (`prisma/schema.prisma`) with models for:
-  - `Account` — mirrors `src/core/types/account.ts`; store `normalBalance` as
-    an enum, `contraTo` as a nullable enum, `isContra` as Boolean.
-  - `JournalEntry` — mirrors `JournalEntry` interface; `status` as enum;
-    `amount` fields are **integers (cents)**, never floats.
-  - `JournalLine` — mirrors `JournalLine` interface; `amount` as Int (cents).
-- Write a mapper layer (`src/db/mappers.ts`) that converts between Prisma
-  model objects and core types. This is the one place where cent↔number
-  conversion happens. The core never sees cents; the DB never sees floats.
-- Do not put any accounting logic in `src/db/`. It maps and persists only.
+**Database strategy decision:**
+- **Default: SQLite** — zero-config, single-file, works out of the box for
+  personal users. No server software required.
+- **Business/multi-user: PostgreSQL** — change `provider` in
+  `prisma/schema.prisma`, regenerate client, update `DATABASE_URL`.
+  A guided migration wizard will be provided in Phase 4 settings UI.
+- Switching databases requires a schema regeneration (not a runtime toggle).
+  See `.env.example` for configuration.
 
-**Repository functions (src/db/repositories/)**
-- `accountRepository.ts` — CRUD for accounts (find, list, create, update).
-- `entryRepository.ts` — persist draft entries; load posted entries into a
-  `Ledger` instance on startup (replay pattern); append new posted entries.
-- Repositories call core engine functions (`postEntry`, `validateEntry`, etc.)
-  and persist the results. They do not re-implement accounting rules.
-
-**REST API (src/api/)**
-- Choose Express or Fastify (Fastify preferred for TypeScript ergonomics).
-- Routes call repositories or engine functions directly. No accounting logic
-  lives here — the API is a thin adapter over the core.
-- Minimum routes for Phase 3:
+**REST API (src/api/) — COMPLETE**
+- Fastify 5 with `@fastify/sensible` for typed error helpers.
+- Routes live in `src/api/routes/`. No accounting logic in routes.
+- All Phase 3 routes implemented:
   - `GET  /accounts` — list chart of accounts
   - `POST /accounts` — create account
+  - `PATCH /accounts/:id` — update account
   - `GET  /entries` — list posted entries
   - `POST /entries/draft` — save a draft entry
   - `POST /entries/post` — post a draft entry (runs full validation)
   - `POST /entries/:id/reverse` — reverse a posted entry
+  - `DELETE /entries/:id` — delete a draft entry
   - `GET  /reports/trial-balance` — current trial balance
   - `GET  /reports/balance-sheet?asOf=YYYY-MM-DD` — balance sheet
   - `GET  /reports/income-statement?from=...&to=...` — income statement
 
-**Tests (tests/db/, tests/api/)**
-- DB tests use a test PostgreSQL database (never the live DB).
-- API tests use supertest or similar; they should hit real routes with a
-  test DB, not mocked repositories.
+**Tests (tests/db/, tests/api/) — NEXT**
+- DB tests use an in-memory or temp-file SQLite database (never the live DB).
+- API tests use supertest; they should hit real routes with a test DB,
+  not mocked repositories.
 
 **Phase 3 Constraints**
 - The core (`src/core/`) must not change. If a DB or API requirement seems
@@ -94,6 +90,27 @@ Phase 3 adds persistence and a REST API. Build in this order:
 - No floating-point amounts in the Prisma schema or database.
 - API responses use the core's TypeScript types (after mapper conversion),
   not raw Prisma model types.
+
+### Phase 4 Preview — UI and Database Wizard
+
+Phase 4 is the React + Tailwind frontend. Key requirements to carry forward:
+
+**First-launch notice for businesses:**
+On the very first launch (detected by an empty database or a `firstLaunch`
+flag), show a dismissible modal or banner that explains:
+- CoreBooks defaults to SQLite (great for personal use, one machine).
+- Businesses with multiple employees should switch to PostgreSQL so all
+  staff can access the same data simultaneously.
+- A step-by-step migration wizard is available in Settings → Database.
+
+This notice must be written in plain language — assume the reader is not
+a developer. Never use the word "schema" or "adapter" in user-facing text.
+
+**Settings → Database page:**
+- Show the current database type (SQLite / PostgreSQL) and file path.
+- Provide a guided PostgreSQL setup wizard: validate connection string,
+  run migrations, confirm data export/import before switching.
+- Link to `.env.example` docs for advanced users.
 
 ### Permanent Core Constraints (all phases)
 
@@ -113,7 +130,7 @@ Phase 3 adds persistence and a REST API. Build in this order:
         types/      ← Interfaces and type definitions
         engine/     ← Business logic functions
         validation/ ← Accounting rules and constraints
-      db/           ← Layer 2: Database layer (Prisma + PostgreSQL) — Phase 3
+      db/           ← Layer 2: Database layer (Prisma + SQLite/PostgreSQL) — Phase 3
       api/          ← Layer 3: REST API (Express/Fastify) — Phase 3
       ui/           ← Layer 4: React + Tailwind frontend — Phase 4
     tests/
