@@ -95,6 +95,12 @@ to the core — the core is never modified to accommodate them.
 
 Phase 4 is the React + Tailwind frontend. Key requirements to carry forward:
 
+**Global toolbar:**
+The top toolbar is always visible. It contains:
+- A **"New Entry" button** on the right side — always present, always clickable,
+  regardless of which page the user is on. This is the primary action in the app.
+- Future items (search, notifications, user menu) may be added here in later phases.
+
 **First-launch notice for businesses:**
 On the very first launch (detected by an empty database or a `firstLaunch`
 flag), show a dismissible modal or banner that explains:
@@ -173,6 +179,30 @@ If a database, API, or UI feature seems to require changing `src/core/`, stop an
   `from` and `to` dates. Both rebuild balances by replaying `postedEntries` — 
   they do not use the live balance map.
 
+## Self-Review Checklist
+
+After completing any implementation, always review the code before reporting it done:
+
+1. **Stale state / stale data** — async flows that capture a value from state at
+   render time may be out of date by the time they execute. Check that the latest
+   value is always read or re-fetched where it matters.
+2. **Type-check** — run `tsc --noEmit` (server) and
+   `tsc --project src/ui/tsconfig.json --noEmit` (UI) and confirm zero errors.
+3. **Edge cases at boundaries** — empty lists, undefined optional fields, zero
+   amounts, and missing IDs should all be handled or explicitly documented as
+   non-cases.
+4. **Consistency** — new code should follow the same patterns already in use
+   (error handling style, naming, file layout) rather than introducing a
+   different approach without reason.
+5. **The onion rule** — confirm that no change in an outer layer (db, api, ui)
+   required touching anything in `src/core/`.
+6. **Fresh read of the diff** — re-read every changed line as if seeing it for
+   the first time. Ask: does each line do exactly what was intended, nothing
+   more and nothing less? This is the catch-all for any error type not covered
+   above — logic inversions, off-by-one, copy-paste mistakes, wrong variable
+   used, silent no-ops, unreachable code, and anything else that only becomes
+   visible when you slow down and read carefully.
+
 ## What NOT to Do
 
 - Do not install external packages into `src/core/`. It must remain dependency-free.
@@ -202,7 +232,10 @@ Draft behavior:
 - Any unposted entry is automatically saved as a draft if the user closes
   the tab or navigates away — no work is ever lost silently. A small notification
   should appear in the corner of the screen to inform the user that the autosave has occurred.
-- A persistent save button is always visible in the left toolbar.
+- A **"New Entry" button is always visible in the top toolbar**, regardless of
+  which page the user is on. Clicking it opens the journal entry form as a modal.
+- Within the entry form, a persistent "Save Draft" button is always visible
+  so the user can save incomplete work at any time.
 - Drafts can be deleted by the user via a delete button that triggers a
   confirmation modal: "Are you sure you want to delete this entry?"
   Deletion requires explicit confirmation and cannot be undone.
