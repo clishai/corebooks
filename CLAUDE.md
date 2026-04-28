@@ -30,70 +30,89 @@ exist in src/core. All 44 tests pass. Key design decisions made in this phase:
   persistence is added, amounts will convert to integer cents at the
   boundary between the core and the database layer.
 
-## Current Phase
-
 **Phase 3 — Persistence and API**
 
-Phase 2 is complete. The core accounting engine is fully built and tested.
+The database layer and REST API are complete. Key decisions:
 
-Phase 3 adds the database layer (Prisma + SQLite) and a REST API. The
-onion architecture rule applies strictly: the database and API layers adapt
-to the core — the core is never modified to accommodate them.
-
-### Phase 3 Scope
-
-**Database layer (src/db/) — COMPLETE**
 - Prisma 7 with `@prisma/adapter-better-sqlite3` (SQLite default).
 - Schema: `Account`, `JournalEntry`, `JournalLine` models in
   `prisma/schema.prisma`. Amounts stored as Int (cents).
 - Mapper layer (`src/db/mappers.ts`) is the sole place for cent↔number
   conversion. Core never sees cents; DB never sees floats.
-- Repositories in `src/db/repositories/` — `accountRepository.ts` for
-  account CRUD, `entryRepository.ts` for draft/post/reverse persistence.
+- Fastify 5 REST API. All routes live in `src/api/routes/`. No accounting
+  logic in routes — they delegate entirely to repositories and the core engine.
+- Routes: `GET/POST /accounts`, `PATCH /accounts/:id`, `GET /entries`,
+  `POST /entries/draft`, `POST /entries/post`, `POST /entries/:id/reverse`,
+  `DELETE /entries/:id`, `GET /reports/trial-balance`,
+  `GET /reports/balance-sheet`, `GET /reports/income-statement`.
+- SQLite is the default. PostgreSQL is supported by changing the provider in
+  `prisma/schema.prisma` and regenerating the client.
 
-**Database strategy decision:**
-- **Default: SQLite** — zero-config, single-file, works out of the box for
-  personal users. No server software required.
-- **Business/multi-user: PostgreSQL** — change `provider` in
-  `prisma/schema.prisma`, regenerate client, update `DATABASE_URL`.
-  A guided migration wizard will be provided in Phase 4 settings UI.
-- Switching databases requires a schema regeneration (not a runtime toggle).
-  See `.env.example` for configuration.
+**Outstanding from Phase 3 — DB and API tests**
+These were deferred and must still be written:
+- DB tests (`tests/db/`) — use an in-memory or temp-file SQLite database,
+  never the live `corebooks.db`.
+- API tests (`tests/api/`) — use supertest against real Fastify routes with a
+  test DB, not mocked repositories.
 
-**REST API (src/api/) — COMPLETE**
-- Fastify 5 with `@fastify/sensible` for typed error helpers.
-- Routes live in `src/api/routes/`. No accounting logic in routes.
-- All Phase 3 routes implemented:
-  - `GET  /accounts` — list chart of accounts
-  - `POST /accounts` — create account
-  - `PATCH /accounts/:id` — update account
-  - `GET  /entries` — list posted entries
-  - `POST /entries/draft` — save a draft entry
-  - `POST /entries/post` — post a draft entry (runs full validation)
-  - `POST /entries/:id/reverse` — reverse a posted entry
-  - `DELETE /entries/:id` — delete a draft entry
-  - `GET  /reports/trial-balance` — current trial balance
-  - `GET  /reports/balance-sheet?asOf=YYYY-MM-DD` — balance sheet
-  - `GET  /reports/income-statement?from=...&to=...` — income statement
+## Current Phase
 
-**Tests (tests/db/, tests/api/) — NEXT**
-- DB tests use an in-memory or temp-file SQLite database (never the live DB).
-- API tests use supertest; they should hit real routes with a test DB,
-  not mocked repositories.
+**Phase 4 — UI**
 
-**Phase 3 Constraints**
-- The core (`src/core/`) must not change. If a DB or API requirement seems
-  to need a core change, stop and solve it in the adapter layer.
-- All amounts crossing the DB boundary must be converted: multiply by 100
-  (number → cents) on write, divide by 100 (cents → number) on read.
-  Conversion only in `src/db/mappers.ts`.
-- No floating-point amounts in the Prisma schema or database.
-- API responses use the core's TypeScript types (after mapper conversion),
-  not raw Prisma model types.
+The React + Tailwind frontend is underway. The Vite 8 + React 19 + Tailwind v4
+SPA lives in `src/ui/` and proxies API calls to the Fastify server on port 3000.
 
-### Phase 4 Preview — UI and Database Wizard
+Run the app:
+- `npm run dev:api` — starts the API server on port 3000 (uses `npx tsx`)
+- `npm run dev:ui` — starts the Vite dev server on port 5173
 
-Phase 4 is the React + Tailwind frontend. Key requirements to carry forward:
+### Phase 4 Scope
+
+**Completed this session:**
+- `src/ui/api/client.ts` — typed fetch wrappers for all API endpoints.
+- `src/ui/components/Layout.tsx` — shell with slate sidebar and top toolbar.
+  The **"+ New Entry" button** is always visible in the toolbar.
+- `src/ui/components/NewEntryModal.tsx` — journal entry form: date, memo,
+  payment method, debit/credit line grid, live balance indicator, Save Draft
+  and Post Entry actions.
+- `src/ui/components/NewAccountModal.tsx` — create account form; auto-sets
+  normal balance based on account type.
+- `src/ui/pages/AccountsPage.tsx` — chart of accounts table with color-coded
+  type badges and a New Account button.
+- `src/ui/pages/EntriesPage.tsx` — posted entries table with expandable rows
+  showing individual debit/credit lines.
+
+**Still to build — begin here next session:**
+1. **Reports pages** (`src/ui/pages/`) — three pages that call the existing
+   report API routes:
+   - Trial Balance — flat table of all accounts with debit/credit balances.
+   - Balance Sheet — grouped by Asset / Liability / Equity with totals;
+     accepts an `asOf` date picker.
+   - Income Statement — Revenue and Expense accounts with net income;
+     accepts `from` / `to` date range pickers.
+   Add these to the sidebar navigation under a "Reports" heading.
+2. **Phase 3 tests** — write `tests/db/` and `tests/api/` as described above.
+   These can be done before or after the reports pages.
+3. **Draft management** — a Drafts page or section listing saved drafts with
+   the ability to reopen and delete them (delete requires a confirmation modal
+   per the CLAUDE.md draft behavior rules).
+4. **Auto-save on navigation** — when the New Entry modal is closed or the
+   user navigates away mid-entry, auto-save the draft silently and show a
+   small corner notification.
+5. **First-launch notice** — dismissible modal on first launch explaining
+   SQLite vs PostgreSQL (plain language, no technical jargon).
+6. **Settings → Database page** — show current DB type, path, and a guided
+   PostgreSQL migration wizard.
+
+### Phase 4 UI Constraints
+- No business logic in UI components. Components call `src/ui/api/client.ts`;
+  they never talk to Prisma or the core engine directly.
+- All amounts displayed in the UI are already in dollars (the mapper layer
+  handles cent conversion). The UI never multiplies or divides by 100.
+- Pages fetch fresh data on mount. There is no global client-side cache yet —
+  navigating to a page always triggers a fresh API call.
+
+### Phase 4 — UI and Database Wizard — Requirements to carry forward
 
 **Global toolbar:**
 The top toolbar is always visible. It contains:
@@ -214,9 +233,11 @@ After completing any implementation, always review the code before reporting it 
 
 - Language: TypeScript (strict mode)
 - Runtime: Node.js
-- Database: PostgreSQL with Prisma ORM (Phase 3)
-- Frontend: React with Tailwind CSS (Phase 3)
-- Testing: Vitest (Phase 2)
+- Database: SQLite via Prisma 7 + `@prisma/adapter-better-sqlite3` (default);
+  PostgreSQL supported by swapping the provider
+- Frontend: React 19 + Vite 8 + Tailwind v4 (src/ui/)
+- API: Fastify 5 + @fastify/sensible (src/api/)
+- Testing: Vitest
 - Package manager: npm
 
 ### Journal Entry — Balance Enforcement and Draft State
