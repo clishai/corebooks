@@ -4,7 +4,7 @@ import { postEntry } from '../../core/engine/entries.js';
 import { Ledger } from '../../core/engine/ledger.js';
 import { ValidationError } from '../../core/validation/entry.js';
 import { getPrismaClient } from '../client.js';
-import { PrismaJournalEntry, toCoreJournalEntry, toDbJournalEntry } from '../mappers.js';
+import { PrismaJournalEntry, toCoreJournalEntry, toDbCents, toDbJournalEntry } from '../mappers.js';
 
 const INCLUDE_LINES = { lines: { orderBy: { id: 'asc' as const } } };
 
@@ -25,7 +25,7 @@ export async function listDraftEntries(): Promise<JournalEntry[]> {
   const rows = await prisma.journalEntry.findMany({
     where: { status: EntryStatus.Draft },
     include: INCLUDE_LINES,
-    orderBy: { createdAt: 'desc' },
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
   });
   return (rows as unknown as PrismaJournalEntry[]).map(toCoreJournalEntry);
 }
@@ -83,7 +83,7 @@ export async function updateDraftEntry(id: string, entry: JournalEntry): Promise
         deleteMany: {},
         create: entry.lines.map((line) => ({
           accountId: line.accountId,
-          amount: Math.round(line.amount * 100),
+          amount: toDbCents(line.amount),
           type: line.type,
         })) as unknown as Parameters<typeof prisma.journalLine.create>[0]['data'][],
       },
