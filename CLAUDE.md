@@ -314,6 +314,8 @@ a developer. Never use the word "schema" or "adapter" in user-facing text.
 
 If a database, API, or UI feature seems to require changing `src/core/`, stop and find a different approach. The core is the accounting engine. It knows nothing about databases, screens, or external services. Everything else adapts to it — never the reverse.
 
+**Precedent — `Ledger.reset()`:** The data-wipe feature in the settings API needed to clear the in-memory ledger after deleting all database records. Rather than rebuilding the server process or exposing internal state, a `reset()` method was added to `Ledger`. This was acceptable because `reset()` is a pure in-memory operation (clears balances, empties `postedEntries`, resets `nextEntryId`) with no knowledge of why it is called, who calls it, or that a database exists. It is conceptually equivalent to constructing a fresh `Ledger()` but without replacing the shared reference. The test for acceptability: could this method exist in a world with no database and no UI? If yes, it belongs in the core.
+
 ## Coding Conventions
 
 - TypeScript strict mode is enabled. No `any` types without explicit justification.
