@@ -201,10 +201,6 @@ Run the app:
   - `listDraftEntries` uses `orderBy: [{ createdAt: 'desc' }, { id: 'desc' }]`
     to avoid non-deterministic order when two entries share the same SQLite
     second-precision timestamp.
-  - DELETE requests no longer send `Content-Type: application/json`; the
-    `request()` helper in `client.ts` now only sets the header when a body is
-    present.
-  - Settings metrics checkboxes now have an `onClick` on the `<label>` element.
   - DELETE requests no longer send `Content-Type: application/json` (Fastify
     rejects an empty body with that header). The `request()` helper in
     `client.ts` now only sets the header when a body is present.
@@ -219,8 +215,8 @@ Run the app:
   asset is supplied.
 - **Payment methods in Settings** — the spec describes a user-managed list of
   payment methods (cash, check, ACH, credit card) stored in settings and
-  referenced on journal entries. The Settings page has three tabs today
-  ("home page" and "database"). A fourth "payment methods" tab needs to be
+  referenced on journal entries. The Settings page has two tabs today
+  ("home page" and "database"). A third "payment methods" tab needs to be
   added with a simple add/remove list UI and persistence (API or localStorage
   TBD). The `NewEntryModal` already has a payment method field; it currently
   accepts free-text and should eventually pull from this managed list.
