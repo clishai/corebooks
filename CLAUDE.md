@@ -48,12 +48,14 @@ The database layer and REST API are complete. Key decisions:
 - SQLite is the default. PostgreSQL is supported by changing the provider in
   `prisma/schema.prisma` and regenerating the client.
 
-**Outstanding from Phase 3 — DB and API tests**
-These were deferred and must still be written:
-- DB tests (`tests/db/`) — use an in-memory or temp-file SQLite database,
-  never the live `corebooks.db`.
-- API tests (`tests/api/`) — use supertest against real Fastify routes with a
-  test DB, not mocked repositories.
+**Phase 3 tests — complete**
+- `tests/db/` — account and entry repository tests against a real temp SQLite file.
+- `tests/api/` — Fastify `inject()` tests for accounts, entries, and reports routes.
+- `tests/helpers/testDb.ts` — shared helper: creates UUID-named temp SQLite,
+  runs migration SQL, clears and destroys between tests.
+- `vitest.config.ts` has `fileParallelism: false` to prevent `DATABASE_URL`
+  env var races across test files.
+- Total: 103 tests passing (44 core + 26 DB + 33 API).
 
 ## Branding
 
@@ -137,11 +139,38 @@ Run the app:
   form, the draft is saved silently and the toast fires. Implemented in
   `NewEntryModal.handleClose`.
 - `GET /entries/drafts` API route + `listDraftEntries` repository function.
+- `src/ui/pages/SettingsPage.tsx` — shows DB type badge (SQLite/PostgreSQL),
+  file path, and a 5-step guided PostgreSQL migration guide for SQLite users;
+  confirms multi-user status for PostgreSQL users.
+- `src/api/routes/settings.ts` — `GET /settings/database` reads
+  `process.env.DATABASE_URL` and returns `{ type, path }`.
+- Phase 3 DB and API tests (see above).
 
-**Still to build — begin here next session:**
-1. **Phase 3 tests** — write `tests/db/` and `tests/api/` as described above.
-2. **Settings → Database page** — show current DB type, path, and a guided
-   PostgreSQL migration wizard.
+**Phase 4 is complete. Begin here next session: Phase 5 — Electron desktop app.**
+
+### Phase 5 — Electron Desktop App (next phase)
+
+Wrap the full application in Electron so it ships as a double-click installer
+with no terminal setup required for end users.
+
+**What Phase 5 must deliver:**
+- A single downloadable installer: `.exe` (Windows), `.app` (macOS), `AppImage` (Linux).
+- The Fastify API server starts automatically as an in-process background
+  worker when Electron launches — the user never runs `npm run dev:api`.
+- The Vite-built React SPA is served from the Electron main process (not a
+  dev server); the user sees the UI immediately on open.
+- The SQLite database file is stored in the OS user-data directory via
+  `app.getPath('userData')`, not a hardcoded project folder path.
+- The API port is dynamically assigned (not hardcoded `3000`); the Electron
+  shell passes it to the renderer so `src/ui/api/client.ts` hits the right URL.
+
+**Key constraints for Phase 5 work:**
+- Do not hardcode `localhost:3000` anywhere — the UI must accept a
+  configurable base URL injected by the Electron shell.
+- The `buildApp()` function in `src/api/server.ts` must remain
+  programmatically startable (it already is — keep it that way).
+- PostgreSQL support remains opt-in via `.env`; SQLite must work out of the
+  box with zero config.
 
 ### Phase 4 UI Constraints
 - No business logic in UI components. Components call `src/ui/api/client.ts`;
