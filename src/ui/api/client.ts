@@ -50,6 +50,37 @@ export interface DraftEntryInput {
   lines: DraftLineInput[]
 }
 
+export interface TrialBalanceRow {
+  account: Account
+  debit: number
+  credit: number
+}
+
+export interface TrialBalance {
+  rows: TrialBalanceRow[]
+  totalDebits: number
+  totalCredits: number
+  balanced: boolean
+}
+
+export interface BalanceSheet {
+  assets: number
+  liabilities: number
+  equity: number
+  balanced: boolean
+}
+
+export interface IncomeStatement {
+  revenue: number
+  expenses: number
+  netIncome: number
+}
+
+export interface DatabaseSettings {
+  type: 'sqlite' | 'postgresql'
+  path: string | null
+}
+
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(url, {
     headers: { 'Content-Type': 'application/json', ...options?.headers },
@@ -73,11 +104,23 @@ export const api = {
   },
   entries: {
     list: (): Promise<JournalEntry[]> => request('/entries'),
+    listDrafts: (): Promise<JournalEntry[]> => request('/entries/drafts'),
     saveDraft: (data: DraftEntryInput): Promise<JournalEntry> =>
       request('/entries/draft', { method: 'POST', body: JSON.stringify(data) }),
     post: (id: string): Promise<JournalEntry> =>
       request('/entries/post', { method: 'POST', body: JSON.stringify({ id }) }),
     delete: (id: string): Promise<void> =>
       request(`/entries/${id}`, { method: 'DELETE' }),
+  },
+  reports: {
+    trialBalance: (): Promise<TrialBalance> =>
+      request('/reports/trial-balance'),
+    balanceSheet: (asOf: string): Promise<BalanceSheet> =>
+      request(`/reports/balance-sheet?asOf=${encodeURIComponent(asOf)}`),
+    incomeStatement: (from: string, to: string): Promise<IncomeStatement> =>
+      request(`/reports/income-statement?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
+  },
+  settings: {
+    database: (): Promise<DatabaseSettings> => request('/settings/database'),
   },
 }
