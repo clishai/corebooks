@@ -1,5 +1,5 @@
 import { useState, useEffect, Fragment } from 'react'
-import { api, Account, DraftEntryInput } from '../api/client'
+import { api, Account, DraftEntryInput, JournalEntry } from '../api/client'
 
 interface Line {
   accountId: string
@@ -10,6 +10,8 @@ interface Line {
 interface Props {
   onClose: () => void
   onPosted: () => void
+  initialDraft?: JournalEntry
+  onAutoSaved?: () => void
 }
 
 function today(): string {
@@ -30,15 +32,34 @@ function toApiLines(lines: Line[]): DraftEntryInput['lines'] {
     )
 }
 
+function fromInitialLines(entry: JournalEntry): Line[] {
+  if (!entry.lines.length) return [emptyLine(), emptyLine()]
+  return entry.lines.map((l) => ({
+    accountId: l.accountId,
+    debit: l.type === 'debit' ? String(l.amount) : '',
+    credit: l.type === 'credit' ? String(l.amount) : '',
+  }))
+}
+
 const emptyLine = (): Line => ({ accountId: '', debit: '', credit: '' })
 
-export default function NewEntryModal({ onClose, onPosted }: Props) {
+function hasContent(memo: string, lines: Line[]): boolean {
+  if (memo.trim()) return true
+  return lines.some((l) => l.accountId || l.debit || l.credit)
+}
+
+const inputClass =
+  'w-full bg-raised border border-rim text-chalk placeholder:text-ash rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-neon focus:border-neon'
+
+export default function NewEntryModal({ onClose, onPosted, initialDraft, onAutoSaved }: Props) {
   const [accounts, setAccounts] = useState<Account[]>([])
-  const [date, setDate] = useState(today())
-  const [memo, setMemo] = useState('')
-  const [paymentMethod, setPaymentMethod] = useState('')
-  const [lines, setLines] = useState<Line[]>([emptyLine(), emptyLine()])
-  const [draftId, setDraftId] = useState<string | undefined>()
+  const [date, setDate] = useState(initialDraft ? initialDraft.date.slice(0, 10) : today())
+  const [memo, setMemo] = useState(initialDraft?.memo ?? '')
+  const [paymentMethod, setPaymentMethod] = useState(initialDraft?.paymentMethod ?? '')
+  const [lines, setLines] = useState<Line[]>(
+    initialDraft ? fromInitialLines(initialDraft) : [emptyLine(), emptyLine()],
+  )
+  const [draftId, setDraftId] = useState<string | undefined>(initialDraft?.id)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -70,6 +91,21 @@ export default function NewEntryModal({ onClose, onPosted }: Props) {
       paymentMethod: paymentMethod.trim() || undefined,
       lines: toApiLines(lines),
     }
+  }
+
+  // Auto-saves if the form has content, then calls onClose.
+  // Used for backdrop clicks and the Cancel button so no work is ever lost.
+  async function handleClose() {
+    if (hasContent(memo, lines)) {
+      try {
+        const saved = await api.entries.saveDraft(buildDraft())
+        setDraftId(saved.id)
+        onAutoSaved?.()
+      } catch {
+        // Auto-save failure is silent — we still close and don't lose the attempt.
+      }
+    }
+    onClose()
   }
 
   async function handleSaveDraft() {
@@ -104,16 +140,18 @@ export default function NewEntryModal({ onClose, onPosted }: Props) {
 
   return (
     <div
-      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-      onMouseDown={(e) => e.target === e.currentTarget && onClose()}
+      className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
+      onMouseDown={(e) => e.target === e.currentTarget && handleClose()}
     >
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[92vh]">
+      <div className="bg-surface border border-rim rounded-xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[92vh]">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 shrink-0">
-          <h2 className="text-base font-semibold text-slate-900">New Journal Entry</h2>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-rim shrink-0">
+          <h2 className="text-base font-semibold text-chalk">
+            {initialDraft ? 'Edit Draft' : 'New Journal Entry'}
+          </h2>
           <button
-            onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 text-lg leading-none"
+            onClick={handleClose}
+            className="text-ash hover:text-chalk text-lg leading-none transition-colors"
           >
             ✕
           </button>
@@ -124,20 +162,21 @@ export default function NewEntryModal({ onClose, onPosted }: Props) {
           {/* Date / payment method */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Date</label>
+              <label className="block text-xs font-medium text-ash mb-1">Date</label>
               <input
                 type="date"
-                className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={inputClass}
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">
-                Payment Method <span className="font-normal text-slate-400">(optional)</span>
+              <label className="block text-xs font-medium text-ash mb-1">
+                Payment Method{' '}
+                <span className="font-normal text-ash/60">(optional)</span>
               </label>
               <input
-                className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={inputClass}
                 placeholder="e.g. ACH, Check, Cash"
                 value={paymentMethod}
                 onChange={(e) => setPaymentMethod(e.target.value)}
@@ -147,9 +186,9 @@ export default function NewEntryModal({ onClose, onPosted }: Props) {
 
           {/* Memo */}
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Memo</label>
+            <label className="block text-xs font-medium text-ash mb-1">Memo</label>
             <input
-              className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className={inputClass}
               placeholder="Description of this entry"
               value={memo}
               onChange={(e) => setMemo(e.target.value)}
@@ -160,26 +199,26 @@ export default function NewEntryModal({ onClose, onPosted }: Props) {
           <div>
             <table className="w-full text-sm border-collapse">
               <thead>
-                <tr className="bg-slate-50">
-                  <th className="text-left px-3 py-2 font-medium text-slate-600 border border-slate-200 rounded-tl-md w-1/2">
+                <tr className="bg-raised">
+                  <th className="text-left px-3 py-2 font-medium text-ash border border-rim rounded-tl-md w-1/2">
                     Account
                   </th>
-                  <th className="text-right px-3 py-2 font-medium text-slate-600 border-t border-b border-slate-200 w-1/4">
+                  <th className="text-right px-3 py-2 font-medium text-ash border-t border-b border-rim w-1/4">
                     Debit
                   </th>
-                  <th className="text-right px-3 py-2 font-medium text-slate-600 border border-slate-200 rounded-tr-md w-1/4">
+                  <th className="text-right px-3 py-2 font-medium text-ash border border-rim rounded-tr-md w-1/4">
                     Credit
                   </th>
-                  <th className="w-8 border-t border-b border-slate-200" />
+                  <th className="w-8 border-t border-b border-rim" />
                 </tr>
               </thead>
               <tbody>
                 {lines.map((line, i) => (
                   <Fragment key={i}>
-                    <tr className="border-b border-slate-100">
-                      <td className="px-1 py-1 border-l border-slate-200">
+                    <tr className="border-b border-rim">
+                      <td className="px-1 py-1 border-l border-rim">
                         <select
-                          className="w-full px-2 py-1.5 text-sm rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                          className="w-full px-2 py-1.5 text-sm rounded bg-raised text-chalk focus:outline-none focus:ring-2 focus:ring-neon"
                           value={line.accountId}
                           onChange={(e) => setLine(i, { accountId: e.target.value })}
                         >
@@ -196,7 +235,7 @@ export default function NewEntryModal({ onClose, onPosted }: Props) {
                           type="number"
                           min="0"
                           step="0.01"
-                          className="w-full px-2 py-1.5 text-sm text-right rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="w-full px-2 py-1.5 text-sm text-right bg-transparent text-chalk placeholder:text-ash rounded focus:outline-none focus:ring-2 focus:ring-neon"
                           placeholder="0.00"
                           value={line.debit}
                           onChange={(e) =>
@@ -207,12 +246,12 @@ export default function NewEntryModal({ onClose, onPosted }: Props) {
                           }
                         />
                       </td>
-                      <td className="px-1 py-1 border-r border-slate-200">
+                      <td className="px-1 py-1 border-r border-rim">
                         <input
                           type="number"
                           min="0"
                           step="0.01"
-                          className="w-full px-2 py-1.5 text-sm text-right rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="w-full px-2 py-1.5 text-sm text-right bg-transparent text-chalk placeholder:text-ash rounded focus:outline-none focus:ring-2 focus:ring-neon"
                           placeholder="0.00"
                           value={line.credit}
                           onChange={(e) =>
@@ -223,11 +262,11 @@ export default function NewEntryModal({ onClose, onPosted }: Props) {
                           }
                         />
                       </td>
-                      <td className="px-1 py-1 text-center border-r border-slate-200">
+                      <td className="px-1 py-1 text-center border-r border-rim">
                         {lines.length > 2 && (
                           <button
                             onClick={() => removeLine(i)}
-                            className="text-slate-300 hover:text-red-500 px-1 transition-colors"
+                            className="text-ash hover:text-red-400 px-1 transition-colors"
                           >
                             ✕
                           </button>
@@ -237,32 +276,32 @@ export default function NewEntryModal({ onClose, onPosted }: Props) {
                   </Fragment>
                 ))}
                 {/* Totals */}
-                <tr className="border-t-2 border-slate-300 bg-slate-50">
-                  <td className="px-3 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wide border-l border-b border-slate-200">
+                <tr className="border-t-2 border-rim bg-raised">
+                  <td className="px-3 py-2 text-xs font-semibold text-ash uppercase tracking-wide border-l border-b border-rim">
                     Total
                   </td>
                   <td
-                    className={`px-3 py-2 text-right font-mono text-sm font-semibold border-b border-slate-200 ${
-                      !balanced && totalDebits > 0 ? 'text-red-600' : 'text-slate-800'
+                    className={`px-3 py-2 text-right font-mono text-sm font-semibold border-b border-rim ${
+                      !balanced && totalDebits > 0 ? 'text-red-400' : 'text-chalk'
                     }`}
                   >
                     {totalDebits > 0 ? fmt(totalDebits) : ''}
                   </td>
                   <td
-                    className={`px-3 py-2 text-right font-mono text-sm font-semibold border-b border-r border-slate-200 ${
-                      !balanced && totalCredits > 0 ? 'text-red-600' : 'text-slate-800'
+                    className={`px-3 py-2 text-right font-mono text-sm font-semibold border-b border-r border-rim ${
+                      !balanced && totalCredits > 0 ? 'text-red-400' : 'text-chalk'
                     }`}
                   >
                     {totalCredits > 0 ? fmt(totalCredits) : ''}
                   </td>
-                  <td className="border-b border-r border-slate-200" />
+                  <td className="border-b border-r border-rim" />
                 </tr>
               </tbody>
             </table>
 
             <button
               onClick={addLine}
-              className="mt-2 text-xs font-medium text-blue-600 hover:text-blue-800 transition-colors"
+              className="mt-2 text-xs font-medium text-neon hover:text-neon-dim transition-colors"
             >
               + Add line
             </button>
@@ -270,29 +309,29 @@ export default function NewEntryModal({ onClose, onPosted }: Props) {
 
           {/* Balance indicator */}
           {totalDebits > 0 && !balanced && (
-            <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 px-3 py-2 rounded-md">
+            <div className="text-xs text-amber-300 bg-amber-950/50 border border-amber-800 px-3 py-2 rounded-md">
               Debits and credits must match before posting. Difference:{' '}
               {fmt(Math.abs(totalDebits - totalCredits))}
             </div>
           )}
           {balanced && (
-            <div className="text-xs text-green-700 bg-green-50 border border-green-200 px-3 py-2 rounded-md">
+            <div className="text-xs text-emerald-300 bg-emerald-950/50 border border-emerald-800 px-3 py-2 rounded-md">
               Entry is balanced. Ready to post.
             </div>
           )}
 
           {error && (
-            <div className="text-xs text-red-700 bg-red-50 border border-red-200 px-3 py-2 rounded-md">
+            <div className="text-xs text-red-300 bg-red-950/50 border border-red-800 px-3 py-2 rounded-md">
               {error}
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-6 py-4 border-t border-slate-200 shrink-0">
+        <div className="flex items-center justify-between px-6 py-4 border-t border-rim shrink-0">
           <button
-            onClick={onClose}
-            className="text-sm text-slate-500 hover:text-slate-700 transition-colors"
+            onClick={handleClose}
+            className="text-sm text-ash hover:text-chalk transition-colors"
           >
             Cancel
           </button>
@@ -300,14 +339,14 @@ export default function NewEntryModal({ onClose, onPosted }: Props) {
             <button
               onClick={handleSaveDraft}
               disabled={saving}
-              className="border border-slate-300 hover:bg-slate-50 disabled:opacity-50 text-slate-700 text-sm font-medium px-4 py-2 rounded-md transition-colors"
+              className="border border-rim hover:bg-raised disabled:opacity-50 text-chalk text-sm font-medium px-4 py-2 rounded-md transition-colors"
             >
               Save Draft
             </button>
             <button
               onClick={handlePost}
               disabled={saving || !balanced}
-              className="bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white text-sm font-semibold px-4 py-2 rounded-md transition-colors"
+              className="bg-neon hover:bg-neon-dim disabled:opacity-40 text-void text-sm font-bold px-4 py-2 rounded-md transition-colors"
             >
               Post Entry
             </button>

@@ -4,11 +4,11 @@ import NewAccountModal from '../components/NewAccountModal'
 
 function typeBadge(type: AccountType): string {
   switch (type) {
-    case 'Asset':     return 'bg-blue-50 text-blue-700'
-    case 'Liability': return 'bg-orange-50 text-orange-700'
-    case 'Equity':    return 'bg-purple-50 text-purple-700'
-    case 'Revenue':   return 'bg-green-50 text-green-700'
-    case 'Expense':   return 'bg-red-50 text-red-700'
+    case 'Asset':     return 'bg-sky-900/50 text-sky-300'
+    case 'Liability': return 'bg-orange-900/50 text-orange-300'
+    case 'Equity':    return 'bg-violet-900/50 text-violet-300'
+    case 'Revenue':   return 'bg-emerald-900/50 text-emerald-300'
+    case 'Expense':   return 'bg-red-900/50 text-red-300'
   }
 }
 
@@ -36,54 +36,51 @@ export default function AccountsPage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-5">
-        <h1 className="text-xl font-semibold text-slate-900">Chart of Accounts</h1>
+        <h1 className="text-xl font-semibold text-chalk">Chart of Accounts</h1>
         <button
           onClick={() => setShowNew(true)}
-          className="border border-slate-300 hover:bg-slate-50 text-slate-700 text-sm font-medium px-4 py-2 rounded-md transition-colors"
+          className="border border-rim hover:bg-raised text-chalk text-sm font-medium px-4 py-2 rounded-md transition-colors"
         >
           + New Account
         </button>
       </div>
 
-      {loading && <p className="text-sm text-slate-500">Loading…</p>}
+      {loading && <p className="text-sm text-ash">Loading…</p>}
 
       {error && (
-        <div className="text-sm text-red-700 bg-red-50 border border-red-200 px-4 py-3 rounded-md">
+        <div className="text-sm text-red-300 bg-red-950/50 border border-red-800 px-4 py-3 rounded-md">
           {error}
         </div>
       )}
 
       {!loading && !error && (
-        <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
+        <div className="bg-surface rounded-lg border border-rim overflow-hidden">
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-slate-50 border-b border-slate-200">
-                <th className="text-left px-4 py-3 font-medium text-slate-600">Number</th>
-                <th className="text-left px-4 py-3 font-medium text-slate-600">Name</th>
-                <th className="text-left px-4 py-3 font-medium text-slate-600">Type</th>
-                <th className="text-left px-4 py-3 font-medium text-slate-600">Normal Balance</th>
-                <th className="text-left px-4 py-3 font-medium text-slate-600">Contra</th>
+              <tr className="bg-raised border-b border-rim">
+                <th className="text-left px-4 py-3 font-medium text-ash">Number</th>
+                <th className="text-left px-4 py-3 font-medium text-ash">Name</th>
+                <th className="text-left px-4 py-3 font-medium text-ash">Type</th>
+                <th className="text-left px-4 py-3 font-medium text-ash">Normal Balance</th>
+                <th className="text-left px-4 py-3 font-medium text-ash">Contra</th>
               </tr>
             </thead>
             <tbody>
               {accounts.length === 0 ? (
                 <tr>
-                  <td
-                    colSpan={5}
-                    className="px-4 py-10 text-center text-slate-400 text-sm"
-                  >
-                    No accounts yet. Click <strong>+ New Account</strong> to build your chart of
-                    accounts.
+                  <td colSpan={5} className="px-4 py-10 text-center text-ash text-sm">
+                    No accounts yet. Click <strong className="text-chalk">+ New Account</strong> to
+                    build your chart of accounts.
                   </td>
                 </tr>
               ) : (
                 accounts.map((account) => (
                   <tr
                     key={account.id}
-                    className="border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors"
+                    className="border-b border-rim last:border-0 hover:bg-raised transition-colors"
                   >
-                    <td className="px-4 py-3 font-mono text-slate-600">{account.number}</td>
-                    <td className="px-4 py-3 text-slate-900 font-medium">{account.name}</td>
+                    <td className="px-4 py-3 font-mono text-ash">{account.number}</td>
+                    <td className="px-4 py-3 text-chalk font-medium">{account.name}</td>
                     <td className="px-4 py-3">
                       <span
                         className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${typeBadge(account.type)}`}
@@ -91,14 +88,12 @@ export default function AccountsPage() {
                         {account.type}
                       </span>
                     </td>
-                    <td className="px-4 py-3 capitalize text-slate-600">
-                      {account.normalBalance}
-                    </td>
-                    <td className="px-4 py-3 text-slate-400 text-xs">
+                    <td className="px-4 py-3 capitalize text-ash">{account.normalBalance}</td>
+                    <td className="px-4 py-3 text-xs">
                       {account.isContra ? (
-                        <span className="text-amber-600 font-medium">Contra</span>
+                        <span className="text-violet font-medium">Contra</span>
                       ) : (
-                        '—'
+                        <span className="text-ash">—</span>
                       )}
                     </td>
                   </tr>

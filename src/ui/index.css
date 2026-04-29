@@ -1,1 +1,29 @@
 @import "tailwindcss";
+
+@theme {
+  /* Backgrounds */
+  --color-void: #0a0c12;
+  --color-base: #0f1117;
+  --color-surface: #181c28;
+  --color-raised: #1e2235;
+
+  /* Borders */
+  --color-rim: #2b3050;
+
+  /* Accents */
+  --color-neon: #00d4ff;
+  --color-neon-dim: #00a8cc;
+  --color-violet: #a78bfa;
+  --color-violet-dim: #8b5cf6;
+
+  /* Text */
+  --color-chalk: #eef2f8;
+  --color-ash: #7d8a9e;
+}
+
+html,
+body,
+#root {
+  background-color: #0f1117;
+  color: #eef2f8;
+}

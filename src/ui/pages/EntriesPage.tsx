@@ -44,38 +44,35 @@ export default function EntriesPage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-5">
-        <h1 className="text-xl font-semibold text-slate-900">Journal Entries</h1>
+        <h1 className="text-xl font-semibold text-chalk">Journal Entries</h1>
       </div>
 
-      {loading && <p className="text-sm text-slate-500">Loading…</p>}
+      {loading && <p className="text-sm text-ash">Loading…</p>}
 
       {error && (
-        <div className="text-sm text-red-700 bg-red-50 border border-red-200 px-4 py-3 rounded-md">
+        <div className="text-sm text-red-300 bg-red-950/50 border border-red-800 px-4 py-3 rounded-md">
           {error}
         </div>
       )}
 
       {!loading && !error && (
-        <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
+        <div className="bg-surface rounded-lg border border-rim overflow-hidden">
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-slate-50 border-b border-slate-200">
+              <tr className="bg-raised border-b border-rim">
                 <th className="w-8" />
-                <th className="text-left px-4 py-3 font-medium text-slate-600 w-32">Date</th>
-                <th className="text-left px-4 py-3 font-medium text-slate-600">Memo</th>
-                <th className="text-right px-4 py-3 font-medium text-slate-600 w-36">Debits</th>
-                <th className="text-right px-4 py-3 font-medium text-slate-600 w-36">Credits</th>
+                <th className="text-left px-4 py-3 font-medium text-ash w-32">Date</th>
+                <th className="text-left px-4 py-3 font-medium text-ash">Memo</th>
+                <th className="text-right px-4 py-3 font-medium text-ash w-36">Debits</th>
+                <th className="text-right px-4 py-3 font-medium text-ash w-36">Credits</th>
               </tr>
             </thead>
             <tbody>
               {entries.length === 0 ? (
                 <tr>
-                  <td
-                    colSpan={5}
-                    className="px-4 py-10 text-center text-slate-400 text-sm"
-                  >
-                    No posted entries yet. Use the <strong>+ New Entry</strong> button to create
-                    one.
+                  <td colSpan={5} className="px-4 py-10 text-center text-ash text-sm">
+                    No posted entries yet. Use the{' '}
+                    <strong className="text-chalk">+ New Entry</strong> button to create one.
                   </td>
                 </tr>
               ) : (
@@ -92,46 +89,43 @@ export default function EntriesPage() {
                   return (
                     <Fragment key={id}>
                       <tr
-                        className="border-b border-slate-100 hover:bg-slate-50 cursor-pointer transition-colors"
+                        className="border-b border-rim hover:bg-raised cursor-pointer transition-colors"
                         onClick={() => toggleExpand(id)}
                       >
-                        <td className="pl-3 py-3 text-slate-400 text-xs select-none">
+                        <td className="pl-3 py-3 text-ash text-xs select-none">
                           {isOpen ? '▾' : '▸'}
                         </td>
-                        <td className="px-4 py-3 text-slate-600 whitespace-nowrap">
+                        <td className="px-4 py-3 text-ash whitespace-nowrap">
                           {formatDate(entry.date)}
                         </td>
-                        <td className="px-4 py-3 text-slate-900">
+                        <td className="px-4 py-3 text-chalk">
                           {entry.memo}
                           {entry.paymentMethod && (
-                            <span className="ml-2 text-xs text-slate-400 font-normal">
+                            <span className="ml-2 text-xs text-ash font-normal">
                               {entry.paymentMethod}
                             </span>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-right font-mono text-slate-700">
+                        <td className="px-4 py-3 text-right font-mono text-chalk">
                           {fmt(totalDebits)}
                         </td>
-                        <td className="px-4 py-3 text-right font-mono text-slate-700">
+                        <td className="px-4 py-3 text-right font-mono text-chalk">
                           {fmt(totalCredits)}
                         </td>
                       </tr>
 
                       {isOpen &&
                         entry.lines.map((line, i) => (
-                          <tr
-                            key={i}
-                            className="bg-slate-50 border-b border-slate-100"
-                          >
+                          <tr key={i} className="bg-raised border-b border-rim">
                             <td />
                             <td className="px-4 py-1.5" />
-                            <td className="px-4 py-1.5 pl-10 text-slate-500 text-xs">
+                            <td className="px-4 py-1.5 pl-10 text-ash text-xs">
                               {accountMap.get(line.accountId)?.name ?? line.accountId}
                             </td>
-                            <td className="px-4 py-1.5 text-right font-mono text-xs text-slate-500">
+                            <td className="px-4 py-1.5 text-right font-mono text-xs text-ash">
                               {line.type === 'debit' ? fmt(line.amount) : ''}
                             </td>
-                            <td className="px-4 py-1.5 text-right font-mono text-xs text-slate-500">
+                            <td className="px-4 py-1.5 text-right font-mono text-xs text-ash">
                               {line.type === 'credit' ? fmt(line.amount) : ''}
                             </td>
                           </tr>

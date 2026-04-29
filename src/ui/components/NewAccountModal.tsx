@@ -16,6 +16,9 @@ interface Props {
   onCreated: (account: Account) => void
 }
 
+const inputClass =
+  'w-full bg-raised border border-rim text-chalk placeholder:text-ash rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-neon focus:border-neon'
+
 export default function NewAccountModal({ onClose, onCreated }: Props) {
   const [form, setForm] = useState<CreateAccountInput>({
     number: '',
@@ -47,15 +50,15 @@ export default function NewAccountModal({ onClose, onCreated }: Props) {
 
   return (
     <div
-      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+      className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
       onMouseDown={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
-          <h2 className="text-base font-semibold text-slate-900">New Account</h2>
+      <div className="bg-surface border border-rim rounded-xl shadow-2xl w-full max-w-md">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-rim">
+          <h2 className="text-base font-semibold text-chalk">New Account</h2>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 text-lg leading-none"
+            className="text-ash hover:text-chalk text-lg leading-none transition-colors"
           >
             ✕
           </button>
@@ -64,11 +67,9 @@ export default function NewAccountModal({ onClose, onCreated }: Props) {
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">
-                Account Number
-              </label>
+              <label className="block text-xs font-medium text-ash mb-1">Account Number</label>
               <input
-                className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={inputClass}
                 placeholder="1000"
                 value={form.number}
                 onChange={(e) => setForm((f) => ({ ...f, number: e.target.value }))}
@@ -76,11 +77,9 @@ export default function NewAccountModal({ onClose, onCreated }: Props) {
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">
-                Account Name
-              </label>
+              <label className="block text-xs font-medium text-ash mb-1">Account Name</label>
               <input
-                className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={inputClass}
                 placeholder="Cash"
                 value={form.name}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
@@ -90,9 +89,9 @@ export default function NewAccountModal({ onClose, onCreated }: Props) {
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Type</label>
+            <label className="block text-xs font-medium text-ash mb-1">Type</label>
             <select
-              className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+              className="w-full bg-raised border border-rim text-chalk rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-neon"
               value={form.type}
               onChange={(e) => handleTypeChange(e.target.value as AccountType)}
             >
@@ -105,14 +104,12 @@ export default function NewAccountModal({ onClose, onCreated }: Props) {
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-2">
-              Normal Balance
-            </label>
+            <label className="block text-xs font-medium text-ash mb-2">Normal Balance</label>
             <div className="flex gap-6">
               {(['debit', 'credit'] as const).map((nb) => (
                 <label
                   key={nb}
-                  className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer"
+                  className="flex items-center gap-2 text-sm text-chalk cursor-pointer"
                 >
                   <input
                     type="radio"
@@ -120,6 +117,7 @@ export default function NewAccountModal({ onClose, onCreated }: Props) {
                     value={nb}
                     checked={form.normalBalance === nb}
                     onChange={() => setForm((f) => ({ ...f, normalBalance: nb }))}
+                    className="accent-neon"
                   />
                   {nb.charAt(0).toUpperCase() + nb.slice(1)}
                 </label>
@@ -132,13 +130,13 @@ export default function NewAccountModal({ onClose, onCreated }: Props) {
               type="checkbox"
               checked={form.isContra}
               onChange={(e) => setForm((f) => ({ ...f, isContra: e.target.checked }))}
-              className="rounded"
+              className="rounded accent-neon"
             />
-            <span className="text-sm text-slate-700">Contra account</span>
+            <span className="text-sm text-chalk">Contra account</span>
           </label>
 
           {error && (
-            <div className="text-xs text-red-700 bg-red-50 border border-red-200 px-3 py-2 rounded-md">
+            <div className="text-xs text-red-300 bg-red-950/50 border border-red-800 px-3 py-2 rounded-md">
               {error}
             </div>
           )}
@@ -147,14 +145,14 @@ export default function NewAccountModal({ onClose, onCreated }: Props) {
             <button
               type="button"
               onClick={onClose}
-              className="text-sm text-slate-500 hover:text-slate-700 px-3 py-2 transition-colors"
+              className="text-sm text-ash hover:text-chalk px-3 py-2 transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-semibold px-4 py-2 rounded-md transition-colors"
+              className="bg-neon hover:bg-neon-dim disabled:opacity-50 text-void text-sm font-bold px-4 py-2 rounded-md transition-colors"
             >
               {saving ? 'Creating…' : 'Create Account'}
             </button>
