@@ -60,10 +60,11 @@ The database layer and REST API are complete. Key decisions:
 ## Branding
 
 ### Mascot
-The CoreBooks mascot is a **pangolin**. The pangolin icon appears in the
-sidebar beside the logo. It is rendered as a simple SVG line illustration
-using the neon blue accent color. Future phases may commission a more
-detailed mascot illustration.
+The CoreBooks mascot is a **pangolin**. The pangolin SVG was removed from
+the sidebar at the user's request — a fixed-size placeholder `div` now
+occupies the same space beside the "corebooks" wordmark, reserved for a
+future logo insert. Do not add any icon back to that slot until a proper
+logo asset is provided.
 
 ### Logo
 The wordmark is `corebooks` — all-lowercase, bold weight, no capitalization.
@@ -111,8 +112,11 @@ Run the app:
 
 **Completed:**
 - `src/ui/api/client.ts` — typed fetch wrappers for all API and report endpoints.
-- `src/ui/components/Layout.tsx` — dark sidebar with pangolin mascot, lowercase
-  bold "corebooks" logo, Reports nav section, neon blue "+" New Entry" toolbar button.
+- `src/ui/components/Layout.tsx` — dark sidebar (no mascot — placeholder div
+  reserved for future logo), lowercase bold "corebooks" wordmark, Reports nav
+  section, cog icon pinned to the bottom-left for Settings, neon blue
+  "+ New Entry" toolbar button. Top toolbar shows company name (from
+  `localStorage`) instead of the static "corebooks" string.
 - `src/ui/components/NewEntryModal.tsx` — journal entry form (dark mode):
   date, memo, payment method, debit/credit line grid, live balance indicator,
   Save Draft and Post Entry actions.
@@ -128,25 +132,58 @@ Run the app:
   with an `asOf` date picker.
 - `src/ui/pages/IncomeStatementPage.tsx` — Revenue, Expenses, Net Income with
   `from` / `to` date range pickers.
-
 - `src/ui/pages/DraftsPage.tsx` — Drafts table with Open (reopens modal pre-filled)
   and Delete (requires confirmation modal) actions.
 - `src/ui/components/Toast.tsx` — bottom-right corner auto-dismiss notification.
 - `src/ui/components/FirstLaunchModal.tsx` — one-time welcome modal shown on
-  first launch (dismissed state stored in `localStorage`). Explains local-first
-  storage and optional multi-user setup in plain language.
+  first launch. Collects company name (stored in `localStorage` as
+  `cb_company_name`; displayed in the top toolbar immediately on dismiss).
+  Explains local-first storage and optional multi-user setup in plain language.
+  `localStorage` key `cb_welcomed` gates whether the modal shows.
 - Auto-save on modal close: if the New Entry modal is closed with content in the
   form, the draft is saved silently and the toast fires. Implemented in
   `NewEntryModal.handleClose`.
 - `GET /entries/drafts` API route + `listDraftEntries` repository function.
-- `src/ui/pages/SettingsPage.tsx` — shows DB type badge (SQLite/PostgreSQL),
-  file path, and a 5-step guided PostgreSQL migration guide for SQLite users;
-  confirms multi-user status for PostgreSQL users.
+- `src/ui/pages/SettingsPage.tsx` — tabbed settings page with two tabs:
+  "home page" (metric multi-select, saves to `localStorage` instantly) and
+  "database" (DB type badge, file path, 5-step PostgreSQL migration guide).
+  Route is `/settings`; old `/settings/database` URL redirects there.
 - `src/api/routes/settings.ts` — `GET /settings/database` reads
   `process.env.DATABASE_URL` and returns `{ type, path }`.
+- `src/ui/lib/metrics.ts` — defines 10 home-page metric IDs and labels,
+  default selection (`cash_balance`, `net_income_30d`, `gross_revenue_30d`),
+  and `localStorage` read/write helpers (`cb_home_metrics`).
+- `src/ui/pages/HomePage.tsx` — default landing page. Picks one of 20
+  all-lowercase welcome messages at random on each mount. Renders selected
+  metrics as fixed-width cards in a `flex-wrap` row (left-to-right, wrapping).
+  Each card shows the current value color-coded (green positive / red negative,
+  with liabilities and expenses treated as red when > 0) and a ▲/▼ change
+  indicator vs. the equivalent prior period fetched in parallel. Cash & Bank
+  Balance is computed from the trial balance by summing Asset accounts whose
+  name contains "cash" or "bank".
 - Phase 3 DB and API tests (see above).
+- Bug fixes applied during Phase 4 audit:
+  - `entryRepository.ts` now uses `toDbCents()` from `src/db/mappers.ts`
+    instead of an inline `Math.round(line.amount * 100)`.
+  - `listDraftEntries` uses `orderBy: [{ createdAt: 'desc' }, { id: 'desc' }]`
+    to avoid non-deterministic order when two entries share the same SQLite
+    second-precision timestamp.
 
-**Phase 4 is complete. Begin here next session: Phase 5 — Electron desktop app.**
+**Phase 4 is complete.**
+
+**Pending UI items discussed but not yet built:**
+- **Sidebar logo** — a fixed-size placeholder `div` (32×28 px) sits beside the
+  "corebooks" wordmark. No icon should be placed there until an actual logo
+  asset is supplied.
+- **Payment methods in Settings** — the spec describes a user-managed list of
+  payment methods (cash, check, ACH, credit card) stored in settings and
+  referenced on journal entries. The Settings page has two tabs today
+  ("home page" and "database"). A third "payment methods" tab needs to be
+  added with a simple add/remove list UI and persistence (API or localStorage
+  TBD). The `NewEntryModal` already has a payment method field; it currently
+  accepts free-text and should eventually pull from this managed list.
+
+**Begin here next session: Phase 5 — Electron desktop app.**
 
 ### Phase 5 — Electron Desktop App (next phase)
 
