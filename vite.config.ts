@@ -11,6 +11,7 @@ export default defineConfig({
       '/accounts': 'http://localhost:3000',
       '/entries': 'http://localhost:3000',
       '/reports': 'http://localhost:3000',
+      '/settings': 'http://localhost:3000',
     },
   },
   build: {

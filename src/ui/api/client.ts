@@ -81,9 +81,24 @@ export interface DatabaseSettings {
   path: string | null
 }
 
+export interface DbStats {
+  accounts: number
+  postedEntries: number
+  draftEntries: number
+  fileSizeBytes: number | null
+}
+
+export interface ExportData {
+  exportedAt: string
+  version: string
+  accounts: Account[]
+  entries: JournalEntry[]
+}
+
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
+  const hasBody = options?.body !== undefined
   const res = await fetch(url, {
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { ...(hasBody ? { 'Content-Type': 'application/json' } : {}), ...options?.headers },
     ...options,
   })
   if (!res.ok) {
@@ -122,5 +137,8 @@ export const api = {
   },
   settings: {
     database: (): Promise<DatabaseSettings> => request('/settings/database'),
+    stats: (): Promise<DbStats> => request('/settings/stats'),
+    export: (): Promise<ExportData> => request('/settings/export'),
+    wipe: (): Promise<{ wiped: boolean }> => request('/settings/wipe', { method: 'POST' }),
   },
 }
