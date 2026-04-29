@@ -55,6 +55,45 @@ These were deferred and must still be written:
 - API tests (`tests/api/`) — use supertest against real Fastify routes with a
   test DB, not mocked repositories.
 
+## Branding
+
+### Mascot
+The CoreBooks mascot is a **pangolin**. The pangolin icon appears in the
+sidebar beside the logo. It is rendered as a simple SVG line illustration
+using the neon blue accent color. Future phases may commission a more
+detailed mascot illustration.
+
+### Logo
+The wordmark is `corebooks` — all-lowercase, bold weight, no capitalization.
+Never title-case it (not "CoreBooks") in user-facing text or the UI. In
+developer documentation and code (class names, variable names, commit
+messages) the standard capitalization rules apply.
+
+### Theme
+The UI uses a dark mode theme throughout. These are the canonical color
+values — use them and do not introduce competing color schemes:
+
+| Role | Token | Hex |
+|---|---|---|
+| Deepest background (sidebar) | `bg-void` | `#0a0c12` |
+| Main background | `bg-base` | `#0f1117` |
+| Card / panel surface | `bg-surface` | `#181c28` |
+| Elevated surface | `bg-raised` | `#1e2235` |
+| Borders | `border-rim` | `#2b3050` |
+| **Neon blue (primary accent)** | `text-neon` / `bg-neon` | `#00d4ff` |
+| Neon blue hover | `bg-neon-dim` | `#00a8cc` |
+| **Electric violet (secondary accent)** | `text-violet` / `bg-violet` | `#a78bfa` |
+| Primary text | `text-chalk` | `#eef2f8` |
+| Muted text | `text-ash` | `#7d8a9e` |
+
+All custom tokens are defined in `src/ui/index.css` via Tailwind v4 `@theme`.
+The neon blue is used for primary action buttons, active nav indicators, and
+interactive accents. Electric violet is used for secondary badges (e.g. Equity
+account type, contra markers) and will expand to other secondary UI states in
+future phases.
+
+---
+
 ## Current Phase
 
 **Phase 4 — UI**
@@ -68,40 +107,40 @@ Run the app:
 
 ### Phase 4 Scope
 
-**Completed this session:**
-- `src/ui/api/client.ts` — typed fetch wrappers for all API endpoints.
-- `src/ui/components/Layout.tsx` — shell with slate sidebar and top toolbar.
-  The **"+ New Entry" button** is always visible in the toolbar.
-- `src/ui/components/NewEntryModal.tsx` — journal entry form: date, memo,
-  payment method, debit/credit line grid, live balance indicator, Save Draft
-  and Post Entry actions.
-- `src/ui/components/NewAccountModal.tsx` — create account form; auto-sets
-  normal balance based on account type.
-- `src/ui/pages/AccountsPage.tsx` — chart of accounts table with color-coded
-  type badges and a New Account button.
+**Completed:**
+- `src/ui/api/client.ts` — typed fetch wrappers for all API and report endpoints.
+- `src/ui/components/Layout.tsx` — dark sidebar with pangolin mascot, lowercase
+  bold "corebooks" logo, Reports nav section, neon blue "+" New Entry" toolbar button.
+- `src/ui/components/NewEntryModal.tsx` — journal entry form (dark mode):
+  date, memo, payment method, debit/credit line grid, live balance indicator,
+  Save Draft and Post Entry actions.
+- `src/ui/components/NewAccountModal.tsx` — create account form (dark mode);
+  auto-sets normal balance based on account type.
+- `src/ui/pages/AccountsPage.tsx` — chart of accounts table with dark-mode
+  color-coded type badges and a New Account button.
 - `src/ui/pages/EntriesPage.tsx` — posted entries table with expandable rows
-  showing individual debit/credit lines.
+  showing individual debit/credit lines (dark mode).
+- `src/ui/pages/TrialBalancePage.tsx` — flat table of all accounts with raw
+  debit/credit balances; shows balanced status.
+- `src/ui/pages/BalanceSheetPage.tsx` — Assets / Liabilities / Equity totals
+  with an `asOf` date picker.
+- `src/ui/pages/IncomeStatementPage.tsx` — Revenue, Expenses, Net Income with
+  `from` / `to` date range pickers.
+
+- `src/ui/pages/DraftsPage.tsx` — Drafts table with Open (reopens modal pre-filled)
+  and Delete (requires confirmation modal) actions.
+- `src/ui/components/Toast.tsx` — bottom-right corner auto-dismiss notification.
+- `src/ui/components/FirstLaunchModal.tsx` — one-time welcome modal shown on
+  first launch (dismissed state stored in `localStorage`). Explains local-first
+  storage and optional multi-user setup in plain language.
+- Auto-save on modal close: if the New Entry modal is closed with content in the
+  form, the draft is saved silently and the toast fires. Implemented in
+  `NewEntryModal.handleClose`.
+- `GET /entries/drafts` API route + `listDraftEntries` repository function.
 
 **Still to build — begin here next session:**
-1. **Reports pages** (`src/ui/pages/`) — three pages that call the existing
-   report API routes:
-   - Trial Balance — flat table of all accounts with debit/credit balances.
-   - Balance Sheet — grouped by Asset / Liability / Equity with totals;
-     accepts an `asOf` date picker.
-   - Income Statement — Revenue and Expense accounts with net income;
-     accepts `from` / `to` date range pickers.
-   Add these to the sidebar navigation under a "Reports" heading.
-2. **Phase 3 tests** — write `tests/db/` and `tests/api/` as described above.
-   These can be done before or after the reports pages.
-3. **Draft management** — a Drafts page or section listing saved drafts with
-   the ability to reopen and delete them (delete requires a confirmation modal
-   per the CLAUDE.md draft behavior rules).
-4. **Auto-save on navigation** — when the New Entry modal is closed or the
-   user navigates away mid-entry, auto-save the draft silently and show a
-   small corner notification.
-5. **First-launch notice** — dismissible modal on first launch explaining
-   SQLite vs PostgreSQL (plain language, no technical jargon).
-6. **Settings → Database page** — show current DB type, path, and a guided
+1. **Phase 3 tests** — write `tests/db/` and `tests/api/` as described above.
+2. **Settings → Database page** — show current DB type, path, and a guided
    PostgreSQL migration wizard.
 
 ### Phase 4 UI Constraints
@@ -229,6 +268,37 @@ After completing any implementation, always review the code before reporting it 
 - Do not skip tests. If a function exists in the core, a test must exist for it.
 - Do not make silent changes. Always explain what changed and why.
 
+## Target Product Direction
+
+CoreBooks is being built toward a **downloadable desktop application** —
+a single file a user double-clicks to open, with no terminal commands, no
+server setup, and no cloud account required. All data lives on the user's
+own device by default.
+
+The current terminal-based development setup (running `npm run dev:api` and
+`npm run dev:ui` separately) is **developer/contributor workflow only**, not
+the end-user experience. Users should never need to know what a terminal is.
+
+**Phase 5 will wrap CoreBooks in Electron** — a framework that bundles
+Chromium (the browser that renders the UI), Node.js (the runtime that runs
+the API server), and SQLite (the database) into a single native application.
+The Fastify API server will start automatically as a background process inside
+the app. The user opens one window and sees the UI immediately.
+
+The optionality to hook up a PostgreSQL server for multi-user setups
+(businesses with multiple employees) remains a goal, but is always opt-in —
+the app must be fully functional out of the box with zero server configuration.
+
+Decisions that flow from this direction:
+- SQLite is the right default. Do not deprioritize the SQLite path.
+- Avoid hardcoding `localhost:3000` in the UI — the port will be
+  dynamically assigned in the Electron shell.
+- The API server must be startable programmatically (not just via a CLI
+  command) so Electron can launch it in-process.
+- File paths for the SQLite database should use the OS user-data directory
+  (via Electron's `app.getPath('userData')`) in Phase 5, not a hardcoded
+  project-folder path.
+
 ## Stack
 
 - Language: TypeScript (strict mode)
@@ -239,6 +309,8 @@ After completing any implementation, always review the code before reporting it 
 - API: Fastify 5 + @fastify/sensible (src/api/)
 - Testing: Vitest
 - Package manager: npm
+- **Phase 5 (planned):** Electron — bundles the full app into a downloadable
+  desktop application (.exe on Windows, .app on macOS, AppImage on Linux)
 
 ### Journal Entry — Balance Enforcement and Draft State
 The core engine maintains a strict separation between draft and posted entries.
