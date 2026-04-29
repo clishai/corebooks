@@ -24,7 +24,7 @@ export function buildApp(context: AppContext, opts: BuildAppOptions = {}) {
   app.register(accountRoutes, { prefix: '/accounts', context });
   app.register(entryRoutes, { prefix: '/entries', context });
   app.register(reportRoutes, { prefix: '/reports', context });
-  app.register(settingsRoutes, { prefix: '/settings' });
+  app.register(settingsRoutes, { prefix: '/settings', context });
 
   return app;
 }

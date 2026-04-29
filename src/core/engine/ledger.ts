@@ -58,6 +58,12 @@ export class Ledger {
     return snapshot;
   }
 
+  reset(): void {
+    this.balances.clear();
+    this.postedEntries.splice(0);
+    this.nextEntryId = 1;
+  }
+
   // Rebuilds balances from entries within [from, to] inclusive. Used by income statement.
   buildBalancesInRange(from: Date, to: Date): Map<string, RawBalance> {
     const snapshot = new Map<string, RawBalance>();
