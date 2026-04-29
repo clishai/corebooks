@@ -20,6 +20,16 @@ export async function listPostedEntries(): Promise<JournalEntry[]> {
   return (rows as unknown as PrismaJournalEntry[]).map(toCoreJournalEntry);
 }
 
+export async function listDraftEntries(): Promise<JournalEntry[]> {
+  const prisma = getPrismaClient();
+  const rows = await prisma.journalEntry.findMany({
+    where: { status: EntryStatus.Draft },
+    include: INCLUDE_LINES,
+    orderBy: { createdAt: 'desc' },
+  });
+  return (rows as unknown as PrismaJournalEntry[]).map(toCoreJournalEntry);
+}
+
 export async function findEntryById(id: string): Promise<JournalEntry | null> {
   const prisma = getPrismaClient();
   const row = await prisma.journalEntry.findUnique({ where: { id }, include: INCLUDE_LINES });

@@ -5,6 +5,7 @@ import { AppContext } from '../server.js';
 import { listAccounts } from '../../db/repositories/accountRepository.js';
 import {
   listPostedEntries,
+  listDraftEntries,
   findEntryById,
   createDraftEntry,
   updateDraftEntry,
@@ -23,6 +24,11 @@ export const entryRoutes: FastifyPluginAsync<RouteOptions> = async (app, opts) =
 
   app.get('/', async () => {
     return listPostedEntries();
+  });
+
+  // Must be registered before /:id so "drafts" isn't captured as an id param.
+  app.get('/drafts', async () => {
+    return listDraftEntries();
   });
 
   app.get<{ Params: { id: string } }>('/:id', async (req, reply) => {
