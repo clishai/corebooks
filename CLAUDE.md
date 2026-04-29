@@ -144,30 +144,72 @@ Run the app:
   form, the draft is saved silently and the toast fires. Implemented in
   `NewEntryModal.handleClose`.
 - `GET /entries/drafts` API route + `listDraftEntries` repository function.
-- `src/ui/pages/SettingsPage.tsx` — tabbed settings page with two tabs:
-  "home page" (metric multi-select, saves to `localStorage` instantly) and
-  "database" (DB type badge, file path, 5-step PostgreSQL migration guide).
-  Route is `/settings`; old `/settings/database` URL redirects there.
-- `src/api/routes/settings.ts` — `GET /settings/database` reads
-  `process.env.DATABASE_URL` and returns `{ type, path }`.
+- `src/api/routes/settings.ts` — settings routes now accept `AppContext` so
+  the wipe endpoint can reset the in-memory ledger. Four endpoints:
+  - `GET /settings/database` — returns `{ type, path }`.
+  - `GET /settings/stats` — returns `{ accounts, postedEntries, draftEntries, fileSizeBytes }`.
+    File size is read from the SQLite file via `fs.stat`; null for PostgreSQL.
+  - `GET /settings/export` — returns all accounts + all entries (posted and
+    draft) as `{ exportedAt, version, accounts, entries }`. The UI downloads
+    this as `corebooks-export-YYYY-MM-DD.json`.
+  - `POST /settings/wipe` — deletes all journal entries (cascades to lines)
+    and all accounts, then calls `ledger.reset()` to clear the in-memory state.
+- `src/core/engine/ledger.ts` — added `reset()` method: clears the balances
+  map, empties `postedEntries`, and resets `nextEntryId` to 1. Used only by
+  the wipe endpoint; the core has no knowledge of why it is called.
+- `vite.config.ts` — added `/settings` to the Vite dev proxy so settings API
+  calls are forwarded to the Fastify server on port 3000. (Previously missing,
+  which caused a "string did not match expected pattern" browser URL error.)
 - `src/ui/lib/metrics.ts` — defines 10 home-page metric IDs and labels,
   default selection (`cash_balance`, `net_income_30d`, `gross_revenue_30d`),
-  and `localStorage` read/write helpers (`cb_home_metrics`).
+  `localStorage` read/write helpers (`cb_home_metrics`), and layout helpers
+  (`cb_home_layout`: `'compact' | 'comfortable'`, default `'comfortable'`).
+- `src/ui/lib/alerts.ts` — alert snooze logic. Two alert IDs: `'drafts'`
+  (unposted drafts exist) and `'memos'` (posted entries missing memo text).
+  `isDismissed(id)` checks `cb_alert_dismissed_{id}` against the global snooze
+  duration (`cb_alert_snooze`). `dismissAlert(id)` writes the current timestamp.
+  Snooze options: 10 min, 1 hr, 6 hrs, 1 day, 1 week, Never. Default: 1 day.
+  "Never" means once dismissed the alert does not reappear until localStorage
+  is cleared.
 - `src/ui/pages/HomePage.tsx` — default landing page. Picks one of 20
-  all-lowercase welcome messages at random on each mount. Renders selected
-  metrics as fixed-width cards in a `flex-wrap` row (left-to-right, wrapping).
-  Each card shows the current value color-coded (green positive / red negative,
-  with liabilities and expenses treated as red when > 0) and a ▲/▼ change
-  indicator vs. the equivalent prior period fetched in parallel. Cash & Bank
-  Balance is computed from the trial balance by summing Asset accounts whose
-  name contains "cash" or "bank".
+  all-lowercase welcome messages at random on each mount. Features:
+  - **Alerts section** (top): amber banner per active alert type, each with a
+    Dismiss button. Alerts reappear after the user-configured snooze duration.
+    Banners are hidden immediately on dismiss and re-evaluated on next mount.
+  - **Metrics row**: selected metrics rendered as fixed-width cards in a
+    `flex-wrap` row. Card width is controlled by the layout setting (`w-44`
+    compact / `w-64` comfortable). Each card shows the value color-coded and a
+    ▲/▼ change indicator vs the equivalent prior period.
+  - **Most Recent Entry card** (bottom): shows the last posted entry — memo,
+    date, payment method badge, and up to 4 debit/credit lines with account
+    names resolved from the accounts list. "+N more" indicator if lines exceed 4.
+    Links to the Entries page. Shows a placeholder when no entries exist yet.
+  - Cash & Bank Balance computed from the trial balance by summing Asset
+    accounts whose name contains "cash" or "bank".
+- `src/ui/pages/SettingsPage.tsx` — Home tab has three sections:
+  1. **Metric card size** — compact / comfortable toggle, saves to `cb_home_layout`.
+  2. **Visible metrics** — checkbox list, saves to `cb_home_metrics`.
+  3. **Alert reminders** — radio list for snooze duration, saves to `cb_alert_snooze`.
+  Database tab now shows a **"What's stored"** stats row (accounts, posted
+  entries, drafts, file size), an **Export Data** button (downloads JSON backup),
+  and a **Wipe All Data** button (opens a confirmation modal; on confirm calls
+  the wipe endpoint and shows a success message).
 - Phase 3 DB and API tests (see above).
-- Bug fixes applied during Phase 4 audit:
+- Bug fixes applied:
   - `entryRepository.ts` now uses `toDbCents()` from `src/db/mappers.ts`
     instead of an inline `Math.round(line.amount * 100)`.
   - `listDraftEntries` uses `orderBy: [{ createdAt: 'desc' }, { id: 'desc' }]`
     to avoid non-deterministic order when two entries share the same SQLite
     second-precision timestamp.
+  - DELETE requests no longer send `Content-Type: application/json`; the
+    `request()` helper in `client.ts` now only sets the header when a body is
+    present.
+  - Settings metrics checkboxes now have an `onClick` on the `<label>` element.
+  - DELETE requests no longer send `Content-Type: application/json` (Fastify
+    rejects an empty body with that header). The `request()` helper in
+    `client.ts` now only sets the header when a body is present.
+  - Settings metrics checkboxes now have an `onClick` on the `<label>` element
+    (the custom div checkbox has no native input, so no implicit activation).
 
 **Phase 4 is complete.**
 
@@ -177,8 +219,8 @@ Run the app:
   asset is supplied.
 - **Payment methods in Settings** — the spec describes a user-managed list of
   payment methods (cash, check, ACH, credit card) stored in settings and
-  referenced on journal entries. The Settings page has two tabs today
-  ("home page" and "database"). A third "payment methods" tab needs to be
+  referenced on journal entries. The Settings page has three tabs today
+  ("home page" and "database"). A fourth "payment methods" tab needs to be
   added with a simple add/remove list UI and persistence (API or localStorage
   TBD). The `NewEntryModal` already has a payment method field; it currently
   accepts free-text and should eventually pull from this managed list.
