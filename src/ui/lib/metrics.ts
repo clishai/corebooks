@@ -45,3 +45,16 @@ export function getSelectedMetrics(): MetricId[] {
 export function saveSelectedMetrics(ids: MetricId[]): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(ids))
 }
+
+export type HomeLayout = 'compact' | 'comfortable'
+
+const LAYOUT_KEY = 'cb_home_layout'
+
+export function getHomeLayout(): HomeLayout {
+  const raw = localStorage.getItem(LAYOUT_KEY)
+  return raw === 'compact' ? 'compact' : 'comfortable'
+}
+
+export function saveHomeLayout(layout: HomeLayout): void {
+  localStorage.setItem(LAYOUT_KEY, layout)
+}
