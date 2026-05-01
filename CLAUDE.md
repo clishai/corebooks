@@ -99,14 +99,26 @@ future phases.
 
 ## Current Phase
 
-**Phase 4 — UI**
+**Phase 5 — Electron desktop app (complete)**
 
-The React + Tailwind frontend is underway. The Vite 8 + React 19 + Tailwind v4
-SPA lives in `src/ui/` and proxies API calls to the Fastify server on port 3000.
+Phases 1–5 are all complete. The app can be built as a native desktop installer.
 
-Run the app:
-- `npm run dev:api` — starts the API server on port 3000 (uses `npx tsx`)
-- `npm run dev:ui` — starts the Vite dev server on port 5173
+Run in development:
+- `npm run dev` — starts both the API server and Vite dev server in one command (primary)
+- `npm run dev:api` / `npm run dev:ui` — individual servers, useful for debugging one at a time
+- Both servers bind to `127.0.0.1` only — not reachable from other devices on the network
+
+Build and package:
+- `npm run build:all` — compiles TypeScript + Vite UI into `dist/`
+- `npm run dev:electron` — opens Electron pointing at the Vite dev server
+- `npm run package` — produces a platform installer in `release/`
+
+Release distribution:
+- `.github/workflows/release.yml` — push a `v*` tag to trigger a GitHub Actions matrix build
+  that packages macOS (.dmg), Windows (.exe), and Linux (.AppImage) and attaches them to a
+  GitHub Release automatically. Code signing is deferred to v1.0 public release.
+- `docs/index.html` — GitHub Pages landing page with download buttons. Enable via
+  repo Settings → Pages → Branch: main, Folder: /docs. Live at `clishai.github.io/corebooks`.
 
 ### Phase 4 Scope
 
@@ -207,7 +219,7 @@ Run the app:
   - Settings metrics checkboxes now have an `onClick` on the `<label>` element
     (the custom div checkbox has no native input, so no implicit activation).
 
-**Phase 4 is complete.**
+**Phases 4 and 5 are complete.**
 
 **Pending UI items discussed but not yet built:**
 - **Sidebar logo** — a fixed-size placeholder `div` (32×28 px) sits beside the
@@ -221,31 +233,52 @@ Run the app:
   TBD). The `NewEntryModal` already has a payment method field; it currently
   accepts free-text and should eventually pull from this managed list.
 
-**Begin here next session: Phase 5 — Electron desktop app.**
+### Phase 5 — Electron Desktop App (complete)
 
-### Phase 5 — Electron Desktop App (next phase)
+Delivered in this phase:
 
-Wrap the full application in Electron so it ships as a double-click installer
-with no terminal setup required for end users.
+- `src/electron/main.ts` — Electron main process. Finds a free port via
+  `net.createServer`, sets `DATABASE_URL` to `app.getPath('userData')/corebooks.db`
+  before any Prisma module loads (dynamic import used to guarantee ordering),
+  generates/retrieves a 256-bit at-rest encryption key via `safeStorage` (stored
+  as `COREBOOKS_DB_KEY` in env — see Security Architecture for SQLCipher next steps),
+  then starts the API and opens the BrowserWindow.
+- `src/electron/preload.ts` — reads `--api-port=N` injected via `additionalArguments`
+  and exposes `window.electronAPI.apiBaseUrl` via `contextBridge`. Synchronous —
+  no IPC round-trip before the React app loads.
+- `src/api/bootstrap.ts` — programmatic `startServer(port)` called by Electron.
+  Runs `ensureSchema()` before Prisma connects, then listens on `127.0.0.1` only.
+- `src/db/ensureSchema.ts` — creates all three SQLite tables (`Account`,
+  `JournalEntry`, `JournalLine`) via `CREATE TABLE IF NOT EXISTS` using
+  `better-sqlite3` directly. Replaces the need for `prisma migrate deploy` in
+  the packaged Electron app where the migration engine binary is not available.
+- `src/ui/electron.d.ts` — global `Window` type augmentation for `electronAPI`.
+- `src/ui/api/client.ts` — `getBaseUrl()` returns `window.electronAPI.apiBaseUrl`
+  in Electron, empty string (relative URL) in the Vite dev server. Dev workflow
+  is unchanged.
+- `vite.config.ts` — `base: './'` added so built asset paths are relative,
+  required for correct `file://` loading in Electron.
+- `package.json` — `"main": "dist/electron/main.js"`, new scripts (`build:all`,
+  `dev:electron`, `package`), `build` script copies `src/generated/` to
+  `dist/generated/` post-compile, `electron-builder` config with `asarUnpack`
+  for `better-sqlite3` native bindings.
 
-**What Phase 5 must deliver:**
-- A single downloadable installer: `.exe` (Windows), `.app` (macOS), `AppImage` (Linux).
-- The Fastify API server starts automatically as an in-process background
-  worker when Electron launches — the user never runs `npm run dev:api`.
-- The Vite-built React SPA is served from the Electron main process (not a
-  dev server); the user sees the UI immediately on open.
-- The SQLite database file is stored in the OS user-data directory via
-  `app.getPath('userData')`, not a hardcoded project folder path.
-- The API port is dynamically assigned (not hardcoded `3000`); the Electron
-  shell passes it to the renderer so `src/ui/api/client.ts` hits the right URL.
+**Security features added alongside Phase 5 (see Security Architecture section):**
+- PostgreSQL SSL enforcement — warning in `src/db/client.ts` + `sslEnabled` in
+  `/settings/database` API + amber warning banner in Settings UI.
+- Encrypted export — AES-256-GCM + PBKDF2 (600 000 iterations) via Web Crypto,
+  client-side. New "Encrypted Export" button in Settings → Database.
+- safeStorage key infrastructure — 256-bit key in OS keychain, ready for
+  SQLCipher once a compatible Prisma adapter is available.
 
-**Key constraints for Phase 5 work:**
-- Do not hardcode `localhost:3000` anywhere — the UI must accept a
-  configurable base URL injected by the Electron shell.
-- The `buildApp()` function in `src/api/server.ts` must remain
-  programmatically startable (it already is — keep it that way).
-- PostgreSQL support remains opt-in via `.env`; SQLite must work out of the
-  box with zero config.
+**Begin here next session: Onboarding questionnaire + feature flag system.**
+
+The recommended next task is the multi-step setup wizard (see Future Feature
+Ideas → Onboarding Questionnaire). It replaces `FirstLaunchModal`, collects the
+business name and business type, and populates the feature flag toggles that
+will gate AR/AP and inventory modules. Build this before any new modules so the
+toggle infrastructure is in place when those features land. Full spec is in the
+Future Feature Ideas section.
 
 ### Phase 4 UI Constraints
 - No business logic in UI components. Components call `src/ui/api/client.ts`;
@@ -381,29 +414,24 @@ a single file a user double-clicks to open, with no terminal commands, no
 server setup, and no cloud account required. All data lives on the user's
 own device by default.
 
-The current terminal-based development setup (running `npm run dev:api` and
-`npm run dev:ui` separately) is **developer/contributor workflow only**, not
-the end-user experience. Users should never need to know what a terminal is.
+The current terminal-based development setup (`npm run dev`) is
+**developer/contributor workflow only**, not the end-user experience.
+Users should never need to know what a terminal is.
 
-**Phase 5 will wrap CoreBooks in Electron** — a framework that bundles
-Chromium (the browser that renders the UI), Node.js (the runtime that runs
-the API server), and SQLite (the database) into a single native application.
-The Fastify API server will start automatically as a background process inside
-the app. The user opens one window and sees the UI immediately.
+**Phase 5 has wrapped CoreBooks in Electron** — Chromium renders the UI,
+Node.js runs the Fastify API server in-process, and SQLite stores the data.
+The Fastify server starts automatically when the app opens. The user
+double-clicks the app and sees the UI immediately.
 
-The optionality to hook up a PostgreSQL server for multi-user setups
-(businesses with multiple employees) remains a goal, but is always opt-in —
-the app must be fully functional out of the box with zero server configuration.
+PostgreSQL remains opt-in for multi-user setups; SQLite works out of the
+box with zero configuration.
 
-Decisions that flow from this direction:
-- SQLite is the right default. Do not deprioritize the SQLite path.
-- Avoid hardcoding `localhost:3000` in the UI — the port will be
-  dynamically assigned in the Electron shell.
-- The API server must be startable programmatically (not just via a CLI
-  command) so Electron can launch it in-process.
-- File paths for the SQLite database should use the OS user-data directory
-  (via Electron's `app.getPath('userData')`) in Phase 5, not a hardcoded
-  project-folder path.
+Constraints enforced in Phase 5 and still active:
+- `localhost:3000` is never hardcoded — the port is dynamically assigned and
+  injected into the renderer via `window.electronAPI.apiBaseUrl`.
+- The API server is started programmatically via `src/api/bootstrap.ts`, not
+  via a CLI command.
+- The SQLite file lives in `app.getPath('userData')`, not the project folder.
 
 ## Stack
 
@@ -415,7 +443,7 @@ Decisions that flow from this direction:
 - API: Fastify 5 + @fastify/sensible (src/api/)
 - Testing: Vitest
 - Package manager: npm
-- **Phase 5 (planned):** Electron — bundles the full app into a downloadable
+- **Phase 5 (complete):** Electron — bundles the full app into a downloadable
   desktop application (.exe on Windows, .app on macOS, AppImage on Linux)
 
 ### Journal Entry — Balance Enforcement and Draft State
@@ -477,3 +505,198 @@ will be stored as integers representing the smallest currency unit (e.g.
 cents for USD). Conversion to and from integer representation occurs at
 the boundary between the engine and the database layer, never inside the
 core engine itself.
+
+---
+
+## Security Architecture
+
+### Threat model and implemented controls
+
+CoreBooks operates in two modes with distinct attack surfaces.
+
+**Local / SQLite mode (default)**
+- The Fastify API binds to `127.0.0.1` only — not reachable from the network.
+- SQLite is a plain file on the user's machine. The primary threats are
+  physical theft and OS-level compromise, not remote network attacks.
+
+**Multi-user / PostgreSQL mode (opt-in)**
+- Data travels over the network. TLS is mandatory.
+- `src/db/client.ts` emits a stderr warning when a PostgreSQL URL lacks an
+  explicit `sslmode`. The `/settings/database` API route surfaces an
+  `sslEnabled: boolean` field so the UI can show an amber warning banner.
+
+### What is implemented
+
+| Feature | Location | Status |
+|---|---|---|
+| API bound to loopback only (`127.0.0.1`) | `src/api/bootstrap.ts` | Complete |
+| PostgreSQL SSL validation (warning + UI banner) | `src/db/client.ts`, `src/api/routes/settings.ts`, `src/ui/pages/SettingsPage.tsx` | Complete |
+| safeStorage key generation (OS keychain via Electron) | `src/electron/main.ts` | Complete — key exists in `COREBOOKS_DB_KEY`, database not yet encrypted |
+| Encrypted export (AES-256-GCM + PBKDF2) | `src/ui/lib/crypto.ts`, `src/ui/components/ExportPasswordModal.tsx` | Complete |
+
+### SQLCipher — the open gap and how to close it
+
+The at-rest encryption key is generated on first launch by
+`getOrCreateEncryptionKey()` in `src/electron/main.ts` and stored via
+`safeStorage` (OS keychain). It is surfaced as `process.env['COREBOOKS_DB_KEY']`.
+The hook point in `src/db/client.ts` shows exactly where to apply it.
+
+**Why the database is not yet encrypted:** `PrismaBetterSqlite3` creates the
+`better-sqlite3` Database instance internally (see
+`node_modules/@prisma/adapter-better-sqlite3/dist/index.d.ts`). It accepts
+`Options & { url: string }` — there is no constructor overload accepting a
+pre-created Database instance, so there is no place to run
+`db.pragma("key = '...'")` before Prisma opens the file.
+
+**How to complete it when unblocked:**
+1. Replace `better-sqlite3` with a SQLCipher-enabled fork:
+   `npm install better-sqlite3-sqlcipher` (and uninstall `better-sqlite3`).
+2. Create a custom Prisma driver adapter (or wait for Prisma to add official
+   SQLCipher support) that accepts an already-opened Database instance.
+3. In `src/db/client.ts`, inside `createPrismaClient()`, instantiate the
+   database, apply the PRAGMA key from `process.env['COREBOOKS_DB_KEY']`, and
+   pass it to the adapter.
+4. Run the migration SQL (`src/db/ensureSchema.ts`) against the now-encrypted
+   database on first launch.
+5. Existing plain databases must be re-encrypted on upgrade. The standard
+   SQLCipher approach is `ATTACH DATABASE ... KEY ...; SELECT sqlcipher_export(...)`.
+6. Add a test that opens the raw `.db` file as text and asserts it does NOT
+   contain plaintext account names (proving encryption is active).
+
+The key infrastructure is already in place. Steps 1–3 are the blocker.
+
+### Encrypted export format
+
+Exported files use this self-describing JSON envelope:
+
+```json
+{
+  "v": 1,
+  "algo": "AES-256-GCM",
+  "kdf": "PBKDF2",
+  "hash": "SHA-256",
+  "iter": 600000,
+  "salt": "<base64 32 bytes>",
+  "iv":   "<base64 12 bytes>",
+  "ct":   "<base64 ciphertext + 16-byte GCM auth tag>"
+}
+```
+
+`iter` is stored explicitly so future versions can increase the work factor
+without breaking older backups. A decryption tool must read `iter` from the
+file, not assume a hardcoded value.
+
+---
+
+## Future Feature Ideas (Backlog)
+
+These are features that have been discussed but not yet planned or scoped.
+Before implementing any of them, do a design conversation with the user to
+agree on scope, data model changes, and which phase they belong to.
+
+### Onboarding Questionnaire (replaces FirstLaunchModal)
+
+Replace the current one-step `FirstLaunchModal` with a multi-step setup
+wizard shown on first launch. Goals:
+
+- Collect business name (already collected today; carry this forward).
+- Ask a short set of business-type questions (freelancer, product business,
+  service business, etc.) to suggest which feature modules to enable.
+- Show a checklist of optional modules (AR/AP manager, inventory, etc.) so
+  the user can toggle them on or off at first launch.
+- Include a persistent **Skip** button on every step that closes the wizard
+  immediately and applies sensible defaults. Users can revisit all settings
+  later in Settings.
+- Store answers in `localStorage` (same pattern as existing keys like
+  `cb_company_name` and `cb_welcomed`).
+
+**Implementation notes:**
+- The wizard is purely a UI concern — no new API routes or DB columns needed
+  for the questionnaire itself. Feature-flag toggles live in `localStorage`.
+- Feature flags control which nav items and pages are visible in the sidebar.
+  A disabled module is hidden entirely, not just grayed out.
+- This should be built before any new modules (AR/AP, inventory) so the
+  toggle infrastructure is ready when those modules land.
+
+---
+
+### Accounts Receivable / Accounts Payable Manager
+
+Track money owed to the business (AR) and money owed by the business (AP)
+against named customers and vendors. AR and AP accounts already exist in the
+chart of accounts; this module adds the entity layer on top.
+
+**What it needs:**
+- New DB models: `Customer` and `Vendor` (name, contact info, terms).
+- New DB model: `Invoice` (linked to customer or vendor, due date, line
+  items, total amount, status: open / partially paid / paid).
+- Payment-matching: record a payment against an invoice and auto-generate
+  the journal entry (debit cash, credit AR — or the AP mirror image).
+- New UI pages: Customers list, Vendors list, Invoices list with aging view
+  (30 / 60 / 90 day buckets).
+- New API routes under `/customers`, `/vendors`, `/invoices`.
+
+**Architectural constraint:** Invoice creation must auto-post a balanced
+journal entry through the existing entry engine. The AR/AP module never
+writes directly to the ledger — it calls the same `postEntry` path that the
+rest of the app uses.
+
+**Implementation order:** Onboarding questionnaire → AR module → AP module
+(AR first because receivables are usually more time-sensitive for small
+businesses).
+
+---
+
+### Inventory Management
+
+Track physical goods: item catalog, quantities on hand, and cost of goods
+sold (COGS) accounting. This is the most complex module on the backlog.
+
+**Minimum viable scope:**
+- New DB model: `InventoryItem` (SKU, name, unit of measure, unit cost,
+  quantity on hand).
+- Receive goods: increase quantity, auto-post a debit to an Inventory asset
+  account and a credit to AP (or cash).
+- Sell goods: decrease quantity, auto-post COGS debit + Inventory credit.
+- Inventory valuation report: total value of stock on hand at cost.
+
+**Out of scope for first iteration:** FIFO/LIFO/weighted-average costing
+selection, multi-location warehousing, reorder points, and barcode scanning.
+Keep the first iteration to the minimum needed to close the accounting loop.
+
+**Gating condition:** Only build this after AR/AP is solid, and only if the
+onboarding questionnaire confirms the user is a product-based business.
+Service businesses and freelancers should never see inventory in their UI.
+
+---
+
+### PostgreSQL Migration Wizard (Settings → Database)
+
+A guided in-app wizard that walks the user through switching from SQLite to
+PostgreSQL for multi-user / multi-employee setups.
+
+**Steps the wizard should cover:**
+1. Explain in plain language when PostgreSQL is the right choice.
+2. Accept a connection string and validate it (test the connection before
+   committing).
+3. Export current SQLite data to a JSON snapshot.
+4. Run migrations against the new PostgreSQL database.
+5. Import the JSON snapshot into PostgreSQL.
+6. Update the stored connection config and restart the API server in-process.
+
+**Note:** "Schema" and "adapter" must never appear in user-facing wizard text.
+Plain language only (e.g., "We'll copy your data to the new database").
+
+---
+
+### Payment Methods Management (Settings → Payment Methods tab)
+
+A third tab in Settings where users manage the list of payment methods
+available when creating a journal entry (cash, check, ACH, credit card, etc.).
+
+**Current state:** `NewEntryModal` has a free-text payment method field.
+This tab should replace free text with a user-managed dropdown, persisted
+either in `localStorage` or via a new `/settings/payment-methods` API route.
+
+**This is the smallest item on the backlog and a good warm-up before the
+larger modules above.**
