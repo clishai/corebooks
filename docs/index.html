@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>corebooks — self-hosted bookkeeping software</title>
+  <meta name="description" content="Open-source, self-hosted accounting and bookkeeping software. Your financial data lives on your machine." />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg-base:    #0f1117;
+      --bg-surface: #181c28;
+      --bg-raised:  #1e2235;
+      --rim:        #2b3050;
+      --neon:       #00d4ff;
+      --neon-dim:   #00a8cc;
+      --violet:     #a78bfa;
+      --chalk:      #eef2f8;
+      --ash:        #7d8a9e;
+    }
+    html { font-size: 16px; }
+    body {
+      background: var(--bg-base);
+      color: var(--chalk);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+    a { color: var(--neon); text-decoration: none; }
+    a:hover { color: var(--neon-dim); }
+    code {
+      font-family: 'SF Mono', 'Fira Mono', 'Consolas', monospace;
+      font-size: 0.875em;
+    }
+
+    header {
+      border-bottom: 1px solid var(--rim);
+      padding: 1.25rem 2rem;
+      display: flex;
+      align-items: center;
+      gap: 0.875rem;
+    }
+    .wordmark { font-size: 1.35rem; font-weight: 800; color: var(--chalk); letter-spacing: -0.02em; }
+    .badge {
+      font-size: 0.7rem;
+      font-weight: 600;
+      background: var(--bg-raised);
+      border: 1px solid var(--rim);
+      border-radius: 4px;
+      padding: 2px 8px;
+      color: var(--ash);
+    }
+
+    main { max-width: 880px; margin: 0 auto; padding: 4rem 2rem; }
+
+    /* ── hero ────────────────────────────────────────────────── */
+    .hero { margin-bottom: 3.5rem; }
+    .hero h1 {
+      font-size: clamp(2.25rem, 5vw, 3.5rem);
+      font-weight: 800;
+      letter-spacing: -0.035em;
+      line-height: 1.12;
+      margin-bottom: 1.25rem;
+    }
+    .hero h1 .accent { color: var(--neon); }
+    .hero p {
+      font-size: 1.1rem;
+      color: var(--ash);
+      max-width: 560px;
+      line-height: 1.65;
+    }
+
+    /* ── download ────────────────────────────────────────────── */
+    .section-label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--ash);
+      margin-bottom: 1rem;
+    }
+    .platform-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(195px, 1fr));
+      gap: 0.75rem;
+      margin-bottom: 1.25rem;
+    }
+    .btn-download {
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+      padding: 0.9rem 1.25rem;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      transition: opacity 0.15s, border-color 0.15s, color 0.15s;
+      border: 1px solid transparent;
+    }
+    .btn-download .sub { font-size: 0.72rem; font-weight: 400; }
+    .btn-primary { background: var(--neon); color: #0a0c12; }
+    .btn-primary .sub { color: rgba(10,12,18,0.65); }
+    .btn-primary:hover { opacity: 0.88; color: #0a0c12; }
+    .btn-secondary {
+      background: var(--bg-surface);
+      border-color: var(--rim);
+      color: var(--chalk);
+    }
+    .btn-secondary .sub { color: var(--ash); }
+    .btn-secondary:hover { border-color: var(--neon); color: var(--neon); }
+
+    .warning-box {
+      background: rgba(251,191,36,0.07);
+      border: 1px solid rgba(251,191,36,0.22);
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      font-size: 0.875rem;
+      color: #fbbf24;
+      line-height: 1.6;
+      margin-bottom: 3rem;
+    }
+    .warning-box strong { display: block; margin-bottom: 0.35rem; font-size: 0.9rem; }
+    .warning-box code { background: rgba(251,191,36,0.14); padding: 1px 5px; border-radius: 3px; }
+
+    /* ── features ────────────────────────────────────────────── */
+    .features {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 0.875rem;
+      margin-bottom: 3.5rem;
+    }
+    .feature-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--rim);
+      border-radius: 10px;
+      padding: 1.25rem;
+    }
+    .feature-card h3 { font-size: 0.9rem; font-weight: 700; margin-bottom: 0.35rem; }
+    .feature-card p { font-size: 0.85rem; color: var(--ash); line-height: 1.55; }
+
+    /* ── source install ──────────────────────────────────────── */
+    .section-title { font-size: 1.35rem; font-weight: 700; margin-bottom: 0.6rem; }
+    .section-intro { color: var(--ash); font-size: 0.9rem; margin-bottom: 1rem; }
+
+    .code-block {
+      background: var(--bg-surface);
+      border: 1px solid var(--rim);
+      border-radius: 10px;
+      padding: 1.4rem 1.6rem;
+      margin-bottom: 0.75rem;
+    }
+    .code-block pre {
+      font-family: 'SF Mono', 'Fira Mono', 'Consolas', monospace;
+      font-size: 0.875rem;
+      color: var(--chalk);
+      line-height: 1.9;
+      overflow-x: auto;
+    }
+    .comment { color: var(--ash); }
+
+    footer {
+      border-top: 1px solid var(--rim);
+      padding: 1.75rem 2rem;
+      text-align: center;
+      color: var(--ash);
+      font-size: 0.85rem;
+      display: flex;
+      justify-content: center;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+    }
+    footer a { color: var(--ash); }
+    footer a:hover { color: var(--neon); }
+
+    @media (max-width: 580px) {
+      main { padding: 2.5rem 1.25rem; }
+      .platform-grid { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <span class="wordmark">corebooks</span>
+  <span class="badge">open source</span>
+  <span class="badge">self-hosted</span>
+  <span class="badge">free forever</span>
+</header>
+
+<main>
+
+  <div class="hero">
+    <h1>Your books.<br><span class="accent">Your machine.</span></h1>
+    <p>Open-source, privacy-first accounting software. No subscription, no cloud account, no data leaving your device — ever.</p>
+  </div>
+
+  <div style="margin-bottom: 3rem;">
+    <div class="section-label">Download</div>
+    <div class="platform-grid">
+      <a class="btn-download btn-primary"
+         href="https://github.com/clishai/corebooks/releases/latest/download/corebooks-mac-arm64.dmg">
+        macOS
+        <span class="sub">Apple Silicon (.dmg)</span>
+      </a>
+      <a class="btn-download btn-secondary"
+         href="https://github.com/clishai/corebooks/releases/latest/download/corebooks-mac-x64.dmg">
+        macOS
+        <span class="sub">Intel (.dmg)</span>
+      </a>
+      <a class="btn-download btn-secondary"
+         href="https://github.com/clishai/corebooks/releases/latest/download/corebooks-win-x64.exe">
+        Windows
+        <span class="sub">64-bit installer (.exe)</span>
+      </a>
+      <a class="btn-download btn-secondary"
+         href="https://github.com/clishai/corebooks/releases/latest/download/corebooks-linux-x64.AppImage">
+        Linux
+        <span class="sub">AppImage (x64)</span>
+      </a>
+    </div>
+
+    <div class="warning-box">
+      <strong>First-time install note</strong>
+      corebooks is not yet code-signed. Your OS will show a security warning the first time you open it.
+      <br><br>
+      <strong>macOS:</strong> Right-click the .dmg &rarr; <code>Open</code> &rarr; click <code>Open</code> in the dialog that appears.<br>
+      <strong>Windows:</strong> Click <code>More info</code> in the SmartScreen prompt &rarr; <code>Run anyway</code>.<br>
+      <strong>Linux:</strong> Mark the AppImage executable: <code>chmod +x corebooks-linux-x64.AppImage</code>
+      <br><br>
+      These warnings will disappear once we add code signing for the v1.0 public release.
+      You can always verify the installer by building from source below.
+    </div>
+  </div>
+
+  <div class="features">
+    <div class="feature-card">
+      <h3>Double-entry bookkeeping</h3>
+      <p>Chart of accounts, journal entries, trial balance, balance sheet, and income statement — built on a pure accounting engine.</p>
+    </div>
+    <div class="feature-card">
+      <h3>Privacy first</h3>
+      <p>Everything lives on your machine. No analytics, no telemetry, no cloud account required — ever.</p>
+    </div>
+    <div class="feature-card">
+      <h3>Encrypted backups</h3>
+      <p>Export your data encrypted with AES-256-GCM. Your passphrase, your backup. No recovery if you lose the passphrase.</p>
+    </div>
+    <div class="feature-card">
+      <h3>Multi-user ready</h3>
+      <p>Connect a PostgreSQL server for teams that need shared access across multiple devices simultaneously.</p>
+    </div>
+    <div class="feature-card">
+      <h3>Draft entries</h3>
+      <p>Work in progress is saved automatically. Entries are only posted when debits equal credits exactly — no exceptions.</p>
+    </div>
+    <div class="feature-card">
+      <h3>Open source (AGPL-3.0)</h3>
+      <p>Read the code, audit it, fork it, or contribute. Modifications must remain open source.</p>
+    </div>
+  </div>
+
+  <section>
+    <div class="section-title">Build from source</div>
+    <p class="section-intro">
+      Requires <a href="https://nodejs.org" target="_blank" rel="noopener">Node.js 20+</a>.
+      No other software needed — SQLite is bundled.
+    </p>
+    <div class="code-block">
+      <pre><span class="comment"># clone and install</span>
+git clone https://github.com/clishai/corebooks.git
+cd corebooks
+npm install
+
+<span class="comment"># start the app</span>
+npm run dev</pre>
+    </div>
+    <p class="section-intro">
+      Open <code style="color: var(--neon);">http://localhost:5173</code> in your browser.
+      Both the API server and the UI start together.
+    </p>
+  </section>
+
+</main>
+
+<footer>
+  <a href="https://github.com/clishai/corebooks" target="_blank" rel="noopener">GitHub</a>
+  <a href="https://github.com/clishai/corebooks/releases" target="_blank" rel="noopener">Releases</a>
+  <a href="https://github.com/clishai/corebooks/issues" target="_blank" rel="noopener">Issues</a>
+  <a href="https://github.com/clishai/corebooks/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener">Contributing</a>
+  <span>AGPL-3.0</span>
+</footer>
+
+</body>
+</html>
