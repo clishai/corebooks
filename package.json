@@ -2,12 +2,18 @@
   "name": "corebooks",
   "version": "1.0.0",
   "description": "Open-source, self-hosted accounting and bookkeeping software. Built from first principles.",
+  "main": "dist/electron/main.js",
   "scripts": {
-    "build": "npx prisma generate && tsc",
+    "build": "npx prisma generate && tsc && cp -r src/generated dist/",
     "build:ui": "vite build",
+    "build:all": "npm run build && npm run build:ui",
     "start": "node dist/index.js",
+    "dev": "concurrently \"npm run dev:api\" \"npm run dev:ui\"",
     "dev:api": "npx tsx watch src/index.ts",
     "dev:ui": "vite",
+    "dev:electron": "NODE_ENV=development electron dist/electron/main.js",
+    "package": "npm run build:all && electron-builder",
+    "postinstall": "electron-builder install-app-deps",
     "test": "vitest run",
     "test:watch": "vitest"
   },
@@ -23,13 +29,73 @@
     "url": "https://github.com/clishai/corebooks/issues"
   },
   "homepage": "https://github.com/clishai/corebooks#readme",
+  "build": {
+    "appId": "com.corebooks.app",
+    "productName": "corebooks",
+    "artifactName": "${productName}-${os}-${arch}.${ext}",
+    "asar": true,
+    "asarUnpack": [
+      "node_modules/better-sqlite3/**",
+      "node_modules/@prisma/adapter-better-sqlite3/**"
+    ],
+    "files": [
+      "dist/**/*",
+      "!dist/**/*.map"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "category": "public.app-category.finance"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "clishai",
+        "repo": "corebooks"
+      }
+    ]
+  },
   "devDependencies": {
+    "@electron/rebuild": "^4.0.4",
     "@tailwindcss/vite": "^4.2.4",
     "@types/better-sqlite3": "^7.6.13",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@types/supertest": "^7.2.0",
     "@vitejs/plugin-react": "^5.2.0",
+    "concurrently": "^9.2.1",
+    "electron": "^41.4.0",
+    "electron-builder": "^26.8.1",
     "supertest": "^7.2.2",
     "tailwindcss": "^4.2.4",
     "typescript": "^6.0.3",

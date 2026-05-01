@@ -79,6 +79,7 @@ export interface IncomeStatement {
 export interface DatabaseSettings {
   type: 'sqlite' | 'postgresql'
   path: string | null
+  sslEnabled: boolean
 }
 
 export interface DbStats {
@@ -95,9 +96,15 @@ export interface ExportData {
   entries: JournalEntry[]
 }
 
+// In Electron the preload injects window.electronAPI.apiBaseUrl; in the Vite
+// dev server all routes are proxied so an empty base (relative URL) works.
+function getBaseUrl(): string {
+  return window.electronAPI?.apiBaseUrl ?? ''
+}
+
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const hasBody = options?.body !== undefined
-  const res = await fetch(url, {
+  const res = await fetch(`${getBaseUrl()}${url}`, {
     headers: { ...(hasBody ? { 'Content-Type': 'application/json' } : {}), ...options?.headers },
     ...options,
   })

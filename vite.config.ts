@@ -4,6 +4,9 @@ import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
   root: 'src/ui',
+  // Relative asset paths so the built HTML loads correctly from file://
+  // in the Electron shell as well as from a standard web server.
+  base: './',
   plugins: [react(), tailwindcss()],
   server: {
     port: 5173,
