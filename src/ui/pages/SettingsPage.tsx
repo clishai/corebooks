@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { api, DatabaseSettings, DbStats } from '../api/client'
 import { ALL_METRICS, MetricId, getSelectedMetrics, saveSelectedMetrics, HomeLayout, getHomeLayout, saveHomeLayout } from '../lib/metrics'
 import { SNOOZE_OPTIONS, getSnoozeDuration, saveSnoozeDuration } from '../lib/alerts'
+import { encryptExport } from '../lib/crypto'
+import ExportPasswordModal from '../components/ExportPasswordModal'
 
 type Tab = 'home' | 'database'
 
@@ -169,6 +171,9 @@ function DatabaseSettings_() {
 
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState<string | null>(null)
+  const [encryptModalOpen, setEncryptModalOpen] = useState(false)
+  const [encrypting, setEncrypting] = useState(false)
+  const [encryptError, setEncryptError] = useState<string | null>(null)
 
   const [wipeOpen, setWipeOpen] = useState(false)
   const [wiping, setWiping] = useState(false)
@@ -207,6 +212,27 @@ function DatabaseSettings_() {
       setExportError(e instanceof Error ? e.message : 'Export failed.')
     } finally {
       setExporting(false)
+    }
+  }
+
+  async function handleEncryptedExport(passphrase: string) {
+    setEncrypting(true)
+    setEncryptError(null)
+    try {
+      const data = await api.settings.export()
+      const envelope = await encryptExport(data, passphrase)
+      const blob = new Blob([JSON.stringify(envelope)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `corebooks-export-${new Date().toISOString().slice(0, 10)}.enc.json`
+      a.click()
+      URL.revokeObjectURL(url)
+      setEncryptModalOpen(false)
+    } catch (e: unknown) {
+      setEncryptError(e instanceof Error ? e.message : 'Encrypted export failed.')
+    } finally {
+      setEncrypting(false)
     }
   }
 
@@ -295,13 +321,20 @@ function DatabaseSettings_() {
             {exportError}
           </div>
         )}
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3">
           <button
             onClick={handleExport}
             disabled={exporting}
             className="px-4 py-2 text-sm font-medium rounded-md border border-neon/40 text-neon hover:bg-neon/10 disabled:opacity-50 transition-colors"
           >
             {exporting ? 'Exporting…' : 'Export Data'}
+          </button>
+          <button
+            onClick={() => { setEncryptModalOpen(true); setEncryptError(null) }}
+            disabled={encrypting}
+            className="px-4 py-2 text-sm font-medium rounded-md border border-violet/40 text-violet hover:bg-violet/10 disabled:opacity-50 transition-colors"
+          >
+            Encrypted Export
           </button>
           <button
             onClick={() => { setWipeOpen(true); setWipeError(null) }}
@@ -382,13 +415,41 @@ function DatabaseSettings_() {
       )}
 
       {db.type === 'postgresql' && (
-        <div className="bg-emerald-950/50 border border-emerald-800 rounded-lg px-5 py-4">
-          <p className="text-sm text-emerald-300 font-medium">Multi-user setup active</p>
-          <p className="text-sm text-ash mt-1">
-            corebooks is connected to a shared PostgreSQL database. All users on your network can
-            access the same data simultaneously.
-          </p>
+        <div className="space-y-3">
+          <div className="bg-emerald-950/50 border border-emerald-800 rounded-lg px-5 py-4">
+            <p className="text-sm text-emerald-300 font-medium">Multi-user setup active</p>
+            <p className="text-sm text-ash mt-1">
+              corebooks is connected to a shared PostgreSQL database. All users on your network can
+              access the same data simultaneously.
+            </p>
+          </div>
+          {!db.sslEnabled && (
+            <div className="bg-amber-950/50 border border-amber-700 rounded-lg px-5 py-4 flex gap-3">
+              <span className="text-amber-400 shrink-0 mt-0.5">⚠</span>
+              <div>
+                <p className="text-sm text-amber-300 font-medium">Connection is not encrypted</p>
+                <p className="text-sm text-ash mt-1 leading-relaxed">
+                  Your PostgreSQL connection does not use SSL. Financial data could be read by
+                  anyone on the same network. Add{' '}
+                  <code className="text-chalk bg-raised px-1 py-0.5 rounded text-xs">
+                    ?sslmode=require
+                  </code>{' '}
+                  to your <code className="text-chalk bg-raised px-1 py-0.5 rounded text-xs">DATABASE_URL</code> and restart corebooks.
+                </p>
+              </div>
+            </div>
+          )}
         </div>
+      )}
+
+      {/* Encrypted export modal */}
+      {encryptModalOpen && (
+        <ExportPasswordModal
+          onEncrypt={handleEncryptedExport}
+          onCancel={() => setEncryptModalOpen(false)}
+          error={encryptError}
+          loading={encrypting}
+        />
       )}
 
       {/* Wipe confirmation modal */}

@@ -11,7 +11,7 @@ interface RouteOptions {
 }
 
 function resolveDbPath(): string | null {
-  const rawUrl = process.env['DATABASE_URL'] ?? 'file:./prisma/dev.db';
+  const rawUrl = process.env['DATABASE_URL'] ?? 'file:corebooks.db';
   if (rawUrl.startsWith('postgresql://') || rawUrl.startsWith('postgres://')) return null;
   const rel = rawUrl.startsWith('file:') ? rawUrl.slice(5) : rawUrl;
   return path.resolve(process.cwd(), rel);
@@ -22,11 +22,18 @@ export const settingsRoutes: FastifyPluginAsync<RouteOptions> = async (app, opts
 
   app.get('/database', async () => {
     const rawUrl = process.env['DATABASE_URL'] ?? 'file:./prisma/dev.db';
-    if (rawUrl.startsWith('postgresql://') || rawUrl.startsWith('postgres://')) {
-      return { type: 'postgresql', path: null };
+    const isPostgres = rawUrl.startsWith('postgresql://') || rawUrl.startsWith('postgres://');
+    const sslEnabled = !isPostgres || (
+      rawUrl.includes('sslmode=require') ||
+      rawUrl.includes('sslmode=verify-full') ||
+      rawUrl.includes('sslmode=verify-ca') ||
+      rawUrl.includes('ssl=true')
+    );
+    if (isPostgres) {
+      return { type: 'postgresql', path: null, sslEnabled };
     }
     const filePath = resolveDbPath();
-    return { type: 'sqlite', path: filePath };
+    return { type: 'sqlite', path: filePath, sslEnabled: true };
   });
 
   app.get('/stats', async () => {
