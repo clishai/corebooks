@@ -43,6 +43,10 @@ export const accountRoutes: FastifyPluginAsync<RouteOptions> = async (app) => {
         typeof body.contraTo === 'string'
           ? (body.contraTo as Parameters<typeof createAccount>[0]['contraTo'])
           : undefined,
+      classification:
+        typeof body.classification === 'string'
+          ? (body.classification as 'current' | 'non-current')
+          : undefined,
     });
     return reply.code(201).send(account);
   });

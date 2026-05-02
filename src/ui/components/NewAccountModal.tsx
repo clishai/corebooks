@@ -19,6 +19,13 @@ interface Props {
 const inputClass =
   'w-full bg-raised border border-rim text-chalk placeholder:text-ash rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-neon focus:border-neon'
 
+const CLASSIFICATION_TOOLTIP: Record<'Asset' | 'Liability', string> = {
+  Asset:
+    'Current assets can be converted to cash within one year, such as cash, receivables, and inventory. Non-current assets are long-term resources not expected to be liquidated within a year, such as equipment, real estate, and intangibles.',
+  Liability:
+    'Current liabilities are obligations due within one year, such as accounts payable and short-term loans. Non-current liabilities are long-term obligations not due within a year, such as mortgages and bonds payable.',
+}
+
 export default function NewAccountModal({ onClose, onCreated }: Props) {
   const [form, setForm] = useState<CreateAccountInput>({
     number: '',
@@ -26,12 +33,18 @@ export default function NewAccountModal({ onClose, onCreated }: Props) {
     type: 'Asset',
     normalBalance: 'debit',
     isContra: false,
+    classification: 'current',
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   function handleTypeChange(type: AccountType) {
-    setForm((f) => ({ ...f, type, normalBalance: DEFAULT_NORMAL_BALANCE[type] }))
+    setForm((f) => ({
+      ...f,
+      type,
+      normalBalance: DEFAULT_NORMAL_BALANCE[type],
+      classification: (type === 'Asset' || type === 'Liability') ? (f.classification ?? 'current') : undefined,
+    }))
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -102,6 +115,37 @@ export default function NewAccountModal({ onClose, onCreated }: Props) {
               ))}
             </select>
           </div>
+
+          {(form.type === 'Asset' || form.type === 'Liability') && (
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs font-medium text-ash">Classification</label>
+                <div className="relative group">
+                  <span className="text-[10px] font-bold text-ash/70 border border-ash/30 rounded-full w-[18px] h-[18px] flex items-center justify-center cursor-help select-none">
+                    ?
+                  </span>
+                  <div className="absolute right-0 top-full mt-1 z-20 w-72 hidden group-hover:block bg-raised border border-rim rounded-lg px-3 py-2.5 text-xs text-ash leading-relaxed shadow-xl">
+                    {CLASSIFICATION_TOOLTIP[form.type]}
+                  </div>
+                </div>
+              </div>
+              <div className="flex gap-6">
+                {(['current', 'non-current'] as const).map((c) => (
+                  <label key={c} className="flex items-center gap-2 text-sm text-chalk cursor-pointer">
+                    <input
+                      type="radio"
+                      name="classification"
+                      value={c}
+                      checked={form.classification === c}
+                      onChange={() => setForm((f) => ({ ...f, classification: c }))}
+                      className="accent-neon"
+                    />
+                    {c === 'current' ? 'Current' : 'Non-current'}
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div>
             <label className="block text-xs font-medium text-ash mb-2">Normal Balance</label>

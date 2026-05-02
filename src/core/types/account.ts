@@ -14,4 +14,5 @@ export interface Account {
   normalBalance: 'debit' | 'credit';
   isContra: boolean;
   contraTo?: AccountType;
+  classification?: 'current' | 'non-current';
 }

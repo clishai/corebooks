@@ -8,23 +8,26 @@ import { disconnectPrisma, getPrismaClient } from '../../src/db/client.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
-// Run the init migration SQL directly against a fresh SQLite file.
+// Run all migration SQL files in order against a fresh SQLite file.
 // This is faster than spawning `prisma migrate deploy` and avoids any
 // network or CLI dependency in the test environment.
-const migrationSql = readFileSync(
-  join(__dirname, '../../prisma/migrations/20260426135826_init/migration.sql'),
-  'utf8',
-)
+const migrationsDir = join(__dirname, '../../prisma/migrations')
+const migrationFiles = [
+  join(migrationsDir, '20260426135826_init/migration.sql'),
+  join(migrationsDir, '20260502180906_add_account_classification/migration.sql'),
+]
 
 /**
- * Creates a temporary SQLite file, runs the schema migration, and returns
- * the absolute file path. Set process.env.DATABASE_URL = `file:${path}`
+ * Creates a temporary SQLite file, runs all schema migrations in order, and
+ * returns the absolute file path. Set process.env.DATABASE_URL = `file:${path}`
  * before the first call to getPrismaClient() in your test file.
  */
 export function createTestDb(): string {
   const dbPath = join(tmpdir(), `corebooks-test-${randomUUID()}.db`)
   const db = new Database(dbPath)
-  db.exec(migrationSql)
+  for (const file of migrationFiles) {
+    db.exec(readFileSync(file, 'utf8'))
+  }
   db.close()
   return dbPath
 }

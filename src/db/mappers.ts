@@ -13,6 +13,7 @@ export interface PrismaAccount {
   normalBalance: string;
   isContra: boolean;
   contraTo: string | null;
+  classification: string | null;
 }
 
 export interface PrismaJournalLine {
@@ -55,6 +56,7 @@ export function toCoreAccount(row: PrismaAccount): Account {
     normalBalance: row.normalBalance as 'debit' | 'credit',
     isContra: row.isContra,
     contraTo: row.contraTo != null ? (row.contraTo as AccountType) : undefined,
+    classification: row.classification != null ? (row.classification as 'current' | 'non-current') : undefined,
   };
 }
 
@@ -71,6 +73,7 @@ export function toDbAccount(account: Account): Record<string, unknown> {
     normalBalance: account.normalBalance,
     isContra: account.isContra,
     contraTo: account.contraTo ?? null,
+    classification: account.classification ?? null,
   };
 }
 

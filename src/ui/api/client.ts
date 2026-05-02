@@ -8,6 +8,7 @@ export interface Account {
   normalBalance: 'debit' | 'credit'
   isContra: boolean
   contraTo?: AccountType
+  classification?: 'current' | 'non-current'
 }
 
 export interface JournalLine {
@@ -34,6 +35,7 @@ export interface CreateAccountInput {
   normalBalance: 'debit' | 'credit'
   isContra: boolean
   contraTo?: AccountType
+  classification?: 'current' | 'non-current'
 }
 
 export interface DraftLineInput {
@@ -63,14 +65,35 @@ export interface TrialBalance {
   balanced: boolean
 }
 
+export interface BalanceSheetLine {
+  accountId: string
+  accountNumber: string
+  accountName: string
+  balance: number
+}
+
+export interface BalanceSheetSection {
+  lines: BalanceSheetLine[]
+  total: number
+}
+
 export interface BalanceSheet {
+  currentAssets: BalanceSheetSection
+  nonCurrentAssets: BalanceSheetSection
+  currentLiabilities: BalanceSheetSection
+  nonCurrentLiabilities: BalanceSheetSection
+  retainedEquityAccounts: BalanceSheetSection
   assets: number
   liabilities: number
+  retainedEquity: number
+  netIncome: number
   equity: number
   balanced: boolean
 }
 
 export interface IncomeStatement {
+  revenueLines: BalanceSheetLine[]
+  expenseLines: BalanceSheetLine[]
   revenue: number
   expenses: number
   netIncome: number

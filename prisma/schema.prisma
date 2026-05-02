@@ -31,14 +31,15 @@ enum LineType {
 }
 
 model Account {
-  id            String        @id @default(cuid())
-  number        String        @unique
-  name          String
-  type          AccountType
-  normalBalance NormalBalance
-  isContra      Boolean       @default(false)
-  contraTo      AccountType?
-  lines         JournalLine[]
+  id             String        @id @default(cuid())
+  number         String        @unique
+  name           String
+  type           AccountType
+  normalBalance  NormalBalance
+  isContra       Boolean       @default(false)
+  contraTo       AccountType?
+  classification String?
+  lines          JournalLine[]
 }
 
 model JournalEntry {

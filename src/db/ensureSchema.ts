@@ -8,7 +8,8 @@ CREATE TABLE IF NOT EXISTS "Account" (
     "type" TEXT NOT NULL,
     "normalBalance" TEXT NOT NULL,
     "isContra" BOOLEAN NOT NULL DEFAULT false,
-    "contraTo" TEXT
+    "contraTo" TEXT,
+    "classification" TEXT
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS "Account_number_key" ON "Account"("number");
@@ -39,6 +40,11 @@ export function ensureSchema(dbPath: string): void {
   const db = new Database(dbPath);
   try {
     db.exec(SCHEMA_SQL);
+    // Idempotent column migrations for databases created before this column existed.
+    const cols = (db.prepare('PRAGMA table_info(Account)').all() as { name: string }[]).map(c => c.name);
+    if (!cols.includes('classification')) {
+      db.exec('ALTER TABLE "Account" ADD COLUMN "classification" TEXT');
+    }
   } finally {
     db.close();
   }
