@@ -22,8 +22,12 @@ async function main() {
 
   try {
     await app.listen({ port: PORT, host: HOST });
-  } catch (err) {
-    app.log.error(err);
+  } catch (err: unknown) {
+    if (err instanceof Error && 'code' in err && (err as NodeJS.ErrnoException).code === 'EADDRINUSE') {
+      process.stderr.write(`\nPort ${PORT} is already in use. Stop any other process using that port and try again.\n\n`);
+    } else {
+      app.log.error(err);
+    }
     await disconnectPrisma();
     process.exit(1);
   }

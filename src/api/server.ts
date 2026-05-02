@@ -21,6 +21,8 @@ export function buildApp(context: AppContext, opts: BuildAppOptions = {}) {
 
   app.register(sensible);
 
+  app.get('/health', async () => ({ ok: true }));
+
   app.register(accountRoutes, { prefix: '/accounts', context });
   app.register(entryRoutes, { prefix: '/entries', context });
   app.register(reportRoutes, { prefix: '/reports', context });

@@ -15,6 +15,7 @@ export default defineConfig({
       '/entries': 'http://localhost:3000',
       '/reports': 'http://localhost:3000',
       '/settings': 'http://localhost:3000',
+      '/health': 'http://localhost:3000',
     },
   },
   build: {
