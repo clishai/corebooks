@@ -61,10 +61,13 @@ The database layer and REST API are complete. Key decisions:
 
 ### Mascot
 The CoreBooks mascot is a **pangolin**. The pangolin SVG was removed from
-the sidebar at the user's request — a fixed-size placeholder `div` now
-occupies the same space beside the "corebooks" wordmark, reserved for a
-future logo insert. Do not add any icon back to that slot until a proper
-logo asset is provided.
+the sidebar at the user's request.
+
+### Logo asset
+`src/ui/assets/logo.png` — a terminal-style `~/ corebooks` lockup with a
+transparent background and white elements, sized to fill the sidebar header.
+Imported and rendered in `src/ui/components/Layout.tsx`. Do not replace or
+remove it without an explicit instruction.
 
 ### Logo
 The wordmark is `corebooks` — all-lowercase, bold weight, no capitalization.
@@ -104,9 +107,12 @@ future phases.
 Phases 1–5 are all complete. The app can be built as a native desktop installer.
 
 Run in development:
-- `npm run dev` — starts both the API server and Vite dev server in one command (primary)
+- `npm run dev` — starts both servers; Vite waits for `GET /health` to return 200 before
+  opening (30 s timeout). If either process crashes, both stop (`--kill-others-on-fail`).
+  Terminal output is color-labeled: `api` in cyan, `ui` in magenta. Primary command.
 - `npm run dev:api` / `npm run dev:ui` — individual servers, useful for debugging one at a time
 - Both servers bind to `127.0.0.1` only — not reachable from other devices on the network
+- `GET /health` — lightweight liveness endpoint (`{ ok: true }`), no DB access, used by `wait-on`
 
 Build and package:
 - `npm run build:all` — compiles TypeScript + Vite UI into `dist/`
@@ -124,10 +130,10 @@ Release distribution:
 
 **Completed:**
 - `src/ui/api/client.ts` — typed fetch wrappers for all API and report endpoints.
-- `src/ui/components/Layout.tsx` — dark sidebar (no mascot — placeholder div
-  reserved for future logo), lowercase bold "corebooks" wordmark, Reports nav
-  section, cog icon pinned to the bottom-left for Settings, neon blue
-  "+ New Entry" toolbar button. Top toolbar shows company name (from
+- `src/ui/components/Layout.tsx` — dark sidebar with `src/ui/assets/logo.png`
+  in the header (terminal-style `~/ corebooks` lockup, fills sidebar width),
+  Reports nav section, cog icon pinned to the bottom-left for Settings, neon
+  blue "+ New Entry" toolbar button. Top toolbar shows company name (from
   `localStorage`) instead of the static "corebooks" string.
 - `src/ui/components/NewEntryModal.tsx` — journal entry form (dark mode):
   date, memo, payment method, debit/credit line grid, live balance indicator,
@@ -294,9 +300,6 @@ Release distribution:
   without a hard reload.
 
 **Pending UI items discussed but not yet built:**
-- **Sidebar logo** — a fixed-size placeholder `div` (32×28 px) sits beside the
-  "corebooks" wordmark. No icon should be placed there until an actual logo
-  asset is supplied.
 - **Payment methods in Settings** — the spec describes a user-managed list of
   payment methods (cash, check, ACH, credit card) stored in settings and
   referenced on journal entries. The Settings page has three tabs today
@@ -316,18 +319,6 @@ Release distribution:
 - `isPostgresUrl` / `postgresHasSSL` — extracted from `src/db/client.ts` and exported;
   `settings.ts` now imports them instead of copy-pasting the 4-condition SSL check.
 - `DraftsPage` — merged byte-identical `handleModalClose` / `handlePosted` into one handler.
-
-**Pending UI items discussed but not yet built:**
-- **Sidebar logo** — a fixed-size placeholder `div` (32×28 px) sits beside the
-  "corebooks" wordmark. No icon should be placed there until an actual logo
-  asset is supplied.
-- **Payment methods in Settings** — the spec describes a user-managed list of
-  payment methods (cash, check, ACH, credit card) stored in settings and
-  referenced on journal entries. The Settings page has two tabs today
-  ("home page" and "database"). A third "payment methods" tab needs to be
-  added with a simple add/remove list UI and persistence (API or localStorage
-  TBD). The `NewEntryModal` already has a payment method field; it currently
-  accepts free-text and should eventually pull from this managed list.
 
 ### Phase 5 — Electron Desktop App (complete)
 
@@ -366,6 +357,29 @@ Delivered in this phase:
   client-side. New "Encrypted Export" button in Settings → Database.
 - safeStorage key infrastructure — 256-bit key in OS keychain, ready for
   SQLCipher once a compatible Prisma adapter is available.
+
+**Logo**
+- `src/ui/assets/logo.png` — terminal-style `~/ corebooks` lockup, transparent background,
+  white elements. Processed from the source PNG (`Documents/corebooks logo terminal block.png`)
+  via Python/Pillow: flood-fill background removal, colour inversion for dark theme, crop to
+  bounding box.
+- `src/ui/components/Layout.tsx` — imports `logoSrc` from `../assets/logo.png`; renders
+  `<img src={logoSrc} alt="corebooks" className="w-full" />` in the sidebar header, replacing
+  the previous placeholder `div` + wordmark `span`.
+
+**Dev server reliability**
+- `tsx` and `wait-on` added as dev dependencies (no longer called via `npx`).
+- `dev:api` — `tsx watch src/index.ts` (local dep, no npx overhead).
+- `dev:ui` — `wait-on --timeout 30000 http://127.0.0.1:3000/health && vite`. Vite only starts
+  after the API confirms it is healthy; times out with a clear error after 30 s if the API
+  never starts.
+- `dev` — `concurrently --kill-others-on-fail -n api,ui -c cyan,magenta`. If either process
+  crashes, the other is killed. Output is color-labeled.
+- `build` — `npx prisma generate` replaced with `prisma generate` (local dep).
+- `GET /health` added to `src/api/server.ts` — returns `{ ok: true }`, no DB access.
+  Also added to the Vite dev proxy in `vite.config.ts`.
+- Port-conflict error in `src/index.ts` — catches `EADDRINUSE` and prints a plain-English
+  message before exiting, instead of a raw stack trace.
 
 **Begin here next session: Onboarding questionnaire + feature flag system.**
 
