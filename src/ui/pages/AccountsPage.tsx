@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
-import { api, Account, AccountType } from '../api/client'
+import { api, Account, AccountType, TrialBalanceRow } from '../api/client'
 import NewAccountModal from '../components/NewAccountModal'
+import EditAccountModal from '../components/EditAccountModal'
+import { AccountColumnId, getVisibleColumns } from '../lib/accountColumns'
 
 function typeBadge(type: AccountType): string {
   switch (type) {
@@ -12,18 +14,48 @@ function typeBadge(type: AccountType): string {
   }
 }
 
+function formatBalance(amount: number): string {
+  const abs = Math.abs(amount)
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(abs)
+}
+
+function buildBalanceMap(rows: TrialBalanceRow[]): Map<string, number> {
+  const map = new Map<string, number>()
+  for (const row of rows) {
+    const balance =
+      row.account.normalBalance === 'debit'
+        ? row.debit - row.credit
+        : row.credit - row.debit
+    map.set(row.account.id, balance)
+  }
+  return map
+}
+
 export default function AccountsPage() {
   const [accounts, setAccounts] = useState<Account[]>([])
+  const [balanceMap, setBalanceMap] = useState<Map<string, number>>(new Map())
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showNew, setShowNew] = useState(false)
+  const [editAccount, setEditAccount] = useState<Account | null>(null)
+  const [visibleCols, setVisibleCols] = useState<AccountColumnId[]>(getVisibleColumns)
 
   useEffect(() => {
-    api.accounts
-      .list()
-      .then(setAccounts)
+    Promise.all([api.accounts.list(), api.reports.trialBalance()])
+      .then(([accts, tb]) => {
+        setAccounts(accts)
+        setBalanceMap(buildBalanceMap(tb.rows))
+      })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Failed to load accounts.'))
       .finally(() => setLoading(false))
+  }, [])
+
+  // Re-read column prefs whenever the user navigates back to this page (storage
+  // may have changed in Settings without a full remount).
+  useEffect(() => {
+    function onFocus() { setVisibleCols(getVisibleColumns()) }
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
   }, [])
 
   function handleCreated(account: Account) {
@@ -32,6 +64,23 @@ export default function AccountsPage() {
     )
     setShowNew(false)
   }
+
+  function handleSaved(updated: Account) {
+    setAccounts((prev) =>
+      prev
+        .map((a) => (a.id === updated.id ? updated : a))
+        .sort((a, b) => a.number.localeCompare(b.number)),
+    )
+    setEditAccount(null)
+    // Re-fetch trial balance because normalBalance or type may have changed,
+    // which affects how debit/credit totals are signed for display.
+    api.reports.trialBalance().then((tb) => setBalanceMap(buildBalanceMap(tb.rows))).catch(() => {})
+  }
+
+  const show = (col: AccountColumnId) => visibleCols.includes(col)
+
+  // Number + Name (fixed) + one column per visible optional col + edit button (fixed)
+  const colCount = 3 + visibleCols.length
 
   return (
     <div>
@@ -60,44 +109,78 @@ export default function AccountsPage() {
               <tr className="bg-raised border-b border-rim">
                 <th className="text-left px-4 py-3 font-medium text-ash">Number</th>
                 <th className="text-left px-4 py-3 font-medium text-ash">Name</th>
-                <th className="text-left px-4 py-3 font-medium text-ash">Type</th>
-                <th className="text-left px-4 py-3 font-medium text-ash">Normal Balance</th>
-                <th className="text-left px-4 py-3 font-medium text-ash">Contra</th>
+                {show('type')           && <th className="text-left px-4 py-3 font-medium text-ash">Type</th>}
+                {show('normalBalance')  && <th className="text-left px-4 py-3 font-medium text-ash">Normal Balance</th>}
+                {show('contra')         && <th className="text-left px-4 py-3 font-medium text-ash">Contra?</th>}
+                {show('classification') && <th className="text-left px-4 py-3 font-medium text-ash">Classification</th>}
+                {show('balance')        && <th className="text-right px-4 py-3 font-medium text-ash">Current Balance</th>}
+                <th className="w-10" />
               </tr>
             </thead>
             <tbody>
               {accounts.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-10 text-center text-ash text-sm">
+                  <td colSpan={colCount} className="px-4 py-10 text-center text-ash text-sm">
                     No accounts yet. Click <strong className="text-chalk">+ New Account</strong> to
                     build your chart of accounts.
                   </td>
                 </tr>
               ) : (
-                accounts.map((account) => (
-                  <tr
-                    key={account.id}
-                    className="border-b border-rim last:border-0 hover:bg-raised transition-colors"
-                  >
-                    <td className="px-4 py-3 font-mono text-ash">{account.number}</td>
-                    <td className="px-4 py-3 text-chalk font-medium">{account.name}</td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${typeBadge(account.type)}`}
-                      >
-                        {account.type}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 capitalize text-ash">{account.normalBalance}</td>
-                    <td className="px-4 py-3 text-xs">
-                      {account.isContra ? (
-                        <span className="text-violet font-medium">Contra</span>
-                      ) : (
-                        <span className="text-ash">—</span>
+                accounts.map((account) => {
+                  const balance = balanceMap.get(account.id) ?? 0
+                  const isAbnormal = balance < 0
+                  return (
+                    <tr
+                      key={account.id}
+                      className="group border-b border-rim last:border-0 hover:bg-raised transition-colors"
+                    >
+                      <td className="px-4 py-3 font-mono text-ash">{account.number}</td>
+                      <td className="px-4 py-3 text-chalk font-medium">{account.name}</td>
+                      {show('type') && (
+                        <td className="px-4 py-3">
+                          <span
+                            className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${typeBadge(account.type)}`}
+                          >
+                            {account.type}
+                          </span>
+                        </td>
                       )}
-                    </td>
-                  </tr>
-                ))
+                      {show('normalBalance') && (
+                        <td className="px-4 py-3 capitalize text-ash">{account.normalBalance}</td>
+                      )}
+                      {show('contra') && (
+                        <td className="px-4 py-3 text-xs">
+                          {account.isContra ? (
+                            <span className="text-emerald-400 text-base leading-none">✓</span>
+                          ) : (
+                            <span className="text-ash">—</span>
+                          )}
+                        </td>
+                      )}
+                      {show('classification') && (
+                        <td className="px-4 py-3 text-xs text-ash capitalize">
+                          {account.classification ?? '—'}
+                        </td>
+                      )}
+                      {show('balance') && (
+                        <td className={`px-4 py-3 text-right tabular-nums text-sm ${isAbnormal ? 'text-amber-400' : 'text-chalk'}`}>
+                          {balance === 0
+                            ? <span className="text-ash">$0.00</span>
+                            : <>{isAbnormal ? <span className="text-xs text-ash mr-1">!</span> : null}{formatBalance(balance)}</>
+                          }
+                        </td>
+                      )}
+                      <td className="px-2 py-3 text-right">
+                        <button
+                          onClick={() => setEditAccount(account)}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity duration-150 text-xs text-ash hover:text-neon px-2 py-1 rounded border border-transparent hover:border-rim"
+                        >
+                          Edit
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                })
               )}
             </tbody>
           </table>
@@ -106,6 +189,14 @@ export default function AccountsPage() {
 
       {showNew && (
         <NewAccountModal onClose={() => setShowNew(false)} onCreated={handleCreated} />
+      )}
+
+      {editAccount && (
+        <EditAccountModal
+          account={editAccount}
+          onClose={() => setEditAccount(null)}
+          onSaved={handleSaved}
+        />
       )}
     </div>
   )

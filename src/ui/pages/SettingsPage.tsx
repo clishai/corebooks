@@ -2,10 +2,11 @@ import { useState, useEffect } from 'react'
 import { api, DatabaseSettings, DbStats } from '../api/client'
 import { ALL_METRICS, MetricId, getSelectedMetrics, saveSelectedMetrics, HomeLayout, getHomeLayout, saveHomeLayout } from '../lib/metrics'
 import { SNOOZE_OPTIONS, getSnoozeDuration, saveSnoozeDuration } from '../lib/alerts'
+import { ALL_ACCOUNT_COLUMNS, AccountColumnId, getVisibleColumns, saveVisibleColumns } from '../lib/accountColumns'
 import { encryptExport } from '../lib/crypto'
 import ExportPasswordModal from '../components/ExportPasswordModal'
 
-type Tab = 'home' | 'database'
+type Tab = 'home' | 'database' | 'accounts'
 
 // ── Home page tab ────────────────────────────────────────────────────────────
 
@@ -130,6 +131,63 @@ function HomePageSettings() {
         </p>
       </div>
 
+    </div>
+  )
+}
+
+// ── Accounts tab ─────────────────────────────────────────────────────────────
+
+function AccountsSettings() {
+  const [visible, setVisible] = useState<AccountColumnId[]>(getVisibleColumns)
+
+  function toggle(id: AccountColumnId) {
+    const next = visible.includes(id) ? visible.filter((c) => c !== id) : [...visible, id]
+    setVisible(next)
+    saveVisibleColumns(next)
+  }
+
+  return (
+    <div className="space-y-8">
+      <div className="space-y-3">
+        <h3 className="text-sm font-semibold text-chalk">Visible columns</h3>
+        <p className="text-sm text-ash leading-relaxed">
+          Choose which columns appear in the chart of accounts. Account number and name are always shown.
+        </p>
+        <div className="bg-surface border border-rim rounded-lg divide-y divide-rim">
+          {ALL_ACCOUNT_COLUMNS.map((col) => {
+            const checked = visible.includes(col.id)
+            return (
+              <label
+                key={col.id}
+                onClick={() => toggle(col.id)}
+                className="flex items-center gap-4 px-5 py-3.5 cursor-pointer hover:bg-raised transition-colors"
+              >
+                <div
+                  className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${
+                    checked ? 'bg-neon border-neon' : 'border-rim bg-base'
+                  }`}
+                >
+                  {checked && (
+                    <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
+                      <path
+                        d="M1 4L3.5 6.5L9 1"
+                        stroke="#0a0c12"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  )}
+                </div>
+                <span className="text-sm text-chalk">{col.label}</span>
+              </label>
+            )
+          })}
+        </div>
+        <p className="text-xs text-ash">
+          Changes save automatically and take effect the next time you visit the accounts page.
+        </p>
+      </div>
     </div>
   )
 }
@@ -515,12 +573,16 @@ export default function SettingsPage() {
         <button className={tabClass('home')} onClick={() => setTab('home')}>
           home page
         </button>
+        <button className={tabClass('accounts')} onClick={() => setTab('accounts')}>
+          accounts
+        </button>
         <button className={tabClass('database')} onClick={() => setTab('database')}>
           database
         </button>
       </div>
 
       {tab === 'home' && <HomePageSettings />}
+      {tab === 'accounts' && <AccountsSettings />}
       {tab === 'database' && <DatabaseSettings_ />}
     </div>
   )
