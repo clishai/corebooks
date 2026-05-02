@@ -12,14 +12,14 @@ This is a project by a college accounting major. The goal is to build the ultima
 
 🚧 **Active Development** — approaching v1.0
 
-The accounting engine, database, REST API, browser-based UI, and Electron desktop app are all functional. The app uses JetBrains Mono throughout for a cypherpunk aesthetic and is fully navigable with spring-animated page transitions. It includes:
-- Chart of accounts with current/non-current asset and liability classification
+The accounting engine, database, REST API, browser-based UI, and Electron desktop app are all functional. The app uses JetBrains Mono Light throughout for a cypherpunk aesthetic and is fully navigable with spring-animated page transitions. It includes:
+- Chart of accounts with current/non-current classification, live current balances, inline account editing, and configurable column visibility
 - Journal entry creation (with draft saving and auto-save)
 - Trial Balance grouped by account type
 - Balance Sheet with collapsible Current/Non-current sections per-account, and Net Income shown as a distinct unreconciled equity line
 - Income Statement with expandable per-account Revenue and Expense sections
 - Encrypted data export (AES-256-GCM)
-- Settings with database stats, JSON export, and data wipe
+- Settings with home page metrics, chart-of-accounts column toggles, database stats, JSON export, and data wipe
 
 **Next up:** Accounts receivable / payable manager, inventory module, and a signed public installer for one-click download.
 

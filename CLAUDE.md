@@ -251,8 +251,11 @@ Release distribution:
   line within the Equity section, separate from permanent Equity accounts.
 
 **UI overhaul — cypherpunk aesthetic**
-- **Font:** JetBrains Mono (Google Fonts) loaded via `src/ui/index.html` and set as the
-  global `font-family` and Tailwind `--font-sans` / `--font-mono` in `src/ui/index.css`.
+- **Font:** JetBrains Mono (Google Fonts) loaded via `src/ui/index.html` (weights 100–800)
+  and set as the global `font-family` and Tailwind `--font-sans` / `--font-mono` in
+  `src/ui/index.css`. Global `font-weight: 300` (Light) is set on `html/body/#root` for a
+  thin, boxy terminal aesthetic; elements that explicitly carry `font-medium`, `font-semibold`,
+  or `font-bold` Tailwind classes still render at their own weight, preserving hierarchy.
 - **Financial statement tables:** spreadsheet-like grid with consistent 4-column layout
   (chevron | account number | name | amount), `border-collapse`, `bg-void` section headers
   in neon uppercase, `border-rim` grid lines, `rounded-sm` (sharper than the previous
@@ -262,6 +265,45 @@ Release distribution:
   `key={location.key}` (forces remount) plus either `page-slide-right` or `page-slide-left`.
   Keyframes + spring cubic-bezier `(0.34, 1.56, 0.64, 1)` are defined in `index.css`.
   Duration: 220 ms.
+
+**Chart of Accounts enhancements**
+- **Edit button:** Each account row has a hidden Edit button in the far-right column that
+  fades in on row hover (`opacity-0 group-hover:opacity-100 transition-opacity`). Clicking
+  it opens `src/ui/components/EditAccountModal.tsx`, a pre-filled form identical in structure
+  to `NewAccountModal`. On save, `PATCH /accounts/:id` is called; the row updates in place
+  and the trial balance is re-fetched so the balance column stays accurate. All fields are
+  preserved on save — including `contraTo` — so editing never silently drops data.
+- **Contra column:** Header renamed "Contra?"; contra accounts show a green `✓` (emerald)
+  instead of the word "Contra". Non-contra rows keep the `—` placeholder.
+- **Current Balance column:** Fetches `GET /reports/trial-balance` on mount alongside the
+  accounts list. Balance is computed as `debit − credit` for debit-normal accounts and
+  `credit − debit` for credit-normal accounts. Zero balances display in muted ash. Abnormal
+  balances (negative result) display in amber with a `!` prefix. Re-fetched after any edit.
+- **Column visibility:** `src/ui/lib/accountColumns.ts` defines 5 toggleable columns
+  (`type`, `normalBalance`, `contra`, `classification`, `balance`) with `localStorage` key
+  `cb_accounts_columns`. All default to visible. Number and Name are always visible and
+  cannot be hidden. `colSpan` for the empty-state row is computed as `3 + visibleCols.length`
+  (2 fixed + N optional + 1 edit-button column), so it auto-adjusts as columns are toggled.
+
+**Settings — accounts tab**
+- `src/ui/pages/SettingsPage.tsx` gained a third tab "accounts" (between "home page" and
+  "database"). It renders `AccountsSettings`, which uses the same neon-checkbox pattern as
+  the home metrics selector to toggle the 5 optional chart-of-accounts columns. Changes save
+  immediately to `cb_accounts_columns` in `localStorage`. `AccountsPage` re-reads the
+  setting on window focus, so toggling in Settings and navigating back reflects the change
+  without a hard reload.
+
+**Pending UI items discussed but not yet built:**
+- **Sidebar logo** — a fixed-size placeholder `div` (32×28 px) sits beside the
+  "corebooks" wordmark. No icon should be placed there until an actual logo
+  asset is supplied.
+- **Payment methods in Settings** — the spec describes a user-managed list of
+  payment methods (cash, check, ACH, credit card) stored in settings and
+  referenced on journal entries. The Settings page has three tabs today
+  ("home page", "accounts", "database"). A "payment methods" tab still needs to
+  be added with a simple add/remove list UI and persistence (API or localStorage
+  TBD). The `NewEntryModal` already has a payment method field; it currently
+  accepts free-text and should eventually pull from this managed list.
 
 **Code condensation (no behavior changes)**
 - `Ledger.applyLines` — private static helper eliminates 3 copies of the 7-line
