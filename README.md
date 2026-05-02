@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/logo-readme.png" alt="corebooks" width="480" />
+</p>
+
 # corebooks
 
 > Open-source, self-hosted accounting and bookkeeping software. Built from first principles.

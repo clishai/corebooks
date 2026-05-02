@@ -3,6 +3,7 @@ import { Outlet, NavLink, useLocation } from 'react-router-dom'
 import NewEntryModal from './NewEntryModal'
 import Toast from './Toast'
 import FirstLaunchModal, { shouldShowFirstLaunch, getCompanyName } from './FirstLaunchModal'
+import logoSrc from '../assets/logo.png'
 
 function CogIcon() {
   return (
@@ -82,10 +83,9 @@ export default function Layout() {
     <div className="flex h-screen bg-base overflow-hidden">
       {/* Sidebar */}
       <aside className="w-52 bg-void flex flex-col shrink-0 border-r border-rim">
-        {/* Logo — icon slot reserved for future logo insert */}
-        <div className="px-4 py-4 border-b border-rim flex items-center gap-2.5">
-          <div className="w-8 h-7 shrink-0" aria-hidden="true" />
-          <span className="font-bold text-base text-chalk lowercase tracking-tight">corebooks</span>
+        {/* Logo */}
+        <div className="px-4 py-3 border-b border-rim">
+          <img src={logoSrc} alt="corebooks" className="w-full" />
         </div>
 
         {/* Nav */}
