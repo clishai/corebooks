@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Outlet, NavLink } from 'react-router-dom'
+import { useState, useRef, useLayoutEffect } from 'react'
+import { Outlet, NavLink, useLocation } from 'react-router-dom'
 import NewEntryModal from './NewEntryModal'
 import Toast from './Toast'
 import FirstLaunchModal, { shouldShowFirstLaunch, getCompanyName } from './FirstLaunchModal'
@@ -25,6 +25,22 @@ function CogIcon() {
   )
 }
 
+// Ordered list of routes — used to determine swipe direction on navigation.
+const ROUTE_ORDER = [
+  '/home',
+  '/accounts',
+  '/entries',
+  '/drafts',
+  '/reports/trial-balance',
+  '/reports/balance-sheet',
+  '/reports/income-statement',
+  '/settings',
+]
+
+function getRouteIndex(pathname: string): number {
+  return ROUTE_ORDER.findIndex((r) => pathname.startsWith(r))
+}
+
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   `flex items-center px-3 py-2 rounded text-sm font-medium transition-colors ${
     isActive
@@ -37,6 +53,21 @@ export default function Layout() {
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [showWelcome, setShowWelcome] = useState(shouldShowFirstLaunch)
   const [companyName, setCompanyName] = useState(getCompanyName)
+
+  const location = useLocation()
+  const prevRouteIndex = useRef(-1)
+  const currRouteIndex = getRouteIndex(location.pathname)
+
+  // Compute slide direction from the previous route index (ref not yet updated this render).
+  let slideClass = ''
+  if (prevRouteIndex.current !== -1 && currRouteIndex !== -1 && prevRouteIndex.current !== currRouteIndex) {
+    slideClass = currRouteIndex > prevRouteIndex.current ? 'page-slide-right' : 'page-slide-left'
+  }
+
+  // Update the ref after every render so the next navigation has a correct baseline.
+  useLayoutEffect(() => {
+    prevRouteIndex.current = currRouteIndex
+  })
 
   function handlePosted() {
     setShowNewEntry(false)
@@ -122,8 +153,8 @@ export default function Layout() {
           </button>
         </header>
 
-        {/* Page content */}
-        <main className="flex-1 overflow-auto p-6">
+        {/* Page content — key forces remount on navigation so the slide animation reruns */}
+        <main key={location.key} className={`flex-1 overflow-auto p-6 ${slideClass}`}>
           <Outlet />
         </main>
       </div>

@@ -19,6 +19,10 @@
   /* Text */
   --color-chalk: #eef2f8;
   --color-ash: #7d8a9e;
+
+  /* Font */
+  --font-sans: 'JetBrains Mono', monospace;
+  --font-mono: 'JetBrains Mono', monospace;
 }
 
 html,
@@ -26,4 +30,24 @@ body,
 #root {
   background-color: #0f1117;
   color: #eef2f8;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Page transition animations — spring cubic-bezier creates the bounce */
+@keyframes page-slide-from-right {
+  from { transform: translateX(36px); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+
+@keyframes page-slide-from-left {
+  from { transform: translateX(-36px); opacity: 0; }
+  to   { transform: translateX(0);     opacity: 1; }
+}
+
+.page-slide-right {
+  animation: page-slide-from-right 0.22s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.page-slide-left {
+  animation: page-slide-from-left 0.22s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
