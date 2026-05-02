@@ -55,7 +55,7 @@ The database layer and REST API are complete. Key decisions:
   runs migration SQL, clears and destroys between tests.
 - `vitest.config.ts` has `fileParallelism: false` to prevent `DATABASE_URL`
   env var races across test files.
-- Total: 103 tests passing (44 core + 26 DB + 33 API).
+- Total: 104 tests passing (44 core + 26 DB + 34 API).
 
 ## Branding
 
@@ -138,12 +138,17 @@ Release distribution:
   color-coded type badges and a New Account button.
 - `src/ui/pages/EntriesPage.tsx` — posted entries table with expandable rows
   showing individual debit/credit lines (dark mode).
-- `src/ui/pages/TrialBalancePage.tsx` — flat table of all accounts with raw
-  debit/credit balances; shows balanced status.
-- `src/ui/pages/BalanceSheetPage.tsx` — Assets / Liabilities / Equity totals
-  with an `asOf` date picker.
-- `src/ui/pages/IncomeStatementPage.tsx` — Revenue, Expenses, Net Income with
-  `from` / `to` date range pickers.
+- `src/ui/pages/TrialBalancePage.tsx` — accounts grouped by type (Asset /
+  Liability / Equity / Revenue / Expense) with debit/credit columns; balanced
+  status indicator.
+- `src/ui/pages/BalanceSheetPage.tsx` — collapsible sections: Current Assets,
+  Non-current Assets, Current Liabilities, Non-current Liabilities, Equity
+  Accounts; per-account lines with number and signed balance; Net Income shown
+  as a separate "current period · unreconciled" sub-line within Equity. `asOf`
+  date picker.
+- `src/ui/pages/IncomeStatementPage.tsx` — collapsible Revenue and Expenses
+  sections with per-account lines; Net Income grand total. `from` / `to` date
+  range pickers.
 - `src/ui/pages/DraftsPage.tsx` — Drafts table with Open (reopens modal pre-filled)
   and Delete (requires confirmation modal) actions.
 - `src/ui/components/Toast.tsx` — bottom-right corner auto-dismiss notification.
@@ -221,6 +226,55 @@ Release distribution:
 
 **Phases 4 and 5 are complete.**
 
+### Post-Phase 5 additions (current session)
+
+**Account current/non-current classification**
+- `Account` core type and Prisma schema gained an optional `classification: 'current' | 'non-current'`
+  field (defaults to `undefined`, treated as current in reports).
+- Migration: `prisma/migrations/20260502180906_add_account_classification/migration.sql` —
+  `ALTER TABLE "Account" ADD COLUMN "classification" TEXT`.
+- `src/db/ensureSchema.ts` uses `PRAGMA table_info` to add the column on existing databases
+  automatically (idempotent).
+- `NewAccountModal` shows a **Classification** radio row (Current / Non-current) whenever
+  type is Asset or Liability. A hoverable `?` badge in the row header shows a 2-sentence
+  context-sensitive tooltip (different copy for assets vs. liabilities).
+
+**Financial statement expansion**
+- `BalanceSheet` interface (core + UI client) gained `currentAssets`, `nonCurrentAssets`,
+  `currentLiabilities`, `nonCurrentLiabilities`, `retainedEquityAccounts` section fields
+  (`BalanceSheetSection = { lines: BalanceSheetLine[], total }`). All existing aggregate
+  fields (`assets`, `liabilities`, `retainedEquity`, `netIncome`, `equity`, `balanced`)
+  unchanged — no tests broken.
+- `IncomeStatement` gained `revenueLines` and `expenseLines` arrays alongside the existing
+  `revenue`, `expenses`, `netIncome` totals.
+- Balance sheet correctly shows Net Income as a distinct "current period · unreconciled"
+  line within the Equity section, separate from permanent Equity accounts.
+
+**UI overhaul — cypherpunk aesthetic**
+- **Font:** JetBrains Mono (Google Fonts) loaded via `src/ui/index.html` and set as the
+  global `font-family` and Tailwind `--font-sans` / `--font-mono` in `src/ui/index.css`.
+- **Financial statement tables:** spreadsheet-like grid with consistent 4-column layout
+  (chevron | account number | name | amount), `border-collapse`, `bg-void` section headers
+  in neon uppercase, `border-rim` grid lines, `rounded-sm` (sharper than the previous
+  `rounded-lg`). Expandable rows follow the same ▸/▾ pattern as `EntriesPage`.
+- **Page transitions:** `src/ui/components/Layout.tsx` tracks the previous route index via
+  a `useRef` updated in `useLayoutEffect`. On each navigation the `<main>` element gets
+  `key={location.key}` (forces remount) plus either `page-slide-right` or `page-slide-left`.
+  Keyframes + spring cubic-bezier `(0.34, 1.56, 0.64, 1)` are defined in `index.css`.
+  Duration: 220 ms.
+
+**Code condensation (no behavior changes)**
+- `Ledger.applyLines` — private static helper eliminates 3 copies of the 7-line
+  balance-accumulation loop shared by `applyEntry`, `buildBalancesAsOf`, and
+  `buildBalancesInRange`.
+- `validateEntry` — merged two separate `forEach` passes over lines into one;
+  replaced two `filter+reduce` chains for debit/credit totals with a single loop;
+  `MIN_DATE` extracted as a module-level constant.
+- `loadLedger` — now calls `listPostedEntries()` instead of duplicating its query.
+- `isPostgresUrl` / `postgresHasSSL` — extracted from `src/db/client.ts` and exported;
+  `settings.ts` now imports them instead of copy-pasting the 4-condition SSL check.
+- `DraftsPage` — merged byte-identical `handleModalClose` / `handlePosted` into one handler.
+
 **Pending UI items discussed but not yet built:**
 - **Sidebar logo** — a fixed-size placeholder `div` (32×28 px) sits beside the
   "corebooks" wordmark. No icon should be placed there until an actual logo
@@ -279,6 +333,10 @@ business name and business type, and populates the feature flag toggles that
 will gate AR/AP and inventory modules. Build this before any new modules so the
 toggle infrastructure is in place when those features land. Full spec is in the
 Future Feature Ideas section.
+
+The balance sheet and income statement now return per-account section breakdowns.
+Any future BalanceSheetPage or IncomeStatementPage work should preserve the
+`BalanceSheetSection` / `BalanceSheetLine` types introduced in this session.
 
 ### Phase 4 UI Constraints
 - No business logic in UI components. Components call `src/ui/api/client.ts`;
