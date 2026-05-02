@@ -1,17 +1,26 @@
 import { PrismaClient } from '../generated/prisma/client.js';
 import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
 
-// ── PostgreSQL SSL guard ──────────────────────────────────────────────────────
-// Warn loudly when a PostgreSQL URL is missing an explicit sslmode. Financial
-// data travelling unencrypted over the network is a serious privacy risk.
-function checkPostgresSSL(rawUrl: string): void {
-  if (!rawUrl.startsWith('postgresql://') && !rawUrl.startsWith('postgres://')) return;
-  const hasSSL =
+// ── PostgreSQL URL helpers ────────────────────────────────────────────────────
+
+export function isPostgresUrl(rawUrl: string): boolean {
+  return rawUrl.startsWith('postgresql://') || rawUrl.startsWith('postgres://');
+}
+
+export function postgresHasSSL(rawUrl: string): boolean {
+  return (
     rawUrl.includes('sslmode=require') ||
     rawUrl.includes('sslmode=verify-full') ||
     rawUrl.includes('sslmode=verify-ca') ||
-    rawUrl.includes('ssl=true');
-  if (!hasSSL) {
+    rawUrl.includes('ssl=true')
+  );
+}
+
+// Warn loudly when a PostgreSQL URL is missing an explicit sslmode. Financial
+// data travelling unencrypted over the network is a serious privacy risk.
+function checkPostgresSSL(rawUrl: string): void {
+  if (!isPostgresUrl(rawUrl)) return;
+  if (!postgresHasSSL(rawUrl)) {
     process.stderr.write(
       '[corebooks] WARNING: PostgreSQL DATABASE_URL does not specify sslmode. ' +
       'Add ?sslmode=require to encrypt data in transit.\n',

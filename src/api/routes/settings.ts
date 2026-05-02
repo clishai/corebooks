@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { FastifyPluginAsync } from 'fastify';
 import { AppContext } from '../server.js';
-import { getPrismaClient } from '../../db/client.js';
+import { getPrismaClient, isPostgresUrl, postgresHasSSL } from '../../db/client.js';
 import { listAccounts } from '../../db/repositories/accountRepository.js';
 import { listPostedEntries, listDraftEntries } from '../../db/repositories/entryRepository.js';
 
@@ -22,18 +22,10 @@ export const settingsRoutes: FastifyPluginAsync<RouteOptions> = async (app, opts
 
   app.get('/database', async () => {
     const rawUrl = process.env['DATABASE_URL'] ?? 'file:./prisma/dev.db';
-    const isPostgres = rawUrl.startsWith('postgresql://') || rawUrl.startsWith('postgres://');
-    const sslEnabled = !isPostgres || (
-      rawUrl.includes('sslmode=require') ||
-      rawUrl.includes('sslmode=verify-full') ||
-      rawUrl.includes('sslmode=verify-ca') ||
-      rawUrl.includes('ssl=true')
-    );
-    if (isPostgres) {
-      return { type: 'postgresql', path: null, sslEnabled };
+    if (isPostgresUrl(rawUrl)) {
+      return { type: 'postgresql', path: null, sslEnabled: postgresHasSSL(rawUrl) };
     }
-    const filePath = resolveDbPath();
-    return { type: 'sqlite', path: filePath, sslEnabled: true };
+    return { type: 'sqlite', path: resolveDbPath(), sslEnabled: true };
   });
 
   app.get('/stats', async () => {

@@ -52,11 +52,6 @@ export default function DraftsPage() {
     loadDrafts()
   }
 
-  function handlePosted() {
-    setOpenDraft(null)
-    loadDrafts()
-  }
-
   return (
     <div>
       <div className="mb-5">
@@ -163,7 +158,7 @@ export default function DraftsPage() {
         <NewEntryModal
           initialDraft={openDraft}
           onClose={handleModalClose}
-          onPosted={handlePosted}
+          onPosted={handleModalClose}
           onAutoSaved={() => setToastMessage('Draft saved.')}
         />
       )}

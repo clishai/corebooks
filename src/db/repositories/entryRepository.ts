@@ -43,16 +43,9 @@ export async function findEntryById(id: string): Promise<JournalEntry | null> {
 // kept live in memory for the duration of the process.
 
 export async function loadLedger(): Promise<Ledger> {
-  const prisma = getPrismaClient();
-  const rows = await prisma.journalEntry.findMany({
-    where: { status: EntryStatus.Posted },
-    include: INCLUDE_LINES,
-    orderBy: { createdAt: 'asc' },
-  });
-
+  const entries = await listPostedEntries();
   const ledger = new Ledger();
-  for (const row of rows as unknown as PrismaJournalEntry[]) {
-    const entry = toCoreJournalEntry(row);
+  for (const entry of entries) {
     ledger.applyEntry(entry);
     ledger.postedEntries.push(entry);
   }
