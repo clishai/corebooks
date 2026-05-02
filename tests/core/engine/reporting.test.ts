@@ -80,6 +80,41 @@ describe('balanceSheet', () => {
     const bs = balanceSheet(ledger, chart, new Date('2024-12-31'));
     expect(bs.balanced).toBe(true);
     expect(bs.assets).toBe(bs.liabilities + bs.equity);
+    // No revenue/expense entries in beforeEach, so netIncome is zero and
+    // equity equals the permanent equity contribution only.
+    expect(bs.retainedEquity).toBe(5000);
+    expect(bs.netIncome).toBe(0);
+    expect(bs.equity).toBe(bs.retainedEquity + bs.netIncome);
+  });
+
+  it('separates permanent equity accounts from current-period net income', () => {
+    // Record a cash sale and a rent expense after the opening entries.
+    postEntry(
+      draft([
+        { accountId: 'cash', amount: 2000, type: 'debit' },
+        { accountId: 'sales', amount: 2000, type: 'credit' },
+      ]),
+      chart,
+      ledger
+    );
+    postEntry(
+      draft([
+        { accountId: 'rent', amount: 800, type: 'debit' },
+        { accountId: 'cash', amount: 800, type: 'credit' },
+      ]),
+      chart,
+      ledger
+    );
+
+    const bs = balanceSheet(ledger, chart, new Date('2024-12-31'));
+    // Equity accounts unchanged — only the Owner's Equity contribution.
+    expect(bs.retainedEquity).toBe(5000);
+    // Net income = 2000 revenue - 800 expense.
+    expect(bs.netIncome).toBe(1200);
+    // Total equity is the sum.
+    expect(bs.equity).toBe(6200);
+    expect(bs.equity).toBe(bs.retainedEquity + bs.netIncome);
+    expect(bs.balanced).toBe(true);
   });
 
   it('nets contra-asset against assets', () => {

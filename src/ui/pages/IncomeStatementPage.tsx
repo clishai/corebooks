@@ -1,13 +1,72 @@
-import { useState, useEffect } from 'react'
-import { api, IncomeStatement } from '../api/client'
+import { useState, useEffect, Fragment } from 'react'
+import { api, IncomeStatement, BalanceSheetLine } from '../api/client'
 
 function fmt(amount: number): string {
+  if (amount < 0) {
+    return `(${Math.abs(amount).toLocaleString('en-US', { style: 'currency', currency: 'USD' })})`
+  }
   return amount.toLocaleString('en-US', { style: 'currency', currency: 'USD' })
 }
 
 function currentYearRange(): { from: string; to: string } {
   const year = new Date().getFullYear()
   return { from: `${year}-01-01`, to: `${year}-12-31` }
+}
+
+const colChevron = 'w-8 text-center pl-2'
+const colNumber  = 'w-24 px-2 font-mono text-xs'
+const colName    = 'px-2'
+const colAmount  = 'w-44 px-3 text-right font-mono text-sm'
+
+interface AccountGroupProps {
+  label: string
+  lines: BalanceSheetLine[]
+  total: number
+  expanded: boolean
+  onToggle: () => void
+  subtotalLabel: string
+  totalColor?: string
+}
+
+function AccountGroup({ label, lines, total, expanded, onToggle, subtotalLabel, totalColor = 'text-chalk' }: AccountGroupProps) {
+  const hasLines = lines.length > 0
+  return (
+    <Fragment>
+      <tr
+        className={`border-b border-rim ${hasLines ? 'cursor-pointer hover:bg-raised/60' : ''} transition-colors`}
+        onClick={hasLines ? onToggle : undefined}
+      >
+        <td className={`${colChevron} py-2.5 text-ash text-xs select-none`}>
+          {hasLines ? (expanded ? '▾' : '▸') : ''}
+        </td>
+        <td className={`${colNumber} py-2.5 text-ash`}></td>
+        <td className={`${colName} py-2.5 text-sm font-semibold text-chalk`}>{label}</td>
+        <td className={`${colAmount} py-2.5 font-semibold ${total === 0 ? 'text-ash' : totalColor}`}>
+          {total === 0 && !hasLines ? '—' : fmt(total)}
+        </td>
+      </tr>
+
+      {expanded && lines.map((line) => (
+        <tr key={line.accountId} className="border-b border-rim/60 bg-void/40">
+          <td className={`${colChevron} py-2`}></td>
+          <td className={`${colNumber} py-2 text-ash/70`}>{line.accountNumber}</td>
+          <td className={`${colName} py-2 pl-7 text-sm text-ash`}>{line.accountName}</td>
+          <td className={`${colAmount} py-2 ${line.balance < 0 ? 'text-red-400' : 'text-chalk/90'}`}>
+            {fmt(line.balance)}
+          </td>
+        </tr>
+      ))}
+
+      {expanded && hasLines && (
+        <tr className="border-b border-rim">
+          <td className={`${colChevron} py-2`}></td>
+          <td className={`${colNumber} py-2`}></td>
+          <td className={`${colName} py-2 pl-7 text-xs text-ash uppercase tracking-wide`}>{subtotalLabel}</td>
+          <td className={`${colAmount} py-2 ${totalColor} font-semibold border-t border-rim`}>{fmt(total)}</td>
+        </tr>
+      )}
+    </Fragment>
+  )
 }
 
 export default function IncomeStatementPage() {
@@ -17,6 +76,8 @@ export default function IncomeStatementPage() {
   const [report, setReport] = useState<IncomeStatement | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [openRev, setOpenRev] = useState(true)
+  const [openExp, setOpenExp] = useState(true)
 
   function fetchReport(f: string, t: string) {
     if (!f || !t || f > t) return
@@ -29,21 +90,7 @@ export default function IncomeStatementPage() {
       .finally(() => setLoading(false))
   }
 
-  useEffect(() => {
-    fetchReport(from, to)
-  }, [])
-
-  function handleFromChange(e: React.ChangeEvent<HTMLInputElement>) {
-    setFrom(e.target.value)
-    fetchReport(e.target.value, to)
-  }
-
-  function handleToChange(e: React.ChangeEvent<HTMLInputElement>) {
-    setTo(e.target.value)
-    fetchReport(from, e.target.value)
-  }
-
-  const isProfit = report ? report.netIncome >= 0 : true
+  useEffect(() => { fetchReport(from, to) }, [])
 
   return (
     <div>
@@ -55,62 +102,84 @@ export default function IncomeStatementPage() {
         <div className="flex items-center gap-2 flex-wrap">
           <label className="text-xs font-medium text-ash">From</label>
           <input
-            type="date"
-            value={from}
-            onChange={handleFromChange}
-            className="bg-raised border border-rim text-chalk rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-neon"
+            type="date" value={from}
+            onChange={(e) => { setFrom(e.target.value); fetchReport(e.target.value, to) }}
+            className="bg-raised border border-rim text-chalk rounded-sm px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-neon"
           />
           <label className="text-xs font-medium text-ash">To</label>
           <input
-            type="date"
-            value={to}
-            onChange={handleToChange}
-            className="bg-raised border border-rim text-chalk rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-neon"
+            type="date" value={to}
+            onChange={(e) => { setTo(e.target.value); fetchReport(from, e.target.value) }}
+            className="bg-raised border border-rim text-chalk rounded-sm px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-neon"
           />
         </div>
       </div>
 
       {from > to && (
-        <div className="text-sm text-amber-300 bg-amber-950/50 border border-amber-800 px-4 py-3 rounded-md mb-4">
+        <div className="text-sm text-amber-300 bg-amber-950/50 border border-amber-800 px-4 py-3 rounded-sm mb-4">
           The start date must be before or equal to the end date.
         </div>
       )}
 
       {loading && <p className="text-sm text-ash">Loading…</p>}
-
       {error && (
-        <div className="text-sm text-red-300 bg-red-950/50 border border-red-800 px-4 py-3 rounded-md">
+        <div className="text-sm text-red-300 bg-red-950/50 border border-red-800 px-4 py-3 rounded-sm">
           {error}
         </div>
       )}
 
       {report && !loading && (
-        <div className="max-w-md">
-          <div className="bg-surface rounded-lg border border-rim overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-rim hover:bg-raised transition-colors">
-              <span className="text-sm font-medium text-ash">Revenue</span>
-              <span className="font-mono text-chalk font-semibold">{fmt(report.revenue)}</span>
-            </div>
-            <div className="flex items-center justify-between px-5 py-4 border-b border-rim hover:bg-raised transition-colors">
-              <span className="text-sm font-medium text-ash">Expenses</span>
-              <span className="font-mono text-chalk font-semibold">{fmt(report.expenses)}</span>
-            </div>
+        <div className="max-w-2xl">
+          <div className="border border-rim rounded-sm overflow-hidden">
+            <table className="w-full text-sm border-collapse">
 
-            {/* Net income */}
-            <div className="flex items-center justify-between px-5 py-4 bg-raised border-t-2 border-rim">
-              <span className="text-sm font-semibold text-chalk">Net Income</span>
-              <span
-                className={`font-mono font-bold text-base ${
-                  isProfit ? 'text-emerald-400' : 'text-red-400'
-                }`}
-              >
-                {fmt(report.netIncome)}
-              </span>
-            </div>
+              {/* Section label */}
+              <thead>
+                <tr className="bg-void border-b border-rim">
+                  <th colSpan={4} className="px-3 py-2 text-left text-xs font-bold text-neon uppercase tracking-widest">
+                    Income Statement
+                  </th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {/* Revenue */}
+                <AccountGroup
+                  label="Revenue"
+                  lines={report.revenueLines}
+                  total={report.revenue}
+                  expanded={openRev}
+                  onToggle={() => setOpenRev((v) => !v)}
+                  subtotalLabel="Total Revenue"
+                  totalColor="text-emerald-400"
+                />
+
+                {/* Expenses */}
+                <AccountGroup
+                  label="Expenses"
+                  lines={report.expenseLines}
+                  total={report.expenses}
+                  expanded={openExp}
+                  onToggle={() => setOpenExp((v) => !v)}
+                  subtotalLabel="Total Expenses"
+                  totalColor="text-amber-400"
+                />
+
+                {/* Net income grand total */}
+                <tr className="bg-raised border-t-2 border-rim">
+                  <td className={`${colChevron} py-3`}></td>
+                  <td className={`${colNumber} py-3`}></td>
+                  <td className={`${colName} py-3 text-sm font-bold text-chalk uppercase tracking-wide`}>Net Income</td>
+                  <td className={`${colAmount} py-3 font-bold text-base ${report.netIncome < 0 ? 'text-red-400' : 'text-neon'}`}>
+                    {fmt(report.netIncome)}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
 
-          {!isProfit && (
-            <div className="text-sm text-amber-300 bg-amber-950/50 border border-amber-800 px-4 py-3 rounded-md mt-4">
+          {report.netIncome < 0 && (
+            <div className="text-sm text-amber-300 bg-amber-950/50 border border-amber-800 px-4 py-3 rounded-sm mt-3">
               Net income is negative — expenses exceed revenue for this period.
             </div>
           )}
