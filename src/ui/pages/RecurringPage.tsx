@@ -21,7 +21,7 @@ export default function RecurringPage() {
   }
 
   return (
-    <div className="p-6 max-w-3xl">
+    <div className="max-w-3xl">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-chalk font-semibold text-lg">Recurring Transactions</h1>
         <button

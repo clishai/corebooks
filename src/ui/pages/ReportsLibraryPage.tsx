@@ -17,7 +17,7 @@ export default function ReportsLibraryPage() {
   }
 
   return (
-    <div className="p-6 max-w-2xl">
+    <div className="max-w-2xl">
       <h1 className="text-chalk font-semibold text-lg mb-1">Reports Library</h1>
       <p className="text-ash text-sm mb-6">
         Pin reports to your sidebar for quick access. Pinned reports appear under the Reports section.

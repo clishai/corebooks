@@ -214,7 +214,7 @@ export default function Layout() {
         </header>
 
         {/* Page content */}
-        <main key={location.key} className={`flex-1 overflow-auto ${slideClass}`}>
+        <main key={location.key} className={`flex-1 overflow-auto p-6 ${slideClass}`}>
           <Outlet />
         </main>
       </div>
