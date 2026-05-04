@@ -31,15 +31,16 @@ enum LineType {
 }
 
 model Account {
-  id             String        @id @default(cuid())
-  number         String        @unique
+  id             String          @id @default(cuid())
+  number         String          @unique
   name           String
   type           AccountType
   normalBalance  NormalBalance
-  isContra       Boolean       @default(false)
+  isContra       Boolean         @default(false)
   contraTo       AccountType?
   classification String?
   lines          JournalLine[]
+  recurringLines RecurringLine[]
 }
 
 model JournalEntry {
@@ -62,4 +63,28 @@ model JournalLine {
   type      LineType
   entry     JournalEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
   account   Account      @relation(fields: [accountId], references: [id])
+}
+
+model RecurringTemplate {
+  id            String          @id @default(cuid())
+  name          String
+  memo          String
+  paymentMethod String?
+  schedule      String
+  customCron    String?
+  nextDue       DateTime
+  autoPost      Boolean         @default(false)
+  lines         RecurringLine[]
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+}
+
+model RecurringLine {
+  id         String            @id @default(cuid())
+  templateId String
+  accountId  String
+  type       String
+  amount     Int
+  template   RecurringTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  account    Account           @relation(fields: [accountId], references: [id])
 }
