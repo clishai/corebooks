@@ -88,3 +88,19 @@ model RecurringLine {
   template   RecurringTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
   account    Account           @relation(fields: [accountId], references: [id])
 }
+
+model PeriodConfig {
+  id                     String  @id @default("singleton")
+  fiscalYearEndMonth     Int     @default(12)
+  fiscalYearEndDay       Int     @default(31)
+  closeFrequency         String  @default("year-end")
+  retainedEarningsAcctId String?
+}
+
+model ClosedPeriod {
+  id       String   @id @default(cuid())
+  year     Int
+  month    Int
+  closedAt DateTime @default(now())
+  entryId  String
+}

@@ -68,6 +68,8 @@ export function ensureSchema(dbPath: string): void {
     if (!cols.includes('classification')) {
       db.exec('ALTER TABLE "Account" ADD COLUMN "classification" TEXT');
     }
+    db.exec(`CREATE TABLE IF NOT EXISTS "PeriodConfig" ("id" TEXT NOT NULL PRIMARY KEY DEFAULT 'singleton', "fiscalYearEndMonth" INTEGER NOT NULL DEFAULT 12, "fiscalYearEndDay" INTEGER NOT NULL DEFAULT 31, "closeFrequency" TEXT NOT NULL DEFAULT 'year-end', "retainedEarningsAcctId" TEXT)`);
+    db.exec(`CREATE TABLE IF NOT EXISTS "ClosedPeriod" ("id" TEXT NOT NULL PRIMARY KEY, "year" INTEGER NOT NULL, "month" INTEGER NOT NULL, "closedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "entryId" TEXT NOT NULL)`);
   } finally {
     db.close();
   }
