@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import {
   BusinessType,
-  FeatureFlags,
   saveBusinessType,
   saveFeatureFlags,
 } from '../lib/featureFlags'
+import { getTemplatesForBusinessType, type AccountTemplate } from '../lib/accountTemplates'
+import { api } from '../api/client'
 
 const WELCOMED_KEY = 'cb_welcomed'
 export const COMPANY_NAME_KEY = 'cb_company_name'
@@ -50,19 +51,12 @@ const BUSINESS_TYPES: { value: BusinessType; label: string; description: string 
 const inputClass =
   'w-full bg-base border border-rim rounded-md px-3 py-2 text-chalk placeholder:text-ash focus:outline-none focus:border-neon text-sm'
 
-function ComingSoonBadge() {
-  return (
-    <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold bg-violet/10 text-violet border border-violet/30 ml-2">
-      coming soon
-    </span>
-  )
-}
-
 export default function OnboardingWizard({ onDismiss }: Props) {
   const [step, setStep] = useState<Step>('name')
   const [companyName, setCompanyName] = useState(() => localStorage.getItem(COMPANY_NAME_KEY) ?? '')
   const [businessType, setBusinessType] = useState<BusinessType | null>(null)
-  const [flags, setFlags] = useState<FeatureFlags>({ ar_ap: false, inventory: false })
+  const [selectedTemplates, setSelectedTemplates] = useState<Set<string>>(new Set())
+  const [addingTemplates, setAddingTemplates] = useState(false)
 
   const stepNum = step === 'name' ? 1 : step === 'type' ? 2 : 3
 
@@ -71,26 +65,44 @@ export default function OnboardingWizard({ onDismiss }: Props) {
   }
 
   function handleTypeNext() {
-    // Pre-select recommended modules based on business type
-    setFlags({
-      ar_ap:
-        businessType === 'service' ||
-        businessType === 'product' ||
-        businessType === 'nonprofit',
-      inventory: businessType === 'product',
-    })
+    setSelectedTemplates(new Set())
     setStep('modules')
   }
 
-  function toggleFlag(key: keyof FeatureFlags) {
-    setFlags((f) => ({ ...f, [key]: !f[key] }))
+  function toggleTemplate(number: string) {
+    setSelectedTemplates((prev) => {
+      const next = new Set(prev)
+      next.has(number) ? next.delete(number) : next.add(number)
+      return next
+    })
   }
 
-  function finish() {
+  async function handleAddSelected(suggestedTemplates: AccountTemplate[]) {
+    setAddingTemplates(true)
+    for (const t of suggestedTemplates.filter((t) => selectedTemplates.has(t.number))) {
+      try {
+        await api.accounts.create({
+          number: t.number,
+          name: t.name,
+          type: t.type,
+          normalBalance: t.normalBalance,
+          isContra: t.isContra,
+          contraTo: t.contraTo,
+          classification: t.classification,
+        })
+      } catch {
+        // skip existing
+      }
+    }
+    setAddingTemplates(false)
+  }
+
+  async function finish(suggestedTemplates: AccountTemplate[]) {
+    await handleAddSelected(suggestedTemplates)
     const name = companyName.trim()
     if (name) localStorage.setItem(COMPANY_NAME_KEY, name)
     if (businessType) saveBusinessType(businessType)
-    saveFeatureFlags(flags)
+    saveFeatureFlags({ ar_ap: false, inventory: false })
     localStorage.setItem(WELCOMED_KEY, '1')
     onDismiss()
   }
@@ -103,6 +115,8 @@ export default function OnboardingWizard({ onDismiss }: Props) {
     localStorage.setItem(WELCOMED_KEY, '1')
     onDismiss()
   }
+
+  const suggestedTemplates = getTemplatesForBusinessType(businessType ?? 'other').slice(0, 12)
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
@@ -191,84 +205,60 @@ export default function OnboardingWizard({ onDismiss }: Props) {
             </>
           )}
 
-          {/* ── Step 3: Optional modules ── */}
+          {/* ── Step 3: Account template suggestions ── */}
           {step === 'modules' && (
             <>
-              <h2 className="text-lg font-bold text-chalk lowercase">optional modules</h2>
+              <h2 className="text-lg font-bold text-chalk lowercase">starter accounts</h2>
               <p className="text-sm text-ash">
-                Enable modules you plan to use. Disabled modules are hidden from the sidebar.
-                You can change these in Settings at any time.
+                Select accounts to add to your chart of accounts. You can add more at any time
+                from the Account Library in Settings.
               </p>
 
-              <div className="bg-void border border-rim rounded-lg divide-y divide-rim">
-                {/* AR/AP */}
-                <label
-                  onClick={() => toggleFlag('ar_ap')}
-                  className="flex items-start gap-4 px-5 py-4 cursor-pointer hover:bg-surface transition-colors"
-                >
-                  <div
-                    className={`mt-0.5 w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${
-                      flags.ar_ap ? 'bg-neon border-neon' : 'border-rim bg-base'
-                    }`}
-                  >
-                    {flags.ar_ap && (
-                      <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
-                        <path
-                          d="M1 4L3.5 6.5L9 1"
-                          stroke="#0a0c12"
-                          strokeWidth="1.8"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      </svg>
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-chalk">
-                      AR / AP Manager
-                      <ComingSoonBadge />
-                    </p>
-                    <p className="text-xs text-ash mt-0.5">
-                      Track invoices, customer payments, and vendor bills. Great for businesses
-                      that send or receive invoices.
-                    </p>
-                  </div>
-                </label>
-
-                {/* Inventory */}
-                <label
-                  onClick={() => toggleFlag('inventory')}
-                  className="flex items-start gap-4 px-5 py-4 cursor-pointer hover:bg-surface transition-colors"
-                >
-                  <div
-                    className={`mt-0.5 w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${
-                      flags.inventory ? 'bg-neon border-neon' : 'border-rim bg-base'
-                    }`}
-                  >
-                    {flags.inventory && (
-                      <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
-                        <path
-                          d="M1 4L3.5 6.5L9 1"
-                          stroke="#0a0c12"
-                          strokeWidth="1.8"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      </svg>
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-chalk">
-                      Inventory
-                      <ComingSoonBadge />
-                    </p>
-                    <p className="text-xs text-ash mt-0.5">
-                      Track physical goods, quantities on hand, and cost of goods sold.
-                      For businesses that sell products.
-                    </p>
-                  </div>
-                </label>
+              <div className="bg-void border border-rim rounded-lg divide-y divide-rim max-h-64 overflow-y-auto">
+                {suggestedTemplates.map((t) => {
+                  const checked = selectedTemplates.has(t.number)
+                  return (
+                    <label
+                      key={t.number}
+                      onClick={() => toggleTemplate(t.number)}
+                      className="flex items-start gap-4 px-5 py-3 cursor-pointer hover:bg-surface transition-colors"
+                    >
+                      <div
+                        className={`mt-0.5 w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${
+                          checked ? 'bg-neon border-neon' : 'border-rim bg-base'
+                        }`}
+                      >
+                        {checked && (
+                          <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
+                            <path
+                              d="M1 4L3.5 6.5L9 1"
+                              stroke="#0a0c12"
+                              strokeWidth="1.8"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </svg>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-ash text-xs font-mono">{t.number}</span>
+                          <span className="text-sm font-medium text-chalk truncate">{t.name}</span>
+                          {t.isContra && <span className="text-violet text-[10px]">contra</span>}
+                        </div>
+                        <p className="text-xs text-ash mt-0.5 line-clamp-1">{t.description}</p>
+                      </div>
+                    </label>
+                  )
+                })}
               </div>
+
+              {suggestedTemplates.length === 0 && (
+                <p className="text-sm text-ash">
+                  No template suggestions for this business type. You can add accounts manually
+                  from the chart of accounts.
+                </p>
+              )}
             </>
           )}
 
@@ -305,10 +295,15 @@ export default function OnboardingWizard({ onDismiss }: Props) {
           )}
           {step === 'modules' && (
             <button
-              onClick={finish}
-              className="bg-neon hover:bg-neon-dim text-void text-sm font-bold px-6 py-2.5 rounded-md transition-colors"
+              onClick={() => finish(suggestedTemplates)}
+              disabled={addingTemplates}
+              className="bg-neon hover:bg-neon-dim disabled:opacity-50 text-void text-sm font-bold px-6 py-2.5 rounded-md transition-colors"
             >
-              Finish ✓
+              {addingTemplates
+                ? 'Adding accounts…'
+                : selectedTemplates.size > 0
+                  ? `Add ${selectedTemplates.size} & Finish`
+                  : 'Finish ✓'}
             </button>
           )}
         </div>
