@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { api, DatabaseSettings, DbStats, getPeriodConfig, savePeriodConfig, listAccounts, Account, PeriodConfig } from '../api/client'
+import { ACCOUNT_TEMPLATES, type AccountTemplate } from '../lib/accountTemplates'
 import { ALL_METRICS, MetricId, getSelectedMetrics, saveSelectedMetrics, HomeLayout, getHomeLayout, saveHomeLayout } from '../lib/metrics'
 import { SNOOZE_OPTIONS, getSnoozeDuration, saveSnoozeDuration } from '../lib/alerts'
 import { ALL_ACCOUNT_COLUMNS, AccountColumnId, getVisibleColumns, saveVisibleColumns } from '../lib/accountColumns'
@@ -186,13 +187,55 @@ function HomePageSettings() {
 
 // ── Accounts tab ─────────────────────────────────────────────────────────────
 
+const LIBRARY_GROUPS: Array<{ label: string; type: AccountTemplate['type'] }> = [
+  { label: 'Assets', type: 'Asset' },
+  { label: 'Liabilities', type: 'Liability' },
+  { label: 'Equity', type: 'Equity' },
+  { label: 'Revenue', type: 'Revenue' },
+  { label: 'Expenses', type: 'Expense' },
+]
+
 function AccountsSettings() {
   const [visible, setVisible] = useState<AccountColumnId[]>(getVisibleColumns)
+  const [existingNumbers, setExistingNumbers] = useState<Set<string>>(new Set())
+  const [addedNumbers, setAddedNumbers] = useState<Set<string>>(new Set())
+  const [addingNumbers, setAddingNumbers] = useState<Set<string>>(new Set())
+  const [expandedGroup, setExpandedGroup] = useState<AccountTemplate['type'] | null>(null)
+
+  useEffect(() => {
+    api.accounts.list()
+      .then((accts) => setExistingNumbers(new Set(accts.map((a) => a.number))))
+      .catch(() => {})
+  }, [])
 
   function toggle(id: AccountColumnId) {
     const next = visible.includes(id) ? visible.filter((c) => c !== id) : [...visible, id]
     setVisible(next)
     saveVisibleColumns(next)
+  }
+
+  async function handleAddTemplate(t: AccountTemplate) {
+    setAddingNumbers((prev) => new Set(prev).add(t.number))
+    try {
+      await api.accounts.create({
+        number: t.number,
+        name: t.name,
+        type: t.type,
+        normalBalance: t.normalBalance,
+        isContra: t.isContra,
+        contraTo: t.contraTo,
+        classification: t.classification,
+      })
+      setAddedNumbers((prev) => new Set(prev).add(t.number))
+    } catch {
+      // skip duplicates
+    } finally {
+      setAddingNumbers((prev) => {
+        const next = new Set(prev)
+        next.delete(t.number)
+        return next
+      })
+    }
   }
 
   return (
@@ -236,6 +279,65 @@ function AccountsSettings() {
         <p className="text-xs text-ash">
           Changes save automatically and take effect the next time you visit the accounts page.
         </p>
+      </div>
+
+      {/* Account Library */}
+      <div className="space-y-3">
+        <h3 className="text-sm font-semibold text-chalk">Account Library</h3>
+        <p className="text-sm text-ash leading-relaxed">
+          Add standard accounts to your chart of accounts. Expand a group to browse templates.
+        </p>
+        <div className="bg-surface border border-rim rounded-lg divide-y divide-rim">
+          {LIBRARY_GROUPS.map(({ label, type }) => {
+            const templates = ACCOUNT_TEMPLATES.filter((t) => t.type === type)
+            const isExpanded = expandedGroup === type
+            return (
+              <div key={type}>
+                <button
+                  onClick={() => setExpandedGroup(isExpanded ? null : type)}
+                  className="w-full flex items-center justify-between px-5 py-3 hover:bg-raised transition-colors"
+                >
+                  <span className="text-sm font-medium text-chalk">{label}</span>
+                  <span className="text-ash text-xs">{isExpanded ? '▾' : '▸'}</span>
+                </button>
+                {isExpanded && (
+                  <div className="border-t border-rim/50">
+                    {templates.map((t) => {
+                      const alreadyExists = existingNumbers.has(t.number) || addedNumbers.has(t.number)
+                      const isAdding = addingNumbers.has(t.number)
+                      return (
+                        <div
+                          key={t.number}
+                          className="flex items-start justify-between px-5 py-2.5 border-b border-rim/30 last:border-0 hover:bg-raised/50"
+                        >
+                          <div className="flex-1 min-w-0 mr-3">
+                            <div className="flex items-center gap-2">
+                              <span className="text-ash text-xs font-mono">{t.number}</span>
+                              <span className="text-chalk text-xs truncate">{t.name}</span>
+                              {t.isContra && <span className="text-violet text-[10px]">contra</span>}
+                            </div>
+                            <p className="text-ash text-[10px] mt-0.5 line-clamp-1">{t.description}</p>
+                          </div>
+                          <button
+                            onClick={() => !alreadyExists && handleAddTemplate(t)}
+                            disabled={alreadyExists || isAdding}
+                            className={`text-[10px] font-semibold shrink-0 px-2 py-1 rounded-sm border transition-colors ${
+                              alreadyExists
+                                ? 'border-rim text-ash cursor-default'
+                                : 'border-neon text-neon hover:bg-neon hover:text-void'
+                            }`}
+                          >
+                            {alreadyExists ? 'Added' : isAdding ? '…' : 'ADD+'}
+                          </button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
       </div>
     </div>
   )
