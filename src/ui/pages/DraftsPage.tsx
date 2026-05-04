@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { api, JournalEntry } from '../api/client'
 import NewEntryModal from '../components/NewEntryModal'
 import Toast from '../components/Toast'
+import BulkActionBar from '../components/BulkActionBar'
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', {
@@ -19,6 +20,19 @@ export default function DraftsPage() {
   const [deleting, setDeleting] = useState(false)
   const [openDraft, setOpenDraft] = useState<JournalEntry | null>(null)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+
+  function toggleSelect(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  function clearSelection() {
+    setSelected(new Set())
+  }
 
   const loadDrafts = useCallback(() => {
     setLoading(true)
@@ -32,6 +46,14 @@ export default function DraftsPage() {
   useEffect(() => {
     loadDrafts()
   }, [loadDrafts])
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') clearSelection()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   async function handleDelete() {
     if (!deleteId) return
@@ -74,6 +96,7 @@ export default function DraftsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-raised border-b border-rim">
+                <th className="w-8" />
                 <th className="text-left px-4 py-3 font-medium text-ash w-32">Date</th>
                 <th className="text-left px-4 py-3 font-medium text-ash">Memo</th>
                 <th className="text-right px-4 py-3 font-medium text-ash w-36">Actions</th>
@@ -82,7 +105,7 @@ export default function DraftsPage() {
             <tbody>
               {drafts.length === 0 ? (
                 <tr>
-                  <td colSpan={3} className="px-4 py-10 text-center text-ash text-sm">
+                  <td colSpan={4} className="px-4 py-10 text-center text-ash text-sm">
                     No drafts. Start a new entry and use{' '}
                     <strong className="text-chalk">Save Draft</strong> to keep unfinished work.
                   </td>
@@ -91,8 +114,17 @@ export default function DraftsPage() {
                 drafts.map((draft) => (
                   <tr
                     key={draft.id}
-                    className="border-b border-rim last:border-0 hover:bg-raised transition-colors"
+                    className="group border-b border-rim last:border-0 hover:bg-raised transition-colors"
                   >
+                    <td className="py-2 px-2 w-8">
+                      <input
+                        type="checkbox"
+                        checked={selected.has(draft.id ?? '')}
+                        onChange={() => toggleSelect(draft.id ?? '')}
+                        className="opacity-0 group-hover:opacity-100 checked:opacity-100 accent-neon transition-opacity"
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </td>
                     <td className="px-4 py-3 text-ash whitespace-nowrap">
                       {formatDate(draft.date)}
                     </td>
@@ -127,6 +159,52 @@ export default function DraftsPage() {
           </table>
         </div>
       )}
+
+      <BulkActionBar
+        count={selected.size}
+        onClear={clearSelection}
+        actions={[
+          {
+            label: 'Post selected',
+            onClick: async () => {
+              const ids = Array.from(selected)
+              for (const id of ids) {
+                await api.entries.post(id)
+              }
+              clearSelection()
+              loadDrafts()
+            },
+          },
+          {
+            label: 'Delete selected',
+            destructive: true,
+            onClick: async () => {
+              if (!confirm(`Delete ${selected.size} draft(s)?`)) return
+              const ids = Array.from(selected)
+              for (const id of ids) {
+                await api.entries.delete(id)
+              }
+              clearSelection()
+              loadDrafts()
+            },
+          },
+          {
+            label: 'Export selected',
+            onClick: () => {
+              const selectedDrafts = drafts.filter((d) => selected.has(d.id ?? ''))
+              const blob = new Blob([JSON.stringify(selectedDrafts, null, 2)], {
+                type: 'application/json',
+              })
+              const url = URL.createObjectURL(blob)
+              const a = document.createElement('a')
+              a.href = url
+              a.download = `drafts-export-${new Date().toISOString().slice(0, 10)}.json`
+              a.click()
+              URL.revokeObjectURL(url)
+            },
+          },
+        ]}
+      />
 
       {/* Delete confirmation modal */}
       {deleteId && (
