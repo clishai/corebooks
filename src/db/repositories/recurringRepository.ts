@@ -28,7 +28,7 @@ function fromDbCents(cents: number): number {
 
 export async function createRecurringTemplate(input: RecurringTemplateInput) {
   const prisma = getPrismaClient()
-  return prisma.recurringTemplate.create({
+  const t = await prisma.recurringTemplate.create({
     data: {
       name: input.name,
       memo: input.memo,
@@ -47,6 +47,7 @@ export async function createRecurringTemplate(input: RecurringTemplateInput) {
     },
     include: { lines: true },
   })
+  return { ...t, lines: t.lines.map((l) => ({ ...l, amount: fromDbCents(l.amount) })) }
 }
 
 export async function listRecurringTemplates() {
