@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { api, Account, AccountType, TrialBalanceRow } from '../api/client'
 import NewAccountModal from '../components/NewAccountModal'
 import EditAccountModal from '../components/EditAccountModal'
 import { AccountColumnId, getVisibleColumns } from '../lib/accountColumns'
+import BulkActionBar from '../components/BulkActionBar'
 
 function typeBadge(type: AccountType): string {
   switch (type) {
@@ -39,8 +40,21 @@ export default function AccountsPage() {
   const [showNew, setShowNew] = useState(false)
   const [editAccount, setEditAccount] = useState<Account | null>(null)
   const [visibleCols, setVisibleCols] = useState<AccountColumnId[]>(getVisibleColumns)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
 
-  useEffect(() => {
+  function toggleSelect(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  function clearSelection() {
+    setSelected(new Set())
+  }
+
+  const loadAccounts = useCallback(() => {
     Promise.all([api.accounts.list(), api.reports.trialBalance()])
       .then(([accts, tb]) => {
         setAccounts(accts)
@@ -48,6 +62,18 @@ export default function AccountsPage() {
       })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Failed to load accounts.'))
       .finally(() => setLoading(false))
+  }, [])
+
+  useEffect(() => {
+    loadAccounts()
+  }, [loadAccounts])
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') clearSelection()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
   // Re-read column prefs whenever the user navigates back to this page (storage
@@ -80,7 +106,8 @@ export default function AccountsPage() {
   const show = (col: AccountColumnId) => visibleCols.includes(col)
 
   // Number + Name (fixed) + one column per visible optional col + edit button (fixed)
-  const colCount = 3 + visibleCols.length
+  // checkbox col (1) + Number + Name (2 fixed) + optional cols + edit button (1)
+  const colCount = 4 + visibleCols.length
 
   return (
     <div>
@@ -107,6 +134,7 @@ export default function AccountsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-raised border-b border-rim">
+                <th className="w-8" />
                 <th className="text-left px-4 py-3 font-medium text-ash">Number</th>
                 <th className="text-left px-4 py-3 font-medium text-ash">Name</th>
                 {show('type')           && <th className="text-left px-4 py-3 font-medium text-ash">Type</th>}
@@ -134,6 +162,15 @@ export default function AccountsPage() {
                       key={account.id}
                       className="group border-b border-rim last:border-0 hover:bg-raised transition-colors"
                     >
+                      <td className="py-2 px-2 w-8">
+                        <input
+                          type="checkbox"
+                          checked={selected.has(account.id)}
+                          onChange={() => toggleSelect(account.id)}
+                          className="opacity-0 group-hover:opacity-100 checked:opacity-100 accent-neon transition-opacity"
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      </td>
                       <td className="px-4 py-3 font-mono text-ash">{account.number}</td>
                       <td className="px-4 py-3 text-chalk font-medium">{account.name}</td>
                       {show('type') && (
@@ -186,6 +223,26 @@ export default function AccountsPage() {
           </table>
         </div>
       )}
+
+      <BulkActionBar
+        count={selected.size}
+        onClear={clearSelection}
+        actions={[
+          {
+            label: 'Set classification',
+            onClick: async () => {
+              const val = prompt('Set classification: "current" or "non-current"')
+              if (val !== 'current' && val !== 'non-current') return
+              const ids = Array.from(selected)
+              for (const id of ids) {
+                await api.accounts.update(id, { classification: val })
+              }
+              clearSelection()
+              loadAccounts()
+            },
+          },
+        ]}
+      />
 
       {showNew && (
         <NewAccountModal onClose={() => setShowNew(false)} onCreated={handleCreated} />
