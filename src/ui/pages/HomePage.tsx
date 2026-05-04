@@ -39,6 +39,7 @@ const WELCOME_MESSAGES = [
   "let's see what the numbers say today.",
   'a clean ledger is a happy ledger.',
   "thank you, pacioli.",
+  "we are the minecraft of accounting.",
 ]
 
 function toDateStr(d: Date): string {
