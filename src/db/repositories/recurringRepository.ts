@@ -87,11 +87,12 @@ export async function updateRecurringTemplate(id: string, input: Partial<Recurri
       })),
     })
   }
-  return prisma.recurringTemplate.update({
+  const updated = await prisma.recurringTemplate.update({
     where: { id },
     data: { ...rest },
     include: { lines: true },
   })
+  return { ...updated, lines: updated.lines.map((l) => ({ ...l, amount: fromDbCents(l.amount) })) }
 }
 
 export async function deleteRecurringTemplate(id: string) {
