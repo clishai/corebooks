@@ -8,6 +8,7 @@ import SidebarSection from './SidebarSection'
 import logoSrc from '../assets/logo.png'
 import { getPinnedReports } from '../lib/sidebarState'
 import { ALL_REPORTS } from '../lib/reports'
+import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 
 function CogIcon() {
   return (
@@ -93,6 +94,17 @@ export default function Layout() {
       window.removeEventListener('cb:pinned-reports-changed', handlePinsChange)
     }
   }, [])
+
+  useKeyboardShortcuts({
+    'new-entry': () => setShowNewEntry(true),
+    'go-home': () => navigate('/home'),
+    'go-entries': () => navigate('/entries'),
+    'go-accounts': () => navigate('/accounts'),
+    'go-drafts': () => navigate('/drafts'),
+    'go-recurring': () => navigate('/extra/recurring'),
+    'go-close-period': () => navigate('/extra/close-period'),
+    'global-search': () => { /* Phase 8 */ },
+  })
 
   function handlePosted() { setShowNewEntry(false) }
   function handleWelcomeDismiss() {
