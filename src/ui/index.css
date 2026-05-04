@@ -52,3 +52,34 @@ body,
 .page-slide-left {
   animation: page-slide-from-left 0.22s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
+
+/* Settings cog hover animation */
+.cog-icon {
+  transition: transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.settings-link:hover .cog-icon {
+  transform: rotate(45deg);
+}
+
+/* Settings label slide-in */
+.settings-label {
+  max-width: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: max-width 200ms ease, opacity 180ms ease;
+  white-space: nowrap;
+}
+.settings-link:hover .settings-label {
+  max-width: 80px;
+  opacity: 1;
+}
+
+/* Star zap-in animation */
+@keyframes star-zap {
+  0%   { transform: scale(0); filter: brightness(3); }
+  60%  { transform: scale(1.35); filter: brightness(2); }
+  100% { transform: scale(1); filter: brightness(1); }
+}
+.star-zap {
+  animation: star-zap 280ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
