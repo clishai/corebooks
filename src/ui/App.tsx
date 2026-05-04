@@ -7,6 +7,7 @@ import DraftsPage from './pages/DraftsPage'
 import TrialBalancePage from './pages/TrialBalancePage'
 import BalanceSheetPage from './pages/BalanceSheetPage'
 import IncomeStatementPage from './pages/IncomeStatementPage'
+import ReportsLibraryPage from './pages/ReportsLibraryPage'
 import SettingsPage from './pages/SettingsPage'
 
 export default function App() {
@@ -22,6 +23,9 @@ export default function App() {
           <Route path="reports/trial-balance" element={<TrialBalancePage />} />
           <Route path="reports/balance-sheet" element={<BalanceSheetPage />} />
           <Route path="reports/income-statement" element={<IncomeStatementPage />} />
+          <Route path="reports/library" element={<ReportsLibraryPage />} />
+          <Route path="extra/recurring" element={<div className="p-6 text-ash text-sm">Recurring transactions — coming soon.</div>} />
+          <Route path="extra/close-period" element={<div className="p-6 text-ash text-sm">Close Period — coming soon.</div>} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="settings/database" element={<Navigate to="/settings" replace />} />
         </Route>
