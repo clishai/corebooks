@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { api, DatabaseSettings, DbStats, getPeriodConfig, savePeriodConfig, listAccounts, Account, PeriodConfig } from '../api/client'
 import { ACCOUNT_TEMPLATES, type AccountTemplate } from '../lib/accountTemplates'
-import { getAuthToken } from '../lib/auth'
+import { getAuthToken, checkAuthStatus } from '../lib/auth'
 import { ALL_METRICS, MetricId, getSelectedMetrics, saveSelectedMetrics, HomeLayout, getHomeLayout, saveHomeLayout } from '../lib/metrics'
 import { SNOOZE_OPTIONS, getSnoozeDuration, saveSnoozeDuration } from '../lib/alerts'
 import { ALL_ACCOUNT_COLUMNS, AccountColumnId, getVisibleColumns, saveVisibleColumns } from '../lib/accountColumns'
@@ -1245,6 +1245,11 @@ function DatabaseSettings_() {
 
 export default function SettingsPage() {
   const [tab, setTab] = useState<Tab>('home')
+  const [authActive, setAuthActive] = useState(false)
+
+  useEffect(() => {
+    checkAuthStatus().then(({ active }) => setAuthActive(active)).catch(() => {})
+  }, [])
 
   const tabClass = (t: Tab) =>
     `px-4 py-2 text-sm font-medium rounded-md transition-colors ${
@@ -1260,7 +1265,7 @@ export default function SettingsPage() {
         <p className="text-sm text-ash mt-1">Application configuration.</p>
       </div>
 
-      <div className="flex gap-1 mb-6 bg-void border border-rim rounded-lg p-1 w-fit">
+      <div className="flex flex-wrap gap-1 mb-6 bg-void border border-rim rounded-lg p-1 w-fit">
         <button className={tabClass('home')} onClick={() => setTab('home')}>
           home page
         </button>
@@ -1276,6 +1281,11 @@ export default function SettingsPage() {
         <button className={tabClass('shortcuts')} onClick={() => setTab('shortcuts')}>
           shortcuts
         </button>
+        {authActive && (
+          <button className={tabClass('users')} onClick={() => setTab('users')}>
+            users
+          </button>
+        )}
         <button className={tabClass('database')} onClick={() => setTab('database')}>
           database
         </button>
@@ -1286,6 +1296,7 @@ export default function SettingsPage() {
       {tab === 'payment-methods' && <PaymentMethodsSettings />}
       {tab === 'accounting' && <AccountingSettings />}
       {tab === 'shortcuts' && <ShortcutsSettings />}
+      {tab === 'users' && <UsersSettings />}
       {tab === 'database' && <DatabaseSettings_ />}
     </div>
   )

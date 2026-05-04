@@ -93,16 +93,9 @@ export default function AccountsPage() {
     setShowNew(false)
   }
 
-  function handleSaved(updated: Account) {
-    setAccounts((prev) =>
-      prev
-        .map((a) => (a.id === updated.id ? updated : a))
-        .sort((a, b) => a.number.localeCompare(b.number)),
-    )
+  function handleSaved() {
     setEditAccount(null)
-    // Re-fetch trial balance because normalBalance or type may have changed,
-    // which affects how debit/credit totals are signed for display.
-    api.reports.trialBalance().then((tb) => setBalanceMap(buildBalanceMap(tb.rows))).catch(() => {})
+    loadAccounts()
   }
 
   const show = (col: AccountColumnId) => visibleCols.includes(col)

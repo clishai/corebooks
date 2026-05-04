@@ -40,7 +40,7 @@ export function useSearch(query: string): { results: SearchResult[]; loading: bo
         .filter((e) => matchesQuery(e.memo ?? '', q) || matchesQuery(e.date?.slice(0, 10) ?? '', q))
         .slice(0, 5)
         .map((e) => ({
-          id: e.id ?? e.date,
+          id: e.id!,
           type: 'entry',
           label: e.memo || '(no memo)',
           sublabel: e.date?.slice(0, 10),

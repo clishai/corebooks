@@ -7,17 +7,26 @@ export default function RecurringPage() {
   const [templates, setTemplates] = useState<RecurringTemplate[]>([])
   const [editTarget, setEditTarget] = useState<RecurringTemplate | null>(null)
   const [showModal, setShowModal] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   async function load() {
-    setTemplates(await listRecurringTemplates())
+    try {
+      setTemplates(await listRecurringTemplates())
+    } catch {
+      setError('Failed to load recurring templates.')
+    }
   }
 
   useEffect(() => { load() }, [])
 
   async function handleDelete(id: string) {
     if (!confirm('Delete this recurring template?')) return
-    await deleteRecurringTemplate(id)
-    load()
+    try {
+      await deleteRecurringTemplate(id)
+      load()
+    } catch {
+      setError('Failed to delete template.')
+    }
   }
 
   return (
@@ -32,7 +41,11 @@ export default function RecurringPage() {
         </button>
       </div>
 
-      {templates.length === 0 && (
+      {error && (
+        <p className="text-red-400 text-sm mb-4">{error}</p>
+      )}
+
+      {!error && templates.length === 0 && (
         <p className="text-ash text-sm">No recurring templates yet. Create one to auto-generate entries on a schedule.</p>
       )}
 

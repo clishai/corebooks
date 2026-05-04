@@ -199,7 +199,7 @@ export default function Layout() {
               onClick={() => setShowSearch(true)}
               className="w-full bg-surface border border-rim rounded-sm px-3 py-1 text-xs text-ash/50 text-left hover:border-neon/50 transition-colors focus:outline-none"
             >
-              search...
+              Press / for global search
             </button>
           </div>
 

@@ -153,13 +153,13 @@ export default function ClosePeriodPage() {
 
   if (loading) {
     return (
-      <div className="p-6 text-sm text-ash">Loading…</div>
+      <div className="text-sm text-ash">Loading…</div>
     )
   }
 
   if (error) {
     return (
-      <div className="p-6 text-sm text-red-300 bg-red-950/50 border border-red-800 rounded-md max-w-xl">
+      <div className="text-sm text-red-300 bg-red-950/50 border border-red-800 rounded-md max-w-xl p-4">
         {error}
       </div>
     )

@@ -17,15 +17,19 @@ This is a project by a college accounting major. The goal is to build the ultima
 🚧 **Active Development** — approaching v1.0
 
 The accounting engine, database, REST API, browser-based UI, and Electron desktop app are all functional. The app uses JetBrains Mono Light throughout for a cypherpunk aesthetic and is fully navigable with spring-animated page transitions. It includes:
-- Multi-step onboarding wizard that collects business name, business type, and optional module preferences
-- Chart of accounts with current/non-current classification, live current balances, inline account editing, and configurable column visibility
-- Journal entry creation with draft saving and auto-save; payment method tracked per entry
-- Trial Balance grouped by account type
-- Balance Sheet with collapsible Current/Non-current sections per-account, and Net Income shown as a distinct unreconciled equity line
-- Income Statement with expandable per-account Revenue and Expense sections
-- Encrypted data export (AES-256-GCM)
-- Settings with home page metrics, chart-of-accounts column toggles, payment method management, database stats, JSON export, and data wipe
-- Feature flag system ready to gate optional modules as they ship
+- Multi-step onboarding wizard (business name, business type, account template suggestions)
+- Chart of accounts with current/non-current classification, live balances, inline editing, configurable column visibility, and an account template library (42 common accounts)
+- Journal entry creation with draft saving, auto-save, and payment method tracking
+- Recurring transaction templates (weekly / monthly / quarterly / annually) with auto-post option
+- Period close workflow that generates closing entries and transfers net income to retained earnings
+- Trial Balance, Balance Sheet (Current/Non-current sections), and Income Statement with per-account breakdowns
+- Global search command palette (press `/`) searching across accounts, entries, and reports
+- Configurable keyboard shortcuts with live rebinding and conflict detection
+- Bulk operations on entries and accounts (reverse, delete, set classification)
+- Multi-user roles (Viewer / Bookkeeper / Admin) in PostgreSQL mode — SQLite stays single-user with no login required
+- Encrypted data export (AES-256-GCM + PBKDF2)
+- Settings covering home page metrics, account columns, payment methods, keyboard shortcuts, user management (PostgreSQL), database stats, JSON export, and data wipe
+- Feature flag system gating optional modules (AR/AP, Inventory) as they ship
 
 ---
 
@@ -77,7 +81,7 @@ If your business needs **multiple employees to access corebooks simultaneously**
 
 Think of it this way: SQLite is a notebook you keep at your desk. PostgreSQL is a shared filing cabinet your whole team can access at the same time. The switch only makes sense if you have a server that is always on and reachable by your staff.
 
-A guided setup wizard is available in **Settings → Database**.
+When connected to PostgreSQL, corebooks activates session-based authentication with three role levels: **Viewer** (read-only), **Bookkeeper** (create and post entries), and **Admin** (full access, user management). Admins can add users and promote others to Admin with password confirmation. All of this is managed in **Settings → Users**. A guided database setup wizard is available in **Settings → Database**.
 
 ---
 
