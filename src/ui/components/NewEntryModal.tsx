@@ -175,7 +175,7 @@ export default function NewEntryModal({ onClose, onPosted, initialDraft, onAutoS
               <label className="block text-xs font-medium text-ash mb-1">Date</label>
               <input
                 type="date"
-                className={inputClass}
+                className={`${inputClass} [color-scheme:dark]`}
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
               />
@@ -258,6 +258,12 @@ export default function NewEntryModal({ onClose, onPosted, initialDraft, onAutoS
                               credit: e.target.value ? '' : line.credit,
                             })
                           }
+                          onBlur={(e) => {
+                            const val = parseFloat(e.target.value)
+                            if (e.target.value !== '' && !isNaN(val)) {
+                              setLine(i, { debit: val.toFixed(2) })
+                            }
+                          }}
                         />
                       </td>
                       <td className="px-1 py-1 border-r border-rim">
@@ -274,6 +280,12 @@ export default function NewEntryModal({ onClose, onPosted, initialDraft, onAutoS
                               debit: e.target.value ? '' : line.debit,
                             })
                           }
+                          onBlur={(e) => {
+                            const val = parseFloat(e.target.value)
+                            if (e.target.value !== '' && !isNaN(val)) {
+                              setLine(i, { credit: val.toFixed(2) })
+                            }
+                          }}
                         />
                       </td>
                       <td className="px-1 py-1 text-center border-r border-rim">

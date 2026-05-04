@@ -7,7 +7,7 @@
 
 ## product vision
 
-corebooks is the minecraft of accounting. the core is a pristine double-entry accounting engine — the physics of money. everything else is built on top of it. users start with a blank world and build exactly what they need. plugins (when built) extend the world with new mechanics. nothing is forced; everything is opt-in.
+the core is a pristine double-entry accounting engine — the physics of money. everything else is built on top of it. users start with a clean slate and build exactly what they need. plugins (when built) extend the app with new mechanics. nothing is forced; everything is opt-in.
 
 **the three pillars:**
 1. **privacy-first, local-first** — data never leaves the user's machine unless they choose it. no telemetry, no cloud accounts, no vendor lock-in. ever.
@@ -84,7 +84,7 @@ corebooks is the minecraft of accounting. the core is a pristine double-entry ac
 
 the home page picks one of N all-lowercase messages at random on each mount. add to the existing pool:
 
-> `"we are the minecraft of accounting."`
+> add a new all-lowercase message to the welcome message pool
 
 ---
 

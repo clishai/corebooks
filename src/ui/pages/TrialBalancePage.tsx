@@ -82,21 +82,25 @@ export default function TrialBalancePage() {
                         </td>
                       </tr>
 
-                      {rows.map((row) => (
-                        <tr
-                          key={row.account.id}
-                          className="border-b border-rim/60 hover:bg-raised/40 transition-colors"
-                        >
-                          <td className="px-3 py-2.5 font-mono text-ash text-xs">{row.account.number}</td>
-                          <td className="px-3 py-2.5 text-chalk text-sm">{row.account.name}</td>
-                          <td className="px-3 py-2.5 text-right font-mono text-chalk">
-                            {row.debit > 0 ? fmt(row.debit) : <span className="text-ash/40">—</span>}
-                          </td>
-                          <td className="px-3 py-2.5 text-right font-mono text-chalk">
-                            {row.credit > 0 ? fmt(row.credit) : <span className="text-ash/40">—</span>}
-                          </td>
-                        </tr>
-                      ))}
+                      {rows.map((row) => {
+                        const debitDisplay = row.debit > row.credit ? row.debit - row.credit : null
+                        const creditDisplay = row.credit > row.debit ? row.credit - row.debit : null
+                        return (
+                          <tr
+                            key={row.account.id}
+                            className="border-b border-rim/60 hover:bg-raised/40 transition-colors"
+                          >
+                            <td className="px-3 py-2.5 font-mono text-ash text-xs">{row.account.number}</td>
+                            <td className="px-3 py-2.5 text-chalk text-sm">{row.account.name}</td>
+                            <td className="px-3 py-2.5 text-right font-mono text-chalk">
+                              {debitDisplay !== null ? fmt(debitDisplay) : <span className="text-ash/40">—</span>}
+                            </td>
+                            <td className="px-3 py-2.5 text-right font-mono text-chalk">
+                              {creditDisplay !== null ? fmt(creditDisplay) : <span className="text-ash/40">—</span>}
+                            </td>
+                          </tr>
+                        )
+                      })}
                     </Fragment>
                   ))
                 )}

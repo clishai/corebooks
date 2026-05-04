@@ -608,13 +608,13 @@ grep -n "welcome\|message\|random\|Math.floor" src/ui/pages/HomePage.tsx | head 
 
 - [ ] **Step 2: Add the new message**
 
-Find the array of welcome messages in `HomePage.tsx` and add `"we are the minecraft of accounting."` as an additional entry. The array likely looks like:
+Find the array of welcome messages in `HomePage.tsx` and add a new all-lowercase entry. The array looks like:
 
 ```typescript
 const MESSAGES = [
   "welcome back.",
   // ... existing messages
-  "we are the minecraft of accounting.",  // ADD THIS
+  "your new message here.",  // ADD THIS
 ]
 ```
 
@@ -629,7 +629,7 @@ Expected: no errors
 
 ```bash
 git add src/ui/pages/HomePage.tsx
-git commit -m "feat: add minecraft welcome message to home page"
+git commit -m "feat: add welcome message to home page"
 ```
 
 ---

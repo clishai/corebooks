@@ -18,7 +18,7 @@ interface Props {
 }
 
 const inputClass =
-  'w-full bg-raised border border-rim text-chalk placeholder:text-ash rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-neon focus:border-neon'
+  'w-full bg-raised border border-rim text-chalk placeholder:text-ash rounded-sm px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-neon focus:border-neon'
 
 const CLASSIFICATION_TOOLTIP: Record<'Asset' | 'Liability', string> = {
   Asset:
@@ -69,7 +69,7 @@ export default function EditAccountModal({ account, onClose, onSaved }: Props) {
       className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
       onMouseDown={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="bg-surface border border-rim rounded-xl shadow-2xl w-full max-w-md">
+      <div className="bg-surface border border-rim rounded-sm shadow-2xl w-full max-w-md">
         <div className="flex items-center justify-between px-6 py-4 border-b border-rim">
           <h2 className="text-base font-semibold text-chalk">Edit Account</h2>
           <button
@@ -106,17 +106,22 @@ export default function EditAccountModal({ account, onClose, onSaved }: Props) {
 
           <div>
             <label className="block text-xs font-medium text-ash mb-1">Type</label>
-            <select
-              className="w-full bg-raised border border-rim text-chalk rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-neon"
-              value={form.type}
-              onChange={(e) => handleTypeChange(e.target.value as AccountType)}
-            >
-              {ACCOUNT_TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
-              ))}
-            </select>
+            <div className="relative">
+              <select
+                className="w-full appearance-none bg-raised border border-rim text-chalk rounded-sm px-3 py-2 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-neon [color-scheme:dark]"
+                value={form.type}
+                onChange={(e) => handleTypeChange(e.target.value as AccountType)}
+              >
+                {ACCOUNT_TYPES.map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-ash">
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+            </div>
           </div>
 
           {(form.type === 'Asset' || form.type === 'Liability') && (
@@ -180,7 +185,7 @@ export default function EditAccountModal({ account, onClose, onSaved }: Props) {
           </label>
 
           {error && (
-            <div className="text-xs text-red-300 bg-red-950/50 border border-red-800 px-3 py-2 rounded-md">
+            <div className="text-xs text-red-300 bg-red-950/50 border border-red-800 px-3 py-2 rounded-sm">
               {error}
             </div>
           )}
@@ -196,7 +201,7 @@ export default function EditAccountModal({ account, onClose, onSaved }: Props) {
             <button
               type="submit"
               disabled={saving}
-              className="bg-neon hover:bg-neon-dim disabled:opacity-50 text-void text-sm font-bold px-4 py-2 rounded-md transition-colors"
+              className="bg-neon hover:bg-neon-dim disabled:opacity-50 text-void text-sm font-bold px-4 py-2 rounded-sm transition-colors"
             >
               {saving ? 'Saving…' : 'Save Changes'}
             </button>
