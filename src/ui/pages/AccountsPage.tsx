@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { api, Account, AccountType, TrialBalanceRow } from '../api/client'
 import NewAccountModal from '../components/NewAccountModal'
 import EditAccountModal from '../components/EditAccountModal'
+import AccountLibraryDrawer from '../components/AccountLibraryDrawer'
 import { AccountColumnId, getVisibleColumns } from '../lib/accountColumns'
 import BulkActionBar from '../components/BulkActionBar'
 
@@ -38,6 +39,7 @@ export default function AccountsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showNew, setShowNew] = useState(false)
+  const [showLibrary, setShowLibrary] = useState(false)
   const [editAccount, setEditAccount] = useState<Account | null>(null)
   const [visibleCols, setVisibleCols] = useState<AccountColumnId[]>(getVisibleColumns)
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -113,12 +115,20 @@ export default function AccountsPage() {
     <div>
       <div className="flex items-center justify-between mb-5">
         <h1 className="text-xl font-semibold text-chalk">Chart of Accounts</h1>
-        <button
-          onClick={() => setShowNew(true)}
-          className="border border-rim hover:bg-raised text-chalk text-sm font-medium px-4 py-2 rounded-md transition-colors"
-        >
-          + New Account
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowLibrary(true)}
+            className="border border-rim hover:bg-raised text-ash hover:text-chalk text-sm font-medium px-4 py-2 rounded-md transition-colors"
+          >
+            Browse Library
+          </button>
+          <button
+            onClick={() => setShowNew(true)}
+            className="border border-rim hover:bg-raised text-chalk text-sm font-medium px-4 py-2 rounded-md transition-colors"
+          >
+            + New Account
+          </button>
+        </div>
       </div>
 
       {loading && <p className="text-sm text-ash">Loading…</p>}
@@ -243,6 +253,14 @@ export default function AccountsPage() {
           },
         ]}
       />
+
+      {showLibrary && (
+        <AccountLibraryDrawer
+          existingNumbers={new Set(accounts.map((a) => a.number))}
+          onClose={() => setShowLibrary(false)}
+          onAdded={loadAccounts}
+        />
+      )}
 
       {showNew && (
         <NewAccountModal onClose={() => setShowNew(false)} onCreated={handleCreated} />

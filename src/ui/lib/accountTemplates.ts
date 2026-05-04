@@ -57,8 +57,10 @@ export const ACCOUNT_TEMPLATES: AccountTemplate[] = [
   { number: '5950', name: 'Miscellaneous Expense', type: 'Expense', normalBalance: 'debit', isContra: false, description: 'Small expenses that do not fit other categories.', businessTypes: ['freelancer','service','product','nonprofit','other'] },
 ]
 
+type BusinessTypeValue = 'freelancer' | 'service' | 'product' | 'nonprofit' | 'other'
+
 export function getTemplatesForBusinessType(type: string): AccountTemplate[] {
   return ACCOUNT_TEMPLATES.filter(
-    (t) => !t.businessTypes || t.businessTypes.includes(type as AccountTemplate['businessTypes'][0])
+    (t) => !t.businessTypes || t.businessTypes.includes(type as BusinessTypeValue)
   )
 }
