@@ -204,6 +204,8 @@ export const api = {
       request('/entries/post', { method: 'POST', body: JSON.stringify({ id }) }),
     delete: (id: string): Promise<void> =>
       request(`/entries/${id}`, { method: 'DELETE' }),
+    reverse: (id: string): Promise<JournalEntry> =>
+      request(`/entries/${id}/reverse`, { method: 'POST' }),
   },
   reports: {
     trialBalance: (): Promise<TrialBalance> =>
