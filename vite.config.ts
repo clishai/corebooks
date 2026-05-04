@@ -15,6 +15,7 @@ export default defineConfig({
       '/entries': 'http://localhost:3000',
       '/reports': 'http://localhost:3000',
       '/settings': 'http://localhost:3000',
+      '/recurring': { target: 'http://127.0.0.1:3000', changeOrigin: true },
       '/health': 'http://localhost:3000',
     },
   },

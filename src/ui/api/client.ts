@@ -142,6 +142,31 @@ export interface ImportResult {
   warnings: string[]
 }
 
+// --- Recurring Templates ---
+
+export interface RecurringLineInput {
+  accountId: string
+  type: 'debit' | 'credit'
+  amount: number
+}
+
+export interface RecurringTemplateInput {
+  name: string
+  memo: string
+  paymentMethod?: string
+  schedule: 'weekly' | 'monthly' | 'quarterly' | 'annually' | 'custom'
+  customCron?: string
+  nextDue: string  // ISO date string
+  autoPost: boolean
+  lines: RecurringLineInput[]
+}
+
+export interface RecurringTemplate extends RecurringTemplateInput {
+  id: string
+  createdAt: string
+  updatedAt: string
+}
+
 // In Electron the preload injects window.electronAPI.apiBaseUrl; in the Vite
 // dev server all routes are proxied so an empty base (relative URL) works.
 function getBaseUrl(): string {
@@ -201,4 +226,35 @@ export const api = {
     }): Promise<ImportResult> =>
       request('/settings/import', { method: 'POST', body: JSON.stringify(payload) }),
   },
+  recurring: {
+    list: (): Promise<RecurringTemplate[]> => request('/recurring'),
+    get: (id: string): Promise<RecurringTemplate> => request(`/recurring/${id}`),
+    create: (input: RecurringTemplateInput): Promise<RecurringTemplate> =>
+      request('/recurring', { method: 'POST', body: JSON.stringify(input) }),
+    update: (id: string, input: Partial<RecurringTemplateInput>): Promise<RecurringTemplate> =>
+      request(`/recurring/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
+    delete: (id: string): Promise<{ deleted: boolean }> =>
+      request(`/recurring/${id}`, { method: 'DELETE' }),
+  },
+}
+
+// Standalone named exports for direct import in UI components
+export async function listAccounts(): Promise<Account[]> {
+  return api.accounts.list()
+}
+
+export async function listRecurringTemplates(): Promise<RecurringTemplate[]> {
+  return api.recurring.list()
+}
+
+export async function createRecurringTemplate(input: RecurringTemplateInput): Promise<RecurringTemplate> {
+  return api.recurring.create(input)
+}
+
+export async function updateRecurringTemplate(id: string, input: Partial<RecurringTemplateInput>): Promise<RecurringTemplate> {
+  return api.recurring.update(id, input)
+}
+
+export async function deleteRecurringTemplate(id: string): Promise<void> {
+  await api.recurring.delete(id)
 }
