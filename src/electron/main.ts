@@ -79,6 +79,20 @@ async function startApi(): Promise<number> {
   // Dynamic import ensures all env vars are set before Prisma initialises.
   const { startServer } = await import('../api/bootstrap.js');
   await startServer(port);
+
+  // Fire recurring template check on launch, then every 24 hours.
+  async function checkRecurring() {
+    try {
+      const { fireOverdueTemplates } = await import('../api/services/recurringService.js')
+      const { ledger: activeLedger } = await import('../api/bootstrap.js')
+      await fireOverdueTemplates(activeLedger)
+    } catch (err) {
+      console.error('[recurring] check failed:', err)
+    }
+  }
+  checkRecurring()
+  setInterval(checkRecurring, 24 * 60 * 60 * 1000)
+
   return port;
 }
 

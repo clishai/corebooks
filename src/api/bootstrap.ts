@@ -1,10 +1,16 @@
 import 'dotenv/config';
 import path from 'path';
+import { Ledger } from '../core/engine/ledger.js';
 import { loadLedger } from '../db/repositories/entryRepository.js';
 import { listAccounts } from '../db/repositories/accountRepository.js';
 import { disconnectPrisma } from '../db/client.js';
 import { buildApp } from './server.js';
 import { ensureSchema } from '../db/ensureSchema.js';
+
+// Module-level ledger reference — populated by startServer() so that
+// callers (e.g. the Electron main process recurring check) can access it
+// without needing to reconstruct it.
+export let ledger: Ledger = new Ledger();
 
 export async function startServer(port: number): Promise<void> {
   const rawUrl = process.env['DATABASE_URL'] ?? 'file:corebooks.db';
@@ -14,10 +20,13 @@ export async function startServer(port: number): Promise<void> {
     ensureSchema(dbPath);
   }
 
-  const [ledger, chartOfAccounts] = await Promise.all([
+  const [loadedLedger, chartOfAccounts] = await Promise.all([
     loadLedger(),
     listAccounts(),
   ]);
+
+  // Update the exported reference so downstream callers see the live ledger.
+  ledger = loadedLedger;
 
   const app = buildApp({ ledger, chartOfAccounts }, { logger: false });
 
