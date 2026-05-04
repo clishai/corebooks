@@ -6,6 +6,7 @@ import { accountRoutes } from './routes/accounts.js';
 import { entryRoutes } from './routes/entries.js';
 import { reportRoutes } from './routes/reports.js';
 import { settingsRoutes } from './routes/settings.js';
+import { recurringRoutes } from './routes/recurring.js';
 
 export interface AppContext {
   ledger: Ledger;
@@ -27,6 +28,7 @@ export function buildApp(context: AppContext, opts: BuildAppOptions = {}) {
   app.register(entryRoutes, { prefix: '/entries', context });
   app.register(reportRoutes, { prefix: '/reports', context });
   app.register(settingsRoutes, { prefix: '/settings', context });
+  app.register(recurringRoutes, { prefix: '/recurring', context });
 
   return app;
 }
