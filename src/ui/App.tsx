@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Layout from './components/Layout'
 import HomePage from './pages/HomePage'
@@ -11,27 +12,62 @@ import ReportsLibraryPage from './pages/ReportsLibraryPage'
 import SettingsPage from './pages/SettingsPage'
 import RecurringPage from './pages/RecurringPage'
 import ClosePeriodPage from './pages/ClosePeriodPage'
+import LoginPage from './pages/LoginPage'
+import { checkAuthStatus, getAuthToken } from './lib/auth'
+
+function AuthGate({ children }: { children: React.ReactNode }) {
+  const [status, setStatus] = useState<'loading' | 'login' | 'setup' | 'ok'>('loading')
+
+  useEffect(() => {
+    checkAuthStatus().then(({ active, needsSetup }) => {
+      if (!active) {
+        setStatus('ok')
+        return
+      }
+      if (needsSetup) {
+        setStatus('setup')
+        return
+      }
+      if (getAuthToken()) {
+        setStatus('ok')
+        return
+      }
+      setStatus('login')
+    }).catch(() => {
+      // If auth status check fails (e.g. SQLite mode where /auth/status is unreachable),
+      // default to ok so the app is usable.
+      setStatus('ok')
+    })
+  }, [])
+
+  if (status === 'loading') return <div className="h-screen bg-base" />
+  if (status === 'setup') return <LoginPage needsSetup onSuccess={() => setStatus('ok')} />
+  if (status === 'login') return <LoginPage needsSetup={false} onSuccess={() => setStatus('ok')} />
+  return <>{children}</>
+}
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Layout />}>
-          <Route index element={<Navigate to="/home" replace />} />
-          <Route path="home" element={<HomePage />} />
-          <Route path="accounts" element={<AccountsPage />} />
-          <Route path="entries" element={<EntriesPage />} />
-          <Route path="drafts" element={<DraftsPage />} />
-          <Route path="reports/trial-balance" element={<TrialBalancePage />} />
-          <Route path="reports/balance-sheet" element={<BalanceSheetPage />} />
-          <Route path="reports/income-statement" element={<IncomeStatementPage />} />
-          <Route path="reports/library" element={<ReportsLibraryPage />} />
-          <Route path="extra/recurring" element={<RecurringPage />} />
-          <Route path="extra/close-period" element={<ClosePeriodPage />} />
-          <Route path="settings" element={<SettingsPage />} />
-          <Route path="settings/database" element={<Navigate to="/settings" replace />} />
-        </Route>
-      </Routes>
-    </BrowserRouter>
+    <AuthGate>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<Layout />}>
+            <Route index element={<Navigate to="/home" replace />} />
+            <Route path="home" element={<HomePage />} />
+            <Route path="accounts" element={<AccountsPage />} />
+            <Route path="entries" element={<EntriesPage />} />
+            <Route path="drafts" element={<DraftsPage />} />
+            <Route path="reports/trial-balance" element={<TrialBalancePage />} />
+            <Route path="reports/balance-sheet" element={<BalanceSheetPage />} />
+            <Route path="reports/income-statement" element={<IncomeStatementPage />} />
+            <Route path="reports/library" element={<ReportsLibraryPage />} />
+            <Route path="extra/recurring" element={<RecurringPage />} />
+            <Route path="extra/close-period" element={<ClosePeriodPage />} />
+            <Route path="settings" element={<SettingsPage />} />
+            <Route path="settings/database" element={<Navigate to="/settings" replace />} />
+          </Route>
+        </Routes>
+      </BrowserRouter>
+    </AuthGate>
   )
 }
