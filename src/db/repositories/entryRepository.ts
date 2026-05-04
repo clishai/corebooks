@@ -5,6 +5,7 @@ import { Ledger } from '../../core/engine/ledger.js';
 import { ValidationError } from '../../core/validation/entry.js';
 import { getPrismaClient } from '../client.js';
 import { PrismaJournalEntry, toCoreJournalEntry, toDbCents, toDbJournalEntry } from '../mappers.js';
+import { isPeriodClosed } from './periodRepository.js';
 
 const INCLUDE_LINES = { lines: { orderBy: { id: 'asc' as const } } };
 
@@ -105,6 +106,14 @@ export async function postDraftEntry(
   chartOfAccounts: Account[],
   ledger: Ledger
 ): Promise<PostPersistedResult> {
+  const entryDate = new Date(draft.date);
+  const locked = await isPeriodClosed(entryDate.getFullYear(), entryDate.getMonth() + 1);
+  if (locked) {
+    throw new Error(
+      `Period ${entryDate.getFullYear()}-${String(entryDate.getMonth() + 1).padStart(2, '0')} is closed.`
+    );
+  }
+
   const result = postEntry(draft, chartOfAccounts, ledger);
   if (!result.posted) {
     return result;
