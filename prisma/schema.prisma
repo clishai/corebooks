@@ -104,3 +104,11 @@ model ClosedPeriod {
   closedAt DateTime @default(now())
   entryId  String
 }
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  role         String   @default("Viewer")
+  createdAt    DateTime @default(now())
+}
