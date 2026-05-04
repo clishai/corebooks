@@ -4,6 +4,7 @@ import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import NewEntryModal from './NewEntryModal'
 import Toast from './Toast'
 import OnboardingWizard, { shouldShowOnboarding, getCompanyName } from './OnboardingWizard'
+import CommandPalette from './CommandPalette'
 import SidebarSection from './SidebarSection'
 import logoSrc from '../assets/logo.png'
 import { getPinnedReports } from '../lib/sidebarState'
@@ -65,6 +66,7 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
 
 export default function Layout() {
   const [showNewEntry, setShowNewEntry] = useState(false)
+  const [showSearch, setShowSearch] = useState(false)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [showWelcome, setShowWelcome] = useState(shouldShowOnboarding)
   const [companyName, setCompanyName] = useState(getCompanyName)
@@ -103,7 +105,7 @@ export default function Layout() {
     'go-drafts': () => navigate('/drafts'),
     'go-recurring': () => navigate('/extra/recurring'),
     'go-close-period': () => navigate('/extra/close-period'),
-    'global-search': () => { /* Phase 8 */ },
+    'global-search': () => setShowSearch(true),
   })
 
   function handlePosted() { setShowNewEntry(false) }
@@ -191,13 +193,14 @@ export default function Layout() {
             {companyName || 'corebooks'}
           </button>
 
-          {/* Ghost search bar — shell only, functionality added in Phase 8 */}
+          {/* Search button */}
           <div className="flex-1 max-w-xs">
-            <input
-              readOnly
-              placeholder="search..."
-              className="w-full bg-surface border border-rim rounded-sm px-3 py-1 text-xs text-ash placeholder-ash/50 cursor-pointer focus:outline-none"
-            />
+            <button
+              onClick={() => setShowSearch(true)}
+              className="w-full bg-surface border border-rim rounded-sm px-3 py-1 text-xs text-ash/50 text-left hover:border-neon/50 transition-colors focus:outline-none"
+            >
+              search...
+            </button>
           </div>
 
           <div className="ml-auto">
@@ -230,6 +233,7 @@ export default function Layout() {
         <Toast message={toastMessage} onDismiss={() => setToastMessage(null)} />
       )}
       {showWelcome && <OnboardingWizard onDismiss={handleWelcomeDismiss} />}
+      {showSearch && <CommandPalette onClose={() => setShowSearch(false)} />}
     </div>
   )
 }
