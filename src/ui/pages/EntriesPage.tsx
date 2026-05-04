@@ -100,9 +100,13 @@ export default function EntriesPage() {
                         </td>
                         <td className="px-4 py-3 text-chalk">
                           {entry.memo}
-                          {entry.paymentMethod && (
+                          {entry.paymentMethod ? (
                             <span className="ml-2 text-xs text-ash font-normal">
                               {entry.paymentMethod}
+                            </span>
+                          ) : (
+                            <span className="ml-2 text-xs text-ash/50 italic font-normal">
+                              adjustment
                             </span>
                           )}
                         </td>

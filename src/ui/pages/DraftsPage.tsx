@@ -98,8 +98,10 @@ export default function DraftsPage() {
                     </td>
                     <td className="px-4 py-3 text-chalk">
                       {draft.memo || <span className="text-ash italic">No memo</span>}
-                      {draft.paymentMethod && (
+                      {draft.paymentMethod ? (
                         <span className="ml-2 text-xs text-ash">{draft.paymentMethod}</span>
+                      ) : (
+                        <span className="ml-2 text-xs text-ash/50 italic">adjustment</span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-right">

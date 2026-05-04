@@ -1,5 +1,6 @@
 import { useState, useEffect, Fragment } from 'react'
 import { api, Account, DraftEntryInput, JournalEntry } from '../api/client'
+import { getPaymentMethods } from '../lib/paymentMethods'
 
 interface Line {
   accountId: string
@@ -53,6 +54,7 @@ const inputClass =
 
 export default function NewEntryModal({ onClose, onPosted, initialDraft, onAutoSaved }: Props) {
   const [accounts, setAccounts] = useState<Account[]>([])
+  const [paymentMethods, setPaymentMethods] = useState<string[]>([])
   const [date, setDate] = useState(initialDraft ? initialDraft.date.slice(0, 10) : today())
   const [memo, setMemo] = useState(initialDraft?.memo ?? '')
   const [paymentMethod, setPaymentMethod] = useState(initialDraft?.paymentMethod ?? '')
@@ -65,6 +67,14 @@ export default function NewEntryModal({ onClose, onPosted, initialDraft, onAutoS
 
   useEffect(() => {
     api.accounts.list().then(setAccounts).catch(() => {})
+    const methods = getPaymentMethods()
+    // If the draft carries a value not in the managed list, include it so it isn't silently lost.
+    const draftMethod = initialDraft?.paymentMethod
+    if (draftMethod && !methods.includes(draftMethod)) {
+      setPaymentMethods([...methods, draftMethod])
+    } else {
+      setPaymentMethods(methods)
+    }
   }, [])
 
   const totalDebits = lines.reduce((s, l) => s + (parseFloat(l.debit) || 0), 0)
@@ -175,12 +185,16 @@ export default function NewEntryModal({ onClose, onPosted, initialDraft, onAutoS
                 Payment Method{' '}
                 <span className="font-normal text-ash/60">(optional)</span>
               </label>
-              <input
+              <select
                 className={inputClass}
-                placeholder="e.g. ACH, Check, Cash"
                 value={paymentMethod}
                 onChange={(e) => setPaymentMethod(e.target.value)}
-              />
+              >
+                <option value="">— none —</option>
+                {paymentMethods.map((m) => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
             </div>
           </div>
 

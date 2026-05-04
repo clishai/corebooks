@@ -3,17 +3,33 @@ import { api, DatabaseSettings, DbStats } from '../api/client'
 import { ALL_METRICS, MetricId, getSelectedMetrics, saveSelectedMetrics, HomeLayout, getHomeLayout, saveHomeLayout } from '../lib/metrics'
 import { SNOOZE_OPTIONS, getSnoozeDuration, saveSnoozeDuration } from '../lib/alerts'
 import { ALL_ACCOUNT_COLUMNS, AccountColumnId, getVisibleColumns, saveVisibleColumns } from '../lib/accountColumns'
+import { getPaymentMethods, savePaymentMethods } from '../lib/paymentMethods'
 import { encryptExport } from '../lib/crypto'
 import ExportPasswordModal from '../components/ExportPasswordModal'
+import ImportModal from '../components/ImportModal'
 
-type Tab = 'home' | 'database' | 'accounts'
+type Tab = 'home' | 'accounts' | 'payment-methods' | 'database'
 
 // ── Home page tab ────────────────────────────────────────────────────────────
 
 function HomePageSettings() {
+  const [companyName, setCompanyName] = useState(() => localStorage.getItem('cb_company_name') ?? '')
+  const [companySaved, setCompanySaved] = useState(false)
   const [selected, setSelected] = useState<MetricId[]>(getSelectedMetrics)
   const [layout, setLayout] = useState<HomeLayout>(getHomeLayout)
   const [snooze, setSnooze] = useState<number | null>(getSnoozeDuration)
+
+  function handleSaveCompanyName() {
+    const trimmed = companyName.trim()
+    if (trimmed) {
+      localStorage.setItem('cb_company_name', trimmed)
+    } else {
+      localStorage.removeItem('cb_company_name')
+    }
+    window.dispatchEvent(new CustomEvent('cb:company-name-changed'))
+    setCompanySaved(true)
+    setTimeout(() => setCompanySaved(false), 2000)
+  }
 
   function toggle(id: MetricId) {
     const next = selected.includes(id) ? selected.filter((m) => m !== id) : [...selected, id]
@@ -33,6 +49,30 @@ function HomePageSettings() {
 
   return (
     <div className="space-y-8">
+
+      {/* Business name */}
+      <div className="space-y-3">
+        <h3 className="text-sm font-semibold text-chalk">Business name</h3>
+        <p className="text-sm text-ash leading-relaxed">
+          Appears in the top bar of the app.
+        </p>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={companyName}
+            onChange={(e) => { setCompanyName(e.target.value); setCompanySaved(false) }}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleSaveCompanyName() }}
+            placeholder="e.g. Acme Corp"
+            className="flex-1 bg-raised border border-rim rounded-md px-3 py-2 text-chalk placeholder:text-ash focus:outline-none focus:border-neon text-sm"
+          />
+          <button
+            onClick={handleSaveCompanyName}
+            className="px-4 py-2 text-sm font-medium rounded-md border border-neon/40 text-neon hover:bg-neon/10 transition-colors shrink-0"
+          >
+            {companySaved ? 'Saved ✓' : 'Save'}
+          </button>
+        </div>
+      </div>
 
       {/* Card size */}
       <div className="space-y-3">
@@ -192,6 +232,90 @@ function AccountsSettings() {
   )
 }
 
+// ── Payment methods tab ───────────────────────────────────────────────────────
+
+function PaymentMethodsSettings() {
+  const [methods, setMethods] = useState<string[]>(getPaymentMethods)
+  const [newMethod, setNewMethod] = useState('')
+  const [error, setError] = useState<string | null>(null)
+
+  function handleAdd() {
+    const trimmed = newMethod.trim()
+    if (!trimmed) return
+    if (methods.includes(trimmed)) {
+      setError('That payment method already exists.')
+      return
+    }
+    const next = [...methods, trimmed]
+    setMethods(next)
+    savePaymentMethods(next)
+    setNewMethod('')
+    setError(null)
+  }
+
+  function handleRemove(method: string) {
+    const next = methods.filter((m) => m !== method)
+    setMethods(next)
+    savePaymentMethods(next)
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="space-y-3">
+        <h3 className="text-sm font-semibold text-chalk">Payment methods</h3>
+        <p className="text-sm text-ash leading-relaxed">
+          These appear as options in the journal entry form. Add or remove methods to match
+          how your business actually moves money.
+        </p>
+
+        {methods.length > 0 ? (
+          <div className="bg-surface border border-rim rounded-lg divide-y divide-rim">
+            {methods.map((m) => (
+              <div key={m} className="flex items-center justify-between px-5 py-3">
+                <span className="text-sm text-chalk">{m}</span>
+                <button
+                  onClick={() => handleRemove(m)}
+                  className="text-ash hover:text-red-400 text-xs transition-colors"
+                >
+                  Remove
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="bg-surface border border-rim rounded-lg px-5 py-4 text-sm text-ash">
+            No payment methods yet. Add one below.
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-2">
+        <h3 className="text-sm font-semibold text-chalk">Add a method</h3>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={newMethod}
+            onChange={(e) => { setNewMethod(e.target.value); setError(null) }}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleAdd() }}
+            placeholder="e.g. Zelle, PayPal"
+            className="flex-1 bg-raised border border-rim rounded-md px-3 py-2 text-chalk placeholder:text-ash focus:outline-none focus:border-neon text-sm"
+          />
+          <button
+            onClick={handleAdd}
+            className="px-4 py-2 text-sm font-medium rounded-md border border-neon/40 text-neon hover:bg-neon/10 transition-colors shrink-0"
+          >
+            Add
+          </button>
+        </div>
+        {error && (
+          <p className="text-xs text-red-400">{error}</p>
+        )}
+        <p className="text-xs text-ash">Changes take effect the next time you open the entry form.</p>
+      </div>
+    </div>
+  )
+}
+
 // ── Database tab ─────────────────────────────────────────────────────────────
 
 function DbTypeBadge({ type }: { type: 'sqlite' | 'postgresql' }) {
@@ -237,6 +361,8 @@ function DatabaseSettings_() {
   const [wiping, setWiping] = useState(false)
   const [wipeError, setWipeError] = useState<string | null>(null)
   const [wipeDone, setWipeDone] = useState(false)
+
+  const [importOpen, setImportOpen] = useState(false)
 
   function loadData() {
     setLoading(true)
@@ -299,6 +425,8 @@ function DatabaseSettings_() {
     setWipeError(null)
     try {
       await api.settings.wipe()
+      // Clear onboarding gate so the setup wizard re-runs on next load.
+      localStorage.removeItem('cb_welcomed')
       setWipeDone(true)
       setWipeOpen(false)
       setStats({ accounts: 0, postedEntries: 0, draftEntries: 0, fileSizeBytes: stats?.fileSizeBytes ?? null })
@@ -362,11 +490,12 @@ function DatabaseSettings_() {
         </div>
       )}
 
-      {/* Export + Wipe */}
+      {/* Export + Import + Wipe */}
       <div>
         <h3 className="text-sm font-semibold text-chalk mb-1">Your data</h3>
         <p className="text-sm text-ash mb-3 leading-relaxed">
-          Export a full backup of your accounts and entries as a JSON file. Use the wipe option
+          Export a full backup of your accounts and entries as a JSON file. Import data from
+          corebooks backups, QuickBooks (IIF), or any standard CSV. Use the wipe option
           to start fresh — for example, when switching to a new business or fiscal year.
         </p>
         {wipeDone && (
@@ -393,6 +522,12 @@ function DatabaseSettings_() {
             className="px-4 py-2 text-sm font-medium rounded-md border border-violet/40 text-violet hover:bg-violet/10 disabled:opacity-50 transition-colors"
           >
             Encrypted Export
+          </button>
+          <button
+            onClick={() => setImportOpen(true)}
+            className="px-4 py-2 text-sm font-medium rounded-md border border-neon/40 text-neon hover:bg-neon/10 transition-colors"
+          >
+            Import Data
           </button>
           <button
             onClick={() => { setWipeOpen(true); setWipeError(null) }}
@@ -500,6 +635,14 @@ function DatabaseSettings_() {
         </div>
       )}
 
+      {/* Import modal */}
+      {importOpen && (
+        <ImportModal
+          onClose={() => setImportOpen(false)}
+          onImported={() => { setImportOpen(false); loadData() }}
+        />
+      )}
+
       {/* Encrypted export modal */}
       {encryptModalOpen && (
         <ExportPasswordModal
@@ -576,6 +719,9 @@ export default function SettingsPage() {
         <button className={tabClass('accounts')} onClick={() => setTab('accounts')}>
           accounts
         </button>
+        <button className={tabClass('payment-methods')} onClick={() => setTab('payment-methods')}>
+          payment methods
+        </button>
         <button className={tabClass('database')} onClick={() => setTab('database')}>
           database
         </button>
@@ -583,6 +729,7 @@ export default function SettingsPage() {
 
       {tab === 'home' && <HomePageSettings />}
       {tab === 'accounts' && <AccountsSettings />}
+      {tab === 'payment-methods' && <PaymentMethodsSettings />}
       {tab === 'database' && <DatabaseSettings_ />}
     </div>
   )

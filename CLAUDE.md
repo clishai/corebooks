@@ -299,14 +299,30 @@ Release distribution:
   setting on window focus, so toggling in Settings and navigating back reflects the change
   without a hard reload.
 
-**Pending UI items discussed but not yet built:**
-- **Payment methods in Settings** — the spec describes a user-managed list of
-  payment methods (cash, check, ACH, credit card) stored in settings and
-  referenced on journal entries. The Settings page has three tabs today
-  ("home page", "accounts", "database"). A "payment methods" tab still needs to
-  be added with a simple add/remove list UI and persistence (API or localStorage
-  TBD). The `NewEntryModal` already has a payment method field; it currently
-  accepts free-text and should eventually pull from this managed list.
+**Payment methods management (complete)**
+- `src/ui/lib/paymentMethods.ts` — localStorage key `cb_payment_methods`, default list
+  (`Cash`, `Check`, `ACH`, `Credit Card`, `Wire Transfer`), read/write helpers.
+- Settings page gained a fourth tab "payment methods" (`PaymentMethodsSettings` component):
+  shows current list with Remove buttons; text input + Add button to append new methods;
+  duplicate-check with inline error message.
+- `NewEntryModal` payment method field replaced from free-text `<input>` to `<select>`
+  reading from `getPaymentMethods()`. If an existing draft carries a value not in the list,
+  it is included as an option so no data is silently discarded.
+
+**Onboarding questionnaire + feature flag system (complete)**
+- `src/ui/lib/featureFlags.ts` — `FeatureFlags` interface (`ar_ap`, `inventory` booleans),
+  localStorage key `cb_flags`, read/write helpers. `BusinessType` union type and
+  `cb_business_type` key for storing the user's business category.
+- `src/ui/components/OnboardingWizard.tsx` — replaces `FirstLaunchModal`. Three-step
+  modal: (1) company name + local-first explanation, (2) business type radio selection,
+  (3) optional module checkboxes (AR/AP, Inventory — both marked "coming soon"). Each
+  step has a persistent Skip button that saves whatever has been filled in and closes
+  with defaults applied. Step 3 pre-checks recommended modules based on business type
+  (service/nonprofit → AR/AP; product → AR/AP + Inventory). Exports `shouldShowOnboarding`
+  and `getCompanyName` (replaces the same exports from `FirstLaunchModal`).
+- `src/ui/components/FirstLaunchModal.tsx` — deleted (replaced by `OnboardingWizard`).
+- `src/ui/components/Layout.tsx` — imports updated from `FirstLaunchModal` to
+  `OnboardingWizard`.
 
 **Code condensation (no behavior changes)**
 - `Ledger.applyLines` — private static helper eliminates 3 copies of the 7-line
@@ -381,18 +397,13 @@ Delivered in this phase:
 - Port-conflict error in `src/index.ts` — catches `EADDRINUSE` and prints a plain-English
   message before exiting, instead of a raw stack trace.
 
-**Begin here next session: Onboarding questionnaire + feature flag system.**
-
-The recommended next task is the multi-step setup wizard (see Future Feature
-Ideas → Onboarding Questionnaire). It replaces `FirstLaunchModal`, collects the
-business name and business type, and populates the feature flag toggles that
-will gate AR/AP and inventory modules. Build this before any new modules so the
-toggle infrastructure is in place when those features land. Full spec is in the
-Future Feature Ideas section.
-
 The balance sheet and income statement now return per-account section breakdowns.
 Any future BalanceSheetPage or IncomeStatementPage work should preserve the
 `BalanceSheetSection` / `BalanceSheetLine` types introduced in this session.
+
+The feature flag system (`src/ui/lib/featureFlags.ts`) is in place. When AR/AP
+or Inventory modules are built, gate their sidebar nav items behind
+`isFeatureEnabled('ar_ap')` and `isFeatureEnabled('inventory')` respectively.
 
 ### Phase 4 UI Constraints
 - No business logic in UI components. Components call `src/ui/api/client.ts`;
@@ -702,37 +713,12 @@ file, not assume a hardcoded value.
 
 ---
 
-## Future Feature Ideas (Backlog)
+## Potential Features
 
-These are features that have been discussed but not yet planned or scoped.
-Before implementing any of them, do a design conversation with the user to
-agree on scope, data model changes, and which phase they belong to.
-
-### Onboarding Questionnaire (replaces FirstLaunchModal)
-
-Replace the current one-step `FirstLaunchModal` with a multi-step setup
-wizard shown on first launch. Goals:
-
-- Collect business name (already collected today; carry this forward).
-- Ask a short set of business-type questions (freelancer, product business,
-  service business, etc.) to suggest which feature modules to enable.
-- Show a checklist of optional modules (AR/AP manager, inventory, etc.) so
-  the user can toggle them on or off at first launch.
-- Include a persistent **Skip** button on every step that closes the wizard
-  immediately and applies sensible defaults. Users can revisit all settings
-  later in Settings.
-- Store answers in `localStorage` (same pattern as existing keys like
-  `cb_company_name` and `cb_welcomed`).
-
-**Implementation notes:**
-- The wizard is purely a UI concern — no new API routes or DB columns needed
-  for the questionnaire itself. Feature-flag toggles live in `localStorage`.
-- Feature flags control which nav items and pages are visible in the sidebar.
-  A disabled module is hidden entirely, not just grayed out.
-- This should be built before any new modules (AR/AP, inventory) so the
-  toggle infrastructure is ready when those modules land.
-
----
+These are open contribution areas. Before building any of them, open a design
+conversation to align on scope, data model changes, and architectural fit.
+All new modules must gate their sidebar nav items behind the feature flag
+system (`src/ui/lib/featureFlags.ts`).
 
 ### Accounts Receivable / Accounts Payable Manager
 
@@ -755,9 +741,8 @@ journal entry through the existing entry engine. The AR/AP module never
 writes directly to the ledger — it calls the same `postEntry` path that the
 rest of the app uses.
 
-**Implementation order:** Onboarding questionnaire → AR module → AP module
-(AR first because receivables are usually more time-sensitive for small
-businesses).
+**Gating:** `isFeatureEnabled('ar_ap')` — enabled by default for service,
+product, and nonprofit business types in the onboarding wizard.
 
 ---
 
@@ -776,11 +761,27 @@ sold (COGS) accounting. This is the most complex module on the backlog.
 
 **Out of scope for first iteration:** FIFO/LIFO/weighted-average costing
 selection, multi-location warehousing, reorder points, and barcode scanning.
-Keep the first iteration to the minimum needed to close the accounting loop.
 
-**Gating condition:** Only build this after AR/AP is solid, and only if the
-onboarding questionnaire confirms the user is a product-based business.
-Service businesses and freelancers should never see inventory in their UI.
+**Gating:** `isFeatureEnabled('inventory')` — enabled by default for product
+business types only. Build after AR/AP is solid.
+
+---
+
+### Import from Other Accounting Software
+
+Parse and import data from QuickBooks, Wave, FreshBooks, or generic CSV
+exports. Map external account structures to the corebooks chart of accounts.
+
+**Minimum viable scope:**
+- CSV import: configurable column mapping (date, memo, debit account, credit
+  account, amount) → create draft journal entries for user review before posting.
+- QuickBooks Desktop (.IIF) or QuickBooks Online export parsing.
+- Account name matching: fuzzy-match imported account names to existing chart
+  of accounts; prompt user to create new accounts for unmatched names.
+
+**Architectural constraint:** Imported entries must go through the same draft
+→ post flow as manual entries. The import tool creates drafts; the user
+reviews and posts them. No bulk-posting without user confirmation.
 
 ---
 
@@ -803,14 +804,28 @@ Plain language only (e.g., "We'll copy your data to the new database").
 
 ---
 
-### Payment Methods Management (Settings → Payment Methods tab)
+### Bank Feed / Transaction Import
 
-A third tab in Settings where users manage the list of payment methods
-available when creating a journal entry (cash, check, ACH, credit card, etc.).
+Import OFX/QFX/CSV bank statements and auto-match transactions to journal
+entries or create drafts for review.
 
-**Current state:** `NewEntryModal` has a free-text payment method field.
-This tab should replace free text with a user-managed dropdown, persisted
-either in `localStorage` or via a new `/settings/payment-methods` API route.
+---
 
-**This is the smallest item on the backlog and a good warm-up before the
-larger modules above.**
+### Plugin API
+
+Webhook and plugin interface so third-party tools (Stripe, Shopify, payroll
+providers) can post transactions directly into corebooks.
+
+---
+
+### Closing Entries
+
+Period-end close that zeroes out Revenue and Expense accounts into Retained
+Earnings, producing a clean opening balance for the next fiscal year.
+
+---
+
+### Multi-currency
+
+Record transactions in foreign currencies with exchange rate tracking and
+unrealised gain/loss accounts.

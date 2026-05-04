@@ -1,8 +1,8 @@
-import { useState, useRef, useLayoutEffect } from 'react'
+import { useState, useRef, useLayoutEffect, useEffect } from 'react'
 import { Outlet, NavLink, useLocation } from 'react-router-dom'
 import NewEntryModal from './NewEntryModal'
 import Toast from './Toast'
-import FirstLaunchModal, { shouldShowFirstLaunch, getCompanyName } from './FirstLaunchModal'
+import OnboardingWizard, { shouldShowOnboarding, getCompanyName } from './OnboardingWizard'
 import logoSrc from '../assets/logo.png'
 
 function CogIcon() {
@@ -52,7 +52,7 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
 export default function Layout() {
   const [showNewEntry, setShowNewEntry] = useState(false)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
-  const [showWelcome, setShowWelcome] = useState(shouldShowFirstLaunch)
+  const [showWelcome, setShowWelcome] = useState(shouldShowOnboarding)
   const [companyName, setCompanyName] = useState(getCompanyName)
 
   const location = useLocation()
@@ -69,6 +69,14 @@ export default function Layout() {
   useLayoutEffect(() => {
     prevRouteIndex.current = currRouteIndex
   })
+
+  useEffect(() => {
+    function handleNameChange() {
+      setCompanyName(getCompanyName())
+    }
+    window.addEventListener('cb:company-name-changed', handleNameChange)
+    return () => window.removeEventListener('cb:company-name-changed', handleNameChange)
+  }, [])
 
   function handlePosted() {
     setShowNewEntry(false)
@@ -172,7 +180,7 @@ export default function Layout() {
       )}
 
       {showWelcome && (
-        <FirstLaunchModal onDismiss={handleWelcomeDismiss} />
+        <OnboardingWizard onDismiss={handleWelcomeDismiss} />
       )}
     </div>
   )

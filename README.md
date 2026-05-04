@@ -17,15 +17,15 @@ This is a project by a college accounting major. The goal is to build the ultima
 🚧 **Active Development** — approaching v1.0
 
 The accounting engine, database, REST API, browser-based UI, and Electron desktop app are all functional. The app uses JetBrains Mono Light throughout for a cypherpunk aesthetic and is fully navigable with spring-animated page transitions. It includes:
+- Multi-step onboarding wizard that collects business name, business type, and optional module preferences
 - Chart of accounts with current/non-current classification, live current balances, inline account editing, and configurable column visibility
-- Journal entry creation (with draft saving and auto-save)
+- Journal entry creation with draft saving and auto-save; payment method tracked per entry
 - Trial Balance grouped by account type
 - Balance Sheet with collapsible Current/Non-current sections per-account, and Net Income shown as a distinct unreconciled equity line
 - Income Statement with expandable per-account Revenue and Expense sections
 - Encrypted data export (AES-256-GCM)
-- Settings with home page metrics, chart-of-accounts column toggles, database stats, JSON export, and data wipe
-
-**Next up:** Accounts receivable / payable manager, inventory module, and a signed public installer for one-click download.
+- Settings with home page metrics, chart-of-accounts column toggles, payment method management, database stats, JSON export, and data wipe
+- Feature flag system ready to gate optional modules as they ship
 
 ---
 
@@ -159,6 +159,23 @@ practice for any server holding sensitive data.
 - It does not phone home. There are no analytics, telemetry, or error reporting calls.
 - It does not store anything in the cloud. All data is yours and lives where you put it.
 - It does not require an account, email, or any form of registration.
+
+---
+
+## Potential Features
+
+These are areas where community contributions would be most valuable. None are scoped or scheduled — they're open invitations. If you want to work on one, open an issue first so we can align on design before you build.
+
+| Feature | Description |
+|---|---|
+| **Accounts Receivable / Payable** | Customer and vendor entities, invoice tracking, payment matching, aging reports (30/60/90 day buckets). Payments auto-generate journal entries through the existing entry engine. |
+| **Inventory Management** | Item catalog, quantities on hand, receive-goods and sell-goods flows, COGS accounting. Gated to product businesses via the feature flag system. |
+| **Import from other accounting software** | Parse and import data from QuickBooks, Wave, FreshBooks, or CSV exports. Map external account structures to corebooks chart of accounts. |
+| **PostgreSQL migration wizard** | Guided in-app flow to switch from SQLite to a shared PostgreSQL server: validate connection, migrate schema, copy data, confirm, restart. Plain-language UI — no technical jargon. |
+| **Bank feed / transaction import** | Import OFX/QFX/CSV bank statements and auto-match transactions to journal entries or create drafts for review. |
+| **Plugin API** | Webhook and plugin interface so third-party tools (Stripe, Shopify, payroll providers) can post transactions directly into corebooks. |
+| **Closing entries** | Period-end close that zeroes out Revenue and Expense accounts into Retained Earnings, producing a clean opening balance for the next fiscal year. |
+| **Multi-currency** | Record transactions in foreign currencies with exchange rate tracking and unrealised gain/loss accounts. |
 
 ---
 

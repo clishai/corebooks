@@ -119,6 +119,29 @@ export interface ExportData {
   entries: JournalEntry[]
 }
 
+export interface ImportMapping {
+  date: string
+  account: string
+  debit: string
+  credit: string
+  memo?: string
+  reference?: string
+  paymentMethod?: string
+}
+
+export interface ImportOptions {
+  createMissingAccounts: boolean
+  importAs: 'draft' | 'posted'
+}
+
+export interface ImportResult {
+  accountsCreated: number
+  accountsSkipped: number
+  entriesCreated: number
+  entriesSkipped: number
+  warnings: string[]
+}
+
 // In Electron the preload injects window.electronAPI.apiBaseUrl; in the Vite
 // dev server all routes are proxied so an empty base (relative URL) works.
 function getBaseUrl(): string {
@@ -170,5 +193,12 @@ export const api = {
     stats: (): Promise<DbStats> => request('/settings/stats'),
     export: (): Promise<ExportData> => request('/settings/export'),
     wipe: (): Promise<{ wiped: boolean }> => request('/settings/wipe', { method: 'POST' }),
+    import: (payload: {
+      format: 'corebooks-json' | 'csv' | 'iif'
+      data: string
+      mapping?: ImportMapping
+      options: ImportOptions
+    }): Promise<ImportResult> =>
+      request('/settings/import', { method: 'POST', body: JSON.stringify(payload) }),
   },
 }

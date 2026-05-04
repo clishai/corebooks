@@ -212,10 +212,12 @@ function RecentEntrySection({
               </p>
               <p className="text-xs text-ash mt-0.5">{formatDate(entry.date)}</p>
             </div>
-            {entry.paymentMethod && (
+            {entry.paymentMethod ? (
               <span className="text-xs text-ash bg-raised border border-rim px-2 py-0.5 rounded shrink-0">
                 {entry.paymentMethod}
               </span>
+            ) : (
+              <span className="text-xs text-ash/50 italic shrink-0">adjustment</span>
             )}
           </div>
 
