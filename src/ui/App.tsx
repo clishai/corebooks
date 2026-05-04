@@ -10,6 +10,7 @@ import IncomeStatementPage from './pages/IncomeStatementPage'
 import ReportsLibraryPage from './pages/ReportsLibraryPage'
 import SettingsPage from './pages/SettingsPage'
 import RecurringPage from './pages/RecurringPage'
+import ClosePeriodPage from './pages/ClosePeriodPage'
 
 export default function App() {
   return (
@@ -26,7 +27,7 @@ export default function App() {
           <Route path="reports/income-statement" element={<IncomeStatementPage />} />
           <Route path="reports/library" element={<ReportsLibraryPage />} />
           <Route path="extra/recurring" element={<RecurringPage />} />
-          <Route path="extra/close-period" element={<div className="p-6 text-ash text-sm">Close Period — coming soon.</div>} />
+          <Route path="extra/close-period" element={<ClosePeriodPage />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="settings/database" element={<Navigate to="/settings" replace />} />
         </Route>

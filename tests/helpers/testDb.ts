@@ -16,6 +16,7 @@ const migrationFiles = [
   join(migrationsDir, '20260426135826_init/migration.sql'),
   join(migrationsDir, '20260502180906_add_account_classification/migration.sql'),
   join(migrationsDir, '20260503000000_add_recurring_templates/migration.sql'),
+  join(migrationsDir, '20260503100000_add_period_close/migration.sql'),
 ]
 
 /**

@@ -238,6 +238,57 @@ export const api = {
   },
 }
 
+// --- Period Close ---
+
+export interface PeriodConfig {
+  fiscalYearEndMonth: number
+  fiscalYearEndDay: number
+  closeFrequency: 'year-end' | 'month-end'
+  retainedEarningsAcctId: string | null
+}
+
+export interface ClosedPeriod {
+  id: string
+  year: number
+  month: number
+  closedAt: string
+  entryId: string
+}
+
+export interface ClosingEntryResult {
+  draftId: string
+  year: number
+  month: number
+  netIncome: number
+  lineCount: number
+}
+
+export interface PostClosingResult {
+  entryId: string
+  year: number
+  month: number
+}
+
+export async function getPeriodConfig(): Promise<PeriodConfig> {
+  return request('/periods/config')
+}
+
+export async function savePeriodConfig(data: PeriodConfig): Promise<PeriodConfig> {
+  return request('/periods/config', { method: 'POST', body: JSON.stringify(data) })
+}
+
+export async function getClosedPeriods(): Promise<ClosedPeriod[]> {
+  return request('/periods/closed')
+}
+
+export async function generateClosingEntry(year: number, month: number): Promise<ClosingEntryResult> {
+  return request('/periods/generate-closing', { method: 'POST', body: JSON.stringify({ year, month }) })
+}
+
+export async function postClosingEntry(draftId: string, year: number, month: number): Promise<PostClosingResult> {
+  return request('/periods/post-closing', { method: 'POST', body: JSON.stringify({ draftId, year, month }) })
+}
+
 // Standalone named exports for direct import in UI components
 export async function listAccounts(): Promise<Account[]> {
   return api.accounts.list()
