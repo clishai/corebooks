@@ -115,34 +115,34 @@ export default function VaultPickerPage() {
 
         {/* New vault form */}
         {showNew ? (
-          <div className="bg-surface border border-rim rounded-lg px-5 py-5 mb-4">
+          <div className="bg-surface border border-rim rounded-xl px-5 py-5 mb-4">
             <h2 className="text-sm font-semibold text-chalk mb-4">Create a new vault</h2>
             <div className="space-y-3">
               <div>
-                <label className="block text-xs text-ash mb-1">Vault name</label>
+                <label className="block text-xs font-medium text-chalk mb-1.5">Vault name</label>
                 <input
                   type="text"
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
                   placeholder="My Business"
-                  className="w-full bg-raised border border-rim rounded px-3 py-2 text-sm text-chalk placeholder-ash/40 focus:outline-none focus:border-neon/50"
+                  className="w-full bg-base border border-rim rounded-md px-3 py-2 text-sm text-chalk placeholder:text-ash focus:outline-none focus:border-neon transition-colors"
                   autoFocus
                   onKeyDown={(e) => { if (e.key === 'Enter') void handleCreate() }}
                 />
               </div>
               <div>
-                <label className="block text-xs text-ash mb-1">Location</label>
+                <label className="block text-xs font-medium text-chalk mb-1.5">Location</label>
                 <div className="flex gap-2">
                   <input
                     type="text"
                     value={newDir}
                     onChange={(e) => setNewDir(e.target.value)}
                     placeholder="/Users/you/Documents"
-                    className="flex-1 bg-raised border border-rim rounded px-3 py-2 text-sm text-chalk placeholder-ash/40 focus:outline-none focus:border-neon/50"
+                    className="flex-1 bg-base border border-rim rounded-md px-3 py-2 text-sm text-chalk placeholder:text-ash focus:outline-none focus:border-neon transition-colors"
                   />
                   <button
                     onClick={handleChooseDir}
-                    className="px-3 py-2 bg-raised border border-rim rounded text-xs text-ash hover:text-chalk hover:border-neon/50 transition-colors cursor-pointer"
+                    className="px-3 py-2 bg-raised border border-rim rounded-md text-xs text-ash hover:text-chalk hover:border-neon/50 transition-colors cursor-pointer"
                   >
                     Browse…
                   </button>
@@ -152,13 +152,13 @@ export default function VaultPickerPage() {
                 <button
                   onClick={handleCreate}
                   disabled={!newName.trim() || !newDir.trim() || creating}
-                  className="flex-1 bg-neon hover:bg-neon-dim text-void text-sm font-semibold py-2 rounded transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="flex-1 bg-neon hover:bg-neon-dim text-void text-sm font-bold py-2 rounded-md transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   {creating ? 'Creating…' : 'Create vault'}
                 </button>
                 <button
                   onClick={() => { setShowNew(false); setNewName(''); setNewDir('') }}
-                  className="px-4 py-2 bg-raised border border-rim rounded text-sm text-ash hover:text-chalk transition-colors cursor-pointer"
+                  className="px-4 py-2 bg-raised border border-rim rounded-md text-sm text-ash hover:text-chalk hover:border-neon/50 transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -169,14 +169,14 @@ export default function VaultPickerPage() {
           <div className="flex gap-3">
             <button
               onClick={() => setShowNew(true)}
-              className="flex-1 bg-neon hover:bg-neon-dim text-void text-sm font-semibold py-2.5 rounded transition-colors cursor-pointer"
+              className="flex-1 bg-neon hover:bg-neon-dim text-void text-sm font-bold py-2.5 rounded-md transition-colors cursor-pointer"
             >
               + New vault
             </button>
             <button
               onClick={handleOpenExisting}
               disabled={opening}
-              className="flex-1 bg-surface border border-rim hover:border-neon/50 text-chalk text-sm font-medium py-2.5 rounded transition-colors cursor-pointer disabled:opacity-40"
+              className="flex-1 bg-surface border border-rim hover:border-neon/50 text-chalk text-sm font-medium py-2.5 rounded-md transition-colors cursor-pointer disabled:opacity-40"
             >
               {opening ? 'Opening…' : 'Open existing…'}
             </button>
