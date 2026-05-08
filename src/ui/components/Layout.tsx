@@ -149,12 +149,12 @@ export default function Layout() {
                 {r.label}
               </NavLink>
             ))}
-            <NavLink
-              to="/reports/library"
-              className="flex items-center px-3 py-2 rounded text-xs text-ash hover:text-chalk hover:bg-surface transition-colors"
+            <button
+              onClick={() => navigate('/settings?tab=reports')}
+              className="flex items-center px-3 py-2 rounded text-xs text-ash hover:text-chalk hover:bg-surface transition-colors cursor-pointer w-full text-left"
             >
               Browse all reports...
-            </NavLink>
+            </button>
           </SidebarSection>
 
           {/* EXTRA WORKFLOWS section */}
