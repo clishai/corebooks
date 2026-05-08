@@ -13,7 +13,18 @@ import SettingsPage from './pages/SettingsPage'
 import RecurringPage from './pages/RecurringPage'
 import ClosePeriodPage from './pages/ClosePeriodPage'
 import LoginPage from './pages/LoginPage'
+import VaultPickerPage from './pages/VaultPickerPage'
 import { checkAuthStatus, getAuthToken } from './lib/auth'
+
+function VaultGate({ children }: { children: React.ReactNode }) {
+  const isElectron = typeof window !== 'undefined' && !!window.electronAPI
+  const hasVault = isElectron ? window.electronAPI!.apiBaseUrl !== null : true
+
+  if (isElectron && !hasVault) {
+    return <VaultPickerPage />
+  }
+  return <>{children}</>
+}
 
 function AuthGate({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = useState<'loading' | 'login' | 'setup' | 'ok'>('loading')
@@ -48,26 +59,28 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   return (
-    <AuthGate>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Layout />}>
-            <Route index element={<Navigate to="/home" replace />} />
-            <Route path="home" element={<HomePage />} />
-            <Route path="accounts" element={<AccountsPage />} />
-            <Route path="entries" element={<EntriesPage />} />
-            <Route path="drafts" element={<DraftsPage />} />
-            <Route path="reports/trial-balance" element={<TrialBalancePage />} />
-            <Route path="reports/balance-sheet" element={<BalanceSheetPage />} />
-            <Route path="reports/income-statement" element={<IncomeStatementPage />} />
-            <Route path="reports/library" element={<ReportsLibraryPage />} />
-            <Route path="extra/recurring" element={<RecurringPage />} />
-            <Route path="extra/close-period" element={<ClosePeriodPage />} />
-            <Route path="settings" element={<SettingsPage />} />
-            <Route path="settings/database" element={<Navigate to="/settings" replace />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
-    </AuthGate>
+    <VaultGate>
+      <AuthGate>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<Layout />}>
+              <Route index element={<Navigate to="/home" replace />} />
+              <Route path="home" element={<HomePage />} />
+              <Route path="accounts" element={<AccountsPage />} />
+              <Route path="entries" element={<EntriesPage />} />
+              <Route path="drafts" element={<DraftsPage />} />
+              <Route path="reports/trial-balance" element={<TrialBalancePage />} />
+              <Route path="reports/balance-sheet" element={<BalanceSheetPage />} />
+              <Route path="reports/income-statement" element={<IncomeStatementPage />} />
+              <Route path="reports/library" element={<ReportsLibraryPage />} />
+              <Route path="extra/recurring" element={<RecurringPage />} />
+              <Route path="extra/close-period" element={<ClosePeriodPage />} />
+              <Route path="settings" element={<SettingsPage />} />
+              <Route path="settings/database" element={<Navigate to="/settings" replace />} />
+            </Route>
+          </Routes>
+        </BrowserRouter>
+      </AuthGate>
+    </VaultGate>
   )
 }
