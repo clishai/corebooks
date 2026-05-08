@@ -2,6 +2,7 @@ import { useState, useEffect, Fragment } from 'react'
 import { api, Account, DraftEntryInput, JournalEntry } from '../api/client'
 import { getPaymentMethods } from '../lib/paymentMethods'
 import AccountSelect from './AccountSelect'
+import DatePicker from './DatePicker'
 
 interface Line {
   accountId: string
@@ -174,12 +175,7 @@ export default function NewEntryModal({ onClose, onPosted, initialDraft, onAutoS
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-medium text-ash mb-1">Date</label>
-              <input
-                type="date"
-                className={`${inputClass} [color-scheme:dark]`}
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-              />
+              <DatePicker value={date} onChange={setDate} />
             </div>
             <div>
               <label className="block text-xs font-medium text-ash mb-1">
