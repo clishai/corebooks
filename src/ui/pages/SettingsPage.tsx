@@ -87,9 +87,15 @@ function VaultSettings() {
             {renaming ? 'Renaming…' : 'Rename'}
           </button>
         </div>
-        <p className="text-xs text-ash mt-2">
-          Renaming the vault renames the folder on disk and restarts the app.
-        </p>
+        {renaming ? (
+          <p className="text-xs text-neon mt-2">
+            Renaming folder on disk and restarting — the app will reopen in a moment.
+          </p>
+        ) : (
+          <p className="text-xs text-ash mt-2">
+            Renaming the vault renames the folder on disk and restarts the app.
+          </p>
+        )}
       </div>
 
       <div>
