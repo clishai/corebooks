@@ -22,6 +22,22 @@ tests/
   core/         ← Unit tests for the accounting engine
 ```
 
+### Vault Structure (Phase 10 — in progress)
+
+A vault is a user-owned folder that contains one company's books. Multiple vaults can exist on the same machine (one per company, project, or client). The app always asks which vault to open on launch.
+
+```
+~/Documents/My Business/     ← vault root (user-named, user-movable)
+  .corebooks                 ← JSON metadata: name, version, created
+  corebooks.db               ← SQLite database for this vault
+  imports/                   ← drop files here to trigger import (future)
+  statements/                ← archived bank statements (future)
+  receipts/                  ← receipts linked to entries (future)
+  exports/                   ← app-generated report files (future)
+```
+
+Vault registry lives at `userData/vaults.json` (the only file outside any vault). Encryption keys stay in `userData/.db.key` — never in the vault folder, so vaults are portable and shareable without exposing key material.
+
 ## Stack
 
 - TypeScript strict mode, Node.js runtime
@@ -91,6 +107,25 @@ Key decisions to carry forward:
 - `src/ui/pages/LoginPage.tsx` — handles first-time Admin setup and subsequent logins. Rendered outside `Layout` directly from `App.tsx`.
 - Auth gate in `App.tsx`: on load calls `/auth/status`; shows `LoginPage` for `'setup'` or `'login'` states; passes through in SQLite mode.
 - Settings → **Users** tab: lists users with role badges; Add User form; Remove; Make Admin (requires admin password confirmation).
+
+### Phase 10 — Vault Architecture (in progress)
+
+Design spec: `docs/superpowers/specs/2026-05-08-vault-architecture-design.md`
+
+**What changes:**
+- `src/electron/vaultTypes.ts` — `VaultEntry` and `VaultState` shared types.
+- `src/electron/vaultManager.ts` — new class: registry I/O (`userData/vaults.json`), vault creation (mkdir + `.corebooks` metadata + subdirs), rename (updates metadata + renames folder on disk + updates registry), list, select.
+- `src/electron/main.ts` — vault-aware startup: creates main window immediately (no API yet), IPC handlers (`vault:getState` synchronous, `vault:list`, `vault:create`, `vault:select`, `vault:rename`, `vault:showInExplorer`, `vault:chooseDirectory`). `DATABASE_URL` is set from vault path (`<vaultPath>/corebooks.db`) instead of `userData`. `startApi()` is called after vault selection, not on app ready.
+- `src/electron/preload.ts` — exposes `vault` IPC namespace. `apiBaseUrl` becomes null until vault is selected (read via sync `vault:getState` IPC on each preload execution, not from `additionalArguments`).
+- `src/ui/pages/VaultPickerPage.tsx` — full-screen launch page rendered when `window.electronAPI.apiBaseUrl` is null. No API calls. Grid of vault cards + "New Vault" + "Open existing". After selection, `vault:ready` event triggers `window.location.reload()`.
+- `src/ui/App.tsx` — checks `window.electronAPI?.apiBaseUrl` on load; renders `VaultPickerPage` if null; registers `vault.onReady` listener to reload.
+- `src/ui/pages/SettingsPage.tsx` — new `vault` tab: editable vault name, read-only vault path, "Show in Finder/Explorer" button, "Switch vault" button.
+
+**What does NOT change:** `src/core/`, `src/db/`, `src/api/` routes/middleware/bootstrap — all untouched.
+
+**Vault rename flow:** user edits name in Settings → `vault:rename` IPC → vaultManager renames folder + updates `.corebooks` + updates registry → `app.relaunch()` + `app.exit(0)` → app restarts, user sees vault picker, opens renamed vault in one click.
+
+**Web/Vite dev mode:** `window.electronAPI` is undefined in the browser — vault picker never renders, app works as before. No changes needed for dev/web mode.
 
 ---
 
@@ -179,9 +214,13 @@ Tokens defined in `src/ui/index.css` via Tailwind v4 `@theme`. Neon blue: primar
 |---|---|
 | API loopback-only | `src/api/bootstrap.ts` |
 | PostgreSQL SSL validation | `src/db/client.ts`, settings route, Settings UI |
-| safeStorage encryption key | `src/electron/main.ts` (`COREBOOKS_DB_KEY`) |
+| safeStorage encryption key | `src/electron/main.ts` (`COREBOOKS_DB_KEY`) — lives in `userData`, NOT in vault |
 | Encrypted export (AES-256-GCM + PBKDF2) | `src/ui/lib/crypto.ts`, `ExportPasswordModal.tsx` |
 | Session auth (PostgreSQL mode only) | `src/api/middleware/auth.ts`, `src/api/routes/auth.ts` |
+| Vault registry | `userData/vaults.json` — list of known vault paths + last-opened timestamps |
+| Vault metadata | `<vault>/.corebooks` — name, version, created date (no secrets) |
+
+**Vault and key separation:** The vault folder (`<vault>/corebooks.db`, `<vault>/.corebooks`) contains no key material. The OS-keychain key (`userData/.db.key`) is intentionally outside any vault so vaults can be moved, copied, or backed up independently without compromising the encryption key.
 
 **SQLCipher gap:** Key is in the OS keychain. Blocker: `PrismaBetterSqlite3` creates the `better-sqlite3` instance internally — no way to pass a pre-opened database or run `PRAGMA key` before Prisma opens the file. Fix: swap to `better-sqlite3-sqlcipher` and write a custom Prisma adapter that accepts a pre-opened encrypted instance.
 
@@ -213,7 +252,9 @@ All new modules must gate sidebar items behind `src/ui/lib/featureFlags.ts`. Ope
 
 **PostgreSQL Migration Wizard:** In-app guided wizard (Settings → Database) to move from SQLite to PostgreSQL. JSON snapshot export, migration, import. No "schema" or "adapter" in user-facing text.
 
-**Bank Feed Import:** OFX/QFX/CSV bank statements → auto-match or create draft entries.
+**Bank Feed Import:** OFX/QFX/CSV bank statements → auto-match or create draft entries. Requires vault architecture (Phase 10) — statements land in `<vault>/imports/`, watched by the app, processed into the draft review queue. Imports always create drafts, never auto-post.
+
+**AI-Assisted Categorisation (Ollama):** Optional built-in feature (not a plugin). If Ollama is running at `localhost:11434`, the bank import flow can request account categorisation suggestions for each transaction. Falls back gracefully to manual mapping if Ollama is absent. Configured in Settings → AI tab. Not a plugin — same pattern as PostgreSQL mode (optional, configuration-gated, first-party).
 
 **Plugin API:** Webhook interface for Stripe, Shopify, payroll providers.
 

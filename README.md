@@ -6,7 +6,7 @@
 
 > Open-source, self-hosted accounting and bookkeeping software. Built from first principles.
 
-**corebooks** is a privacy-first alternative to cloud accounting platforms. Your financial data lives on your machine — never in someone else's cloud.
+**corebooks** is a privacy-first alternative to cloud accounting platforms. Your financial data lives on your machine — never in someone else's cloud. Each set of books lives in a **vault**: a plain folder you own, name, and control. You can have as many vaults as you have companies, clients, or projects.
 
 This is a project by a college accounting major. The goal is to build the ultimate community-led accounting tool — one that any business owner can download, run, and own completely. Advances in AI and open-source tooling have made it possible for non-technical people to build the software they've always wanted, rather than being stuck with expensive, closed-source SaaS.
 
@@ -17,6 +17,7 @@ This is a project by a college accounting major. The goal is to build the ultima
 🚧 **Active Development** — approaching v1.0
 
 The accounting engine, database, REST API, browser-based UI, and Electron desktop app are all functional. The app uses JetBrains Mono Light throughout for a cypherpunk aesthetic and is fully navigable with spring-animated page transitions. It includes:
+- **Vault-based storage** — each company's books live in a named folder you own; pick or create a vault on every launch; rename a vault from within the app and the folder renames on disk
 - Multi-step onboarding wizard (business name, business type, account template suggestions)
 - Chart of accounts with current/non-current classification, live balances, inline editing, configurable column visibility, and an account template library (42 common accounts)
 - Journal entry creation with draft saving, auto-save, and payment method tracking
@@ -41,7 +42,7 @@ CoreBooks runs on your own computer. No account, subscription, or internet conne
 
 - **Node.js** version 20 or newer — download it at [nodejs.org](https://nodejs.org) (choose the "LTS" version)
 
-That is it. No separate database software needed — corebooks uses SQLite, a lightweight database stored in a single file on your computer.
+That is it. No separate database software needed — corebooks uses SQLite, a lightweight database stored inside your vault folder.
 
 ### Installation
 
@@ -53,6 +54,8 @@ npm run dev
 ```
 
 Open `http://localhost:5173` in your browser. Both the API server and the UI start together with `npm run dev`.
+
+When you open corebooks for the first time (as a desktop app), you will be prompted to create your first vault — a folder on your machine where your books will live. Give it a name like "My Business" and pick a location. You can create additional vaults later for separate companies, clients, or projects.
 
 ### Updating
 
@@ -94,8 +97,8 @@ corebooks is designed like an onion. Each layer wraps the one before it without 
 | **Core (Layer 1)** | Pure double-entry accounting engine. Chart of accounts, journal entries, general ledger, trial balance, financial statements. Zero external dependencies. |
 | **Database & API (Layer 2)** | Persistence with SQLite (default) or PostgreSQL (business). REST API. |
 | **UI (Layer 3)** | React + Tailwind browser-based interface. Dark mode. |
-| **Desktop App (Layer 4)** | Electron wrapper — single downloadable .exe / .app. Complete. |
-| **Integrations (Future)** | Plugin API, webhooks, bank feeds, Stripe, AI assistant. |
+| **Desktop App (Layer 4)** | Electron wrapper — vault picker on launch, named vault folders, `safeStorage` key management. Builds to .dmg / .exe / .AppImage. |
+| **Integrations (Future)** | Bank feed import (OFX/QFX/CSV), Ollama AI categorisation, plugin API, webhooks. |
 
 ## Who This Is For
 
@@ -121,9 +124,10 @@ Corebooks is designed with a clear threat model for each of its two operating mo
 
 ### Local mode (SQLite — the default)
 
-Your database is a single file on your machine. It is not reachable from the network.
-The Fastify API server binds to `127.0.0.1` only (loopback), so no other device on your
-network can reach it.
+Your vault is a plain folder on your machine. The database (`corebooks.db`) lives inside it.
+Neither the folder nor the database is reachable from the network — the Fastify API server
+binds to `127.0.0.1` only (loopback). The vault can be backed up by any tool that copies
+folders (Time Machine, iCloud Drive, Dropbox, rsync). No special export step required.
 
 **At-rest encryption (in progress):** When running as a desktop app, corebooks generates
 a 256-bit random key on first launch and stores it in your OS credential vault —
@@ -176,7 +180,8 @@ These are areas where community contributions would be most valuable. None are s
 | **Inventory Management** | Item catalog, quantities on hand, receive-goods and sell-goods flows, COGS accounting. Gated to product businesses via the feature flag system. |
 | **Import from other accounting software** | Parse and import data from QuickBooks, Wave, FreshBooks, or CSV exports. Map external account structures to corebooks chart of accounts. |
 | **PostgreSQL migration wizard** | Guided in-app flow to switch from SQLite to a shared PostgreSQL server: validate connection, migrate schema, copy data, confirm, restart. Plain-language UI — no technical jargon. |
-| **Bank feed / transaction import** | Import OFX/QFX/CSV bank statements and auto-match transactions to journal entries or create drafts for review. |
+| **Bank feed / transaction import** | Drop OFX/QFX/CSV bank statements into your vault's `imports/` folder and auto-match or create draft entries for review. Imports always create drafts — never auto-post. |
+| **AI-assisted categorisation** | Optional Ollama integration: if Ollama is running locally, corebooks can suggest account mappings during import. No API keys, no data leaves the machine. |
 | **Plugin API** | Webhook and plugin interface so third-party tools (Stripe, Shopify, payroll providers) can post transactions directly into corebooks. |
 | **Closing entries** | Period-end close that zeroes out Revenue and Expense accounts into Retained Earnings, producing a clean opening balance for the next fiscal year. |
 | **Multi-currency** | Record transactions in foreign currencies with exchange rate tracking and unrealised gain/loss accounts. |
