@@ -1,6 +1,7 @@
 import { useState, useEffect, Fragment } from 'react'
 import { api, Account, DraftEntryInput, JournalEntry } from '../api/client'
 import { getPaymentMethods } from '../lib/paymentMethods'
+import AccountSelect from './AccountSelect'
 
 interface Line {
   accountId: string
@@ -231,18 +232,11 @@ export default function NewEntryModal({ onClose, onPosted, initialDraft, onAutoS
                   <Fragment key={i}>
                     <tr className="border-b border-rim">
                       <td className="px-1 py-1 border-l border-rim">
-                        <select
-                          className="w-full px-2 py-1.5 text-sm rounded bg-raised text-chalk focus:outline-none focus:ring-2 focus:ring-neon"
+                        <AccountSelect
+                          accounts={accounts}
                           value={line.accountId}
-                          onChange={(e) => setLine(i, { accountId: e.target.value })}
-                        >
-                          <option value="">— select —</option>
-                          {accounts.map((a) => (
-                            <option key={a.id} value={a.id}>
-                              {a.number} {a.name}
-                            </option>
-                          ))}
-                        </select>
+                          onChange={(id) => setLine(i, { accountId: id })}
+                        />
                       </td>
                       <td className="px-1 py-1">
                         <input
