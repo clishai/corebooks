@@ -8,7 +8,6 @@ import DraftsPage from './pages/DraftsPage'
 import TrialBalancePage from './pages/TrialBalancePage'
 import BalanceSheetPage from './pages/BalanceSheetPage'
 import IncomeStatementPage from './pages/IncomeStatementPage'
-import ReportsLibraryPage from './pages/ReportsLibraryPage'
 import SettingsPage from './pages/SettingsPage'
 import RecurringPage from './pages/RecurringPage'
 import ClosePeriodPage from './pages/ClosePeriodPage'
@@ -72,7 +71,7 @@ export default function App() {
               <Route path="reports/trial-balance" element={<TrialBalancePage />} />
               <Route path="reports/balance-sheet" element={<BalanceSheetPage />} />
               <Route path="reports/income-statement" element={<IncomeStatementPage />} />
-              <Route path="reports/library" element={<ReportsLibraryPage />} />
+              <Route path="reports/library" element={<Navigate to="/settings?tab=reports" replace />} />
               <Route path="extra/recurring" element={<RecurringPage />} />
               <Route path="extra/close-period" element={<ClosePeriodPage />} />
               <Route path="settings" element={<SettingsPage />} />

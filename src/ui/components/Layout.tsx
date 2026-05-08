@@ -47,7 +47,6 @@ const ROUTE_ORDER = [
   '/reports/trial-balance',
   '/reports/balance-sheet',
   '/reports/income-statement',
-  '/reports/library',
   '/extra/recurring',
   '/extra/close-period',
   '/settings',

@@ -110,9 +110,6 @@ Key decisions to carry forward:
 
 ### Phase 10 — Vault Architecture (complete)
 
-Design spec: `docs/superpowers/specs/2026-05-08-vault-architecture-design.md`
-Implementation plan: `docs/superpowers/plans/2026-05-08-vault-architecture.md`
-
 **Files added/changed:**
 - `src/electron/vaultTypes.ts` — `VaultEntry`, `VaultState`, `VaultMetadata`, `VaultRegistry` shared types.
 - `src/electron/vaultManager.ts` — registry I/O (`userData/vaults.json`), vault creation (mkdir + `.corebooks` metadata + subdirs), rename (updates metadata + renames folder on disk + updates registry), list, select.
