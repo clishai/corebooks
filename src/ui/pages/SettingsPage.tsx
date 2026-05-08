@@ -22,7 +22,85 @@ import {
   type ShortcutBinding,
 } from '../lib/shortcuts'
 
-type Tab = 'home' | 'accounts' | 'payment-methods' | 'accounting' | 'shortcuts' | 'users' | 'database' | 'reports'
+type Tab = 'vault' | 'home' | 'accounts' | 'payment-methods' | 'accounting' | 'shortcuts' | 'users' | 'database' | 'reports'
+
+// ── Vault tab (Electron only) ────────────────────────────────────────────────
+
+function VaultSettings() {
+  const vault = window.electronAPI?.vault
+  const state = vault?.getState()
+  const [name, setName] = useState(state?.vaultName ?? '')
+  const [renaming, setRenaming] = useState(false)
+
+  if (!vault || !state) {
+    return <p className="text-sm text-ash">Vault settings are only available in the desktop app.</p>
+  }
+
+  async function handleRename() {
+    if (!name.trim()) return
+    setRenaming(true)
+    try {
+      await vault!.rename(name.trim())
+      // main.ts calls app.relaunch() + app.exit(0) — app restarts
+    } catch (e) {
+      console.error(e)
+      setRenaming(false)
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-sm font-semibold text-chalk mb-3">Vault name</h3>
+        <div className="flex gap-3">
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') void handleRename() }}
+            className="flex-1 bg-raised border border-rim rounded px-3 py-2 text-sm text-chalk focus:outline-none focus:border-neon/50"
+          />
+          <button
+            onClick={handleRename}
+            disabled={renaming || !name.trim() || name.trim() === state.vaultName}
+            className="px-4 py-2 bg-neon hover:bg-neon-dim text-void text-sm font-semibold rounded transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {renaming ? 'Renaming…' : 'Rename'}
+          </button>
+        </div>
+        <p className="text-xs text-ash mt-2">
+          Renaming the vault renames the folder on disk and restarts the app.
+        </p>
+      </div>
+
+      <div>
+        <h3 className="text-sm font-semibold text-chalk mb-2">Vault location</h3>
+        <div className="flex items-center gap-3">
+          <span className="flex-1 text-sm text-ash truncate font-mono">{state.vaultPath}</span>
+          <button
+            onClick={() => void vault.showInExplorer()}
+            className="px-3 py-1.5 bg-raised border border-rim rounded text-xs text-ash hover:text-chalk hover:border-neon/50 transition-colors cursor-pointer whitespace-nowrap"
+          >
+            Show in Finder
+          </button>
+        </div>
+      </div>
+
+      <div>
+        <h3 className="text-sm font-semibold text-chalk mb-2">Switch vault</h3>
+        <p className="text-sm text-ash mb-3">
+          Close the current vault and return to the vault picker.
+        </p>
+        <button
+          onClick={() => window.location.reload()}
+          className="px-4 py-2 bg-raised border border-rim rounded text-sm text-ash hover:text-chalk hover:border-neon/50 transition-colors cursor-pointer"
+        >
+          Switch vault…
+        </button>
+      </div>
+    </div>
+  )
+}
 
 // ── Home page tab ────────────────────────────────────────────────────────────
 
@@ -1291,7 +1369,7 @@ function ReportsSettings() {
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 
-const VALID_TABS: Tab[] = ['home', 'accounts', 'payment-methods', 'accounting', 'shortcuts', 'users', 'database', 'reports']
+const VALID_TABS: Tab[] = ['vault', 'home', 'accounts', 'payment-methods', 'accounting', 'shortcuts', 'users', 'database', 'reports']
 
 export default function SettingsPage() {
   const [searchParams] = useSearchParams()
@@ -1320,6 +1398,11 @@ export default function SettingsPage() {
       </div>
 
       <div className="flex flex-wrap gap-1 mb-6 bg-void border border-rim rounded-lg p-1 w-fit">
+        {window.electronAPI && (
+          <button className={tabClass('vault')} onClick={() => setTab('vault')}>
+            vault
+          </button>
+        )}
         <button className={tabClass('home')} onClick={() => setTab('home')}>
           home page
         </button>
@@ -1348,6 +1431,7 @@ export default function SettingsPage() {
         </button>
       </div>
 
+      {tab === 'vault' && <VaultSettings />}
       {tab === 'home' && <HomePageSettings />}
       {tab === 'accounts' && <AccountsSettings />}
       {tab === 'payment-methods' && <PaymentMethodsSettings />}
