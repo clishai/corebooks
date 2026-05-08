@@ -185,28 +185,33 @@ export default function Layout() {
       {/* Right column */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Top toolbar */}
-        <header className="h-12 border-b border-rim bg-void flex items-center px-4 gap-3 shrink-0">
-          <button
-            onClick={() => navigate('/home')}
-            className="text-sm font-medium text-chalk hover:text-neon transition-colors truncate max-w-[180px]"
-          >
-            {companyName || 'corebooks'}
-          </button>
+        <header className="h-12 border-b border-rim bg-void grid grid-cols-[1fr_auto_1fr] items-center px-4 shrink-0">
+          {/* Left: company name */}
+          <div className="flex items-center min-w-0">
+            <button
+              onClick={() => navigate('/home')}
+              className="text-sm font-medium text-chalk hover:text-neon transition-colors truncate max-w-[160px] cursor-pointer"
+              title={companyName || 'corebooks'}
+            >
+              {companyName || 'corebooks'}
+            </button>
+          </div>
 
-          {/* Search button */}
-          <div className="flex-1 max-w-xs">
+          {/* Center: search bar — always truly centered */}
+          <div className="w-72">
             <button
               onClick={() => setShowSearch(true)}
-              className="w-full bg-surface border border-rim rounded-sm px-3 py-1 text-xs text-ash/50 text-left hover:border-neon/50 transition-colors focus:outline-none"
+              className="w-full bg-surface border border-rim rounded-sm px-3 py-1 text-xs text-ash/50 text-left hover:border-neon/50 transition-colors focus:outline-none cursor-pointer"
             >
               Press / for global search
             </button>
           </div>
 
-          <div className="ml-auto">
+          {/* Right: new entry button */}
+          <div className="flex items-center justify-end">
             <button
               onClick={() => setShowNewEntry(true)}
-              className="bg-neon hover:bg-neon-dim text-void text-xs font-semibold px-3 py-1.5 rounded-sm transition-colors"
+              className="bg-neon hover:bg-neon-dim text-void text-xs font-semibold px-3 py-1.5 rounded-sm transition-colors cursor-pointer"
             >
               + New Entry
             </button>
