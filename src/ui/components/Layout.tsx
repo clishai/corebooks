@@ -58,7 +58,7 @@ function getRouteIndex(pathname: string): number {
 }
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
-  `flex items-center px-3 py-2 rounded text-sm font-medium transition-colors ${
+  `flex items-center px-3 py-2 rounded text-sm font-medium transition-colors cursor-pointer ${
     isActive
       ? 'bg-raised text-neon border-l-2 border-neon pl-[10px]'
       : 'text-ash hover:bg-surface hover:text-chalk'
@@ -126,7 +126,7 @@ export default function Layout() {
         {/* Logo — clicking navigates home */}
         <button
           onClick={() => navigate('/home')}
-          className="px-4 py-3 border-b border-rim w-full text-left hover:opacity-80 transition-opacity"
+          className="px-4 py-3 border-b border-rim w-full text-left hover:opacity-80 transition-opacity cursor-pointer"
         >
           <img src={logoSrc} alt="corebooks" className="w-full" />
         </button>
@@ -172,7 +172,7 @@ export default function Layout() {
           <NavLink
             to="/settings"
             className={({ isActive }) =>
-              `settings-link flex items-center gap-0 px-3 py-2 rounded text-sm font-medium transition-colors overflow-hidden ${
+              `settings-link flex items-center gap-0 px-3 py-2 rounded text-sm font-medium transition-colors overflow-hidden cursor-pointer ${
                 isActive
                   ? 'bg-raised text-neon border-l-2 border-neon pl-[10px]'
                   : 'text-ash hover:bg-surface hover:text-chalk'
