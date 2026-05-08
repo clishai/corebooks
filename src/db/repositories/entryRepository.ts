@@ -11,12 +11,22 @@ const INCLUDE_LINES = { lines: { orderBy: { id: 'asc' as const } } };
 
 // ── Read ───────────────────────────────────────────────────────────────────
 
-export async function listPostedEntries(): Promise<JournalEntry[]> {
+export async function listPostedEntries(from?: string, to?: string): Promise<JournalEntry[]> {
   const prisma = getPrismaClient();
+  const dateFilter: Record<string, Date> = {}
+  if (from) dateFilter['gte'] = new Date(from)
+  if (to) {
+    const d = new Date(to)
+    d.setHours(23, 59, 59, 999)
+    dateFilter['lte'] = d
+  }
   const rows = await prisma.journalEntry.findMany({
-    where: { status: EntryStatus.Posted },
+    where: {
+      status: EntryStatus.Posted,
+      ...(Object.keys(dateFilter).length ? { date: dateFilter } : {}),
+    },
     include: INCLUDE_LINES,
-    orderBy: { createdAt: 'asc' },
+    orderBy: { date: 'desc' },
   });
   return (rows as unknown as PrismaJournalEntry[]).map(toCoreJournalEntry);
 }

@@ -196,7 +196,12 @@ export const api = {
       request(`/accounts/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   },
   entries: {
-    list: (): Promise<JournalEntry[]> => request('/entries'),
+    list: (params?: { from?: string; to?: string }): Promise<JournalEntry[]> => {
+      const qs = params ? new URLSearchParams(
+        Object.fromEntries(Object.entries(params).filter(([, v]) => v != null && v !== ''))
+      ).toString() : ''
+      return request(`/entries${qs ? '?' + qs : ''}`)
+    },
     listDrafts: (): Promise<JournalEntry[]> => request('/entries/drafts'),
     saveDraft: (data: DraftEntryInput): Promise<JournalEntry> =>
       request('/entries/draft', { method: 'POST', body: JSON.stringify(data) }),

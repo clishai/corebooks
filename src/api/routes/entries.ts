@@ -22,8 +22,9 @@ interface RouteOptions {
 export const entryRoutes: FastifyPluginAsync<RouteOptions> = async (app, opts) => {
   const { ledger } = opts.context;
 
-  app.get('/', async () => {
-    return listPostedEntries();
+  app.get<{ Querystring: { from?: string; to?: string } }>('/', async (req) => {
+    const { from, to } = req.query
+    return listPostedEntries(from, to)
   });
 
   // Must be registered before /:id so "drafts" isn't captured as an id param.
