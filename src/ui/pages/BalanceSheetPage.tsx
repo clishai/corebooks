@@ -43,9 +43,7 @@ function SectionGroup({ label, section, expanded, onToggle, subtotalLabel }: Sec
         </td>
         <td className={`${colNumber} py-2.5 text-ash`}></td>
         <td className={`${colName} py-2.5 text-sm font-semibold text-chalk`}>{label}</td>
-        <td className={`${colAmount} py-2.5 font-semibold ${section.total === 0 ? 'text-ash' : 'text-chalk'}`}>
-          {section.total === 0 && !hasLines ? '—' : fmt(section.total)}
-        </td>
+        <td className={colAmount} />
       </tr>
 
       {/* Account detail rows */}
