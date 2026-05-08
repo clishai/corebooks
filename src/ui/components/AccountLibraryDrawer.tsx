@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { ACCOUNT_TEMPLATES, type AccountTemplate } from '../lib/accountTemplates'
 import { api } from '../api/client'
 
@@ -50,15 +51,15 @@ export default function AccountLibraryDrawer({ existingNumbers, onClose, onAdded
     for (const t of templates) await handleAdd(t)
   }
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 bg-black/50 z-50 flex justify-end" onClick={onClose}>
       <div
-        className="w-96 h-full bg-void border-l border-rim overflow-y-auto flex flex-col"
+        className="w-96 min-h-screen bg-void border-l border-rim overflow-y-auto flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-rim shrink-0">
           <h2 className="text-chalk font-semibold text-sm">Account Library</h2>
-          <button onClick={onClose} className="text-ash hover:text-chalk text-sm transition-colors">
+          <button onClick={onClose} className="text-ash hover:text-chalk text-sm transition-colors cursor-pointer">
             ✕
           </button>
         </div>
@@ -76,7 +77,7 @@ export default function AccountLibraryDrawer({ existingNumbers, onClose, onAdded
                   </span>
                   <button
                     onClick={() => handleAddAll(type)}
-                    className="text-ash hover:text-neon text-[10px] uppercase tracking-wide transition-colors"
+                    className="text-ash hover:text-neon text-[10px] uppercase tracking-wide transition-colors cursor-pointer"
                   >
                     Add All
                   </button>
@@ -103,7 +104,7 @@ export default function AccountLibraryDrawer({ existingNumbers, onClose, onAdded
                         className={`text-[10px] font-semibold shrink-0 px-2 py-1 rounded-sm border transition-colors ${
                           alreadyExists
                             ? 'border-rim text-ash cursor-default'
-                            : 'border-neon text-neon hover:bg-neon hover:text-void'
+                            : 'border-neon text-neon hover:bg-neon hover:text-void cursor-pointer'
                         }`}
                       >
                         {alreadyExists ? 'Added' : isAdding ? '…' : 'ADD+'}
@@ -116,6 +117,7 @@ export default function AccountLibraryDrawer({ existingNumbers, onClose, onAdded
           })}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
