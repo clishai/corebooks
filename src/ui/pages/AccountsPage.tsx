@@ -43,6 +43,17 @@ export default function AccountsPage() {
   const [editAccount, setEditAccount] = useState<Account | null>(null)
   const [visibleCols, setVisibleCols] = useState<AccountColumnId[]>(getVisibleColumns)
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [classificationPicking, setClassificationPicking] = useState(false)
+
+  async function applyClassification(val: 'current' | 'non-current') {
+    const ids = Array.from(selected)
+    for (const id of ids) {
+      await api.accounts.update(id, { classification: val })
+    }
+    setClassificationPicking(false)
+    clearSelection()
+    loadAccounts()
+  }
 
   function toggleSelect(id: string) {
     setSelected((prev) => {
@@ -229,20 +240,14 @@ export default function AccountsPage() {
 
       <BulkActionBar
         count={selected.size}
-        onClear={clearSelection}
+        onClear={() => { setClassificationPicking(false); clearSelection() }}
+        classificationPicking={classificationPicking}
+        onPickClassification={applyClassification}
+        onCancelClassification={() => setClassificationPicking(false)}
         actions={[
           {
             label: 'Set classification',
-            onClick: async () => {
-              const val = prompt('Set classification: "current" or "non-current"')
-              if (val !== 'current' && val !== 'non-current') return
-              const ids = Array.from(selected)
-              for (const id of ids) {
-                await api.accounts.update(id, { classification: val })
-              }
-              clearSelection()
-              loadAccounts()
-            },
+            onClick: () => setClassificationPicking(true),
           },
         ]}
       />
