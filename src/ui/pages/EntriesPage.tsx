@@ -51,6 +51,11 @@ export default function EntriesPage() {
   }, [loadEntries])
 
   useEffect(() => {
+    window.addEventListener('cb:entry-posted', loadEntries)
+    return () => window.removeEventListener('cb:entry-posted', loadEntries)
+  }, [loadEntries])
+
+  useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') clearSelection()
     }

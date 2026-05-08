@@ -108,7 +108,10 @@ export default function Layout() {
     'global-search': () => setShowSearch(true),
   })
 
-  function handlePosted() { setShowNewEntry(false) }
+  function handlePosted() {
+    setShowNewEntry(false)
+    window.dispatchEvent(new Event('cb:entry-posted'))
+  }
   function handleWelcomeDismiss() {
     setShowWelcome(false)
     setCompanyName(getCompanyName())
