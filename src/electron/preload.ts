@@ -14,5 +14,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     showInExplorer: () => ipcRenderer.invoke('vault:showInExplorer'),
     chooseDirectory: () => ipcRenderer.invoke('vault:chooseDirectory'),
     onReady: (cb: () => void) => { ipcRenderer.on('vault:ready', cb) },
+    relaunch: () => ipcRenderer.invoke('vault:relaunch'),
   },
 })

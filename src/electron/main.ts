@@ -161,6 +161,14 @@ function registerIpc(): void {
     })
     return result.canceled ? null : (result.filePaths[0] ?? null)
   })
+
+  // Restarts the app cleanly so the vault picker shows on next launch.
+  // Required because the Prisma client singleton can't be re-pointed to a
+  // different database within the same process.
+  ipcMain.handle('vault:relaunch', () => {
+    app.relaunch()
+    app.exit(0)
+  })
 }
 
 app.whenReady().then(async () => {

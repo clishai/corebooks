@@ -15,6 +15,7 @@ declare global {
         showInExplorer: () => Promise<void>
         chooseDirectory: () => Promise<string | null>
         onReady: (cb: () => void) => void
+        relaunch: () => Promise<void>
       }
     }
   }

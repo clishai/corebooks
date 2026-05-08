@@ -22,7 +22,7 @@ tests/
   core/         ← Unit tests for the accounting engine
 ```
 
-### Vault Structure (Phase 10 — in progress)
+### Vault Structure (Phase 10 — complete)
 
 A vault is a user-owned folder that contains one company's books. Multiple vaults can exist on the same machine (one per company, project, or client). The app always asks which vault to open on launch.
 
@@ -108,24 +108,32 @@ Key decisions to carry forward:
 - Auth gate in `App.tsx`: on load calls `/auth/status`; shows `LoginPage` for `'setup'` or `'login'` states; passes through in SQLite mode.
 - Settings → **Users** tab: lists users with role badges; Add User form; Remove; Make Admin (requires admin password confirmation).
 
-### Phase 10 — Vault Architecture (in progress)
+### Phase 10 — Vault Architecture (complete)
 
 Design spec: `docs/superpowers/specs/2026-05-08-vault-architecture-design.md`
+Implementation plan: `docs/superpowers/plans/2026-05-08-vault-architecture.md`
 
-**What changes:**
-- `src/electron/vaultTypes.ts` — `VaultEntry` and `VaultState` shared types.
-- `src/electron/vaultManager.ts` — new class: registry I/O (`userData/vaults.json`), vault creation (mkdir + `.corebooks` metadata + subdirs), rename (updates metadata + renames folder on disk + updates registry), list, select.
-- `src/electron/main.ts` — vault-aware startup: creates main window immediately (no API yet), IPC handlers (`vault:getState` synchronous, `vault:list`, `vault:create`, `vault:select`, `vault:rename`, `vault:showInExplorer`, `vault:chooseDirectory`). `DATABASE_URL` is set from vault path (`<vaultPath>/corebooks.db`) instead of `userData`. `startApi()` is called after vault selection, not on app ready.
-- `src/electron/preload.ts` — exposes `vault` IPC namespace. `apiBaseUrl` becomes null until vault is selected (read via sync `vault:getState` IPC on each preload execution, not from `additionalArguments`).
-- `src/ui/pages/VaultPickerPage.tsx` — full-screen launch page rendered when `window.electronAPI.apiBaseUrl` is null. No API calls. Grid of vault cards + "New Vault" + "Open existing". After selection, `vault:ready` event triggers `window.location.reload()`.
-- `src/ui/App.tsx` — checks `window.electronAPI?.apiBaseUrl` on load; renders `VaultPickerPage` if null; registers `vault.onReady` listener to reload.
-- `src/ui/pages/SettingsPage.tsx` — new `vault` tab: editable vault name, read-only vault path, "Show in Finder/Explorer" button, "Switch vault" button.
+**Files added/changed:**
+- `src/electron/vaultTypes.ts` — `VaultEntry`, `VaultState`, `VaultMetadata`, `VaultRegistry` shared types.
+- `src/electron/vaultManager.ts` — registry I/O (`userData/vaults.json`), vault creation (mkdir + `.corebooks` metadata + subdirs), rename (updates metadata + renames folder on disk + updates registry), list, select.
+- `src/electron/main.ts` — vault-aware startup: window created immediately (no API yet), full IPC surface for vault operations, `DATABASE_URL` set from vault path after selection, `startApiForVault()` replaces the old `startApi()`.
+- `src/electron/preload.ts` — `apiBaseUrl` is null until vault selected (sync `vault:getState` IPC); exposes `vault` namespace including `relaunch()`.
+- `src/ui/electron.d.ts` — updated to reflect nullable `apiBaseUrl` and full `vault` namespace.
+- `src/ui/pages/VaultPickerPage.tsx` — full-screen launch page when `apiBaseUrl` is null. Grid of vault cards, "New vault" inline form, "Open existing…" folder picker.
+- `src/ui/App.tsx` — `VaultGate` wraps everything; shows `VaultPickerPage` in Electron until vault is selected.
+- `src/ui/pages/SettingsPage.tsx` — vault tab: rename, Show in Finder, Switch vault (calls `vault.relaunch()` → `app.relaunch() + app.exit(0)`).
+
+**IPC surface:** `vault:getState` (sync), `vault:list`, `vault:create`, `vault:select`, `vault:rename`, `vault:showInExplorer`, `vault:chooseDirectory`, `vault:relaunch`.
 
 **What does NOT change:** `src/core/`, `src/db/`, `src/api/` routes/middleware/bootstrap — all untouched.
 
-**Vault rename flow:** user edits name in Settings → `vault:rename` IPC → vaultManager renames folder + updates `.corebooks` + updates registry → `app.relaunch()` + `app.exit(0)` → app restarts, user sees vault picker, opens renamed vault in one click.
+**Vault rename flow:** Settings → rename → `vault:rename` IPC → folder renamed on disk + registry updated → `app.relaunch()` → vault picker shows → one click to open renamed vault.
 
-**Web/Vite dev mode:** `window.electronAPI` is undefined in the browser — vault picker never renders, app works as before. No changes needed for dev/web mode.
+**Switch vault flow:** Settings → Switch vault → `vault.relaunch()` IPC → `app.relaunch() + app.exit(0)` → fresh process → `vaultManager.current` is null → vault picker shows. Full restart is required because the Prisma client singleton cannot be re-pointed to a different database in the same process.
+
+**Web/Vite dev mode:** `window.electronAPI` is undefined — vault picker never renders, app works as before.
+
+**Known limitation:** Company name (`cb_company_name` in `localStorage`) is currently shared across vaults. Future work: store per-vault settings in the database or in `.corebooks` metadata.
 
 ---
 

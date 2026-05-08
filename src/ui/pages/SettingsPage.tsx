@@ -33,7 +33,26 @@ function VaultSettings() {
   const [renaming, setRenaming] = useState(false)
 
   if (!vault || !state) {
-    return <p className="text-sm text-ash">Vault settings are only available in the desktop app.</p>
+    return (
+      <div className="bg-surface border border-rim rounded-lg px-5 py-5 space-y-3">
+        <h3 className="text-sm font-semibold text-chalk">Vaults are a desktop-only feature</h3>
+        <p className="text-sm text-ash leading-relaxed">
+          In the desktop app, every set of books lives in a <strong className="text-chalk">vault</strong> — a plain
+          folder on your machine that you own and control. You pick which vault to open on every
+          launch, and you can rename a vault directly from Settings (the folder renames on disk).
+        </p>
+        <p className="text-sm text-ash leading-relaxed">
+          In web mode, corebooks connects to whichever database is configured via{' '}
+          <code className="text-neon text-xs bg-raised px-1.5 py-0.5 rounded">DATABASE_URL</code>{' '}
+          on the server. There is no vault picker because the database path is an infrastructure
+          decision made by whoever deployed the server.
+        </p>
+        <p className="text-sm text-ash leading-relaxed">
+          If you want local, transparent, file-system-based storage where you own every byte —
+          the desktop app is what you want.
+        </p>
+      </div>
+    )
   }
 
   async function handleRename() {
@@ -92,7 +111,7 @@ function VaultSettings() {
           Close the current vault and return to the vault picker.
         </p>
         <button
-          onClick={() => window.location.reload()}
+          onClick={() => void vault.relaunch()}
           className="px-4 py-2 bg-raised border border-rim rounded text-sm text-ash hover:text-chalk hover:border-neon/50 transition-colors cursor-pointer"
         >
           Switch vault…
@@ -1398,11 +1417,9 @@ export default function SettingsPage() {
       </div>
 
       <div className="flex flex-wrap gap-1 mb-6 bg-void border border-rim rounded-lg p-1 w-fit">
-        {window.electronAPI && (
-          <button className={tabClass('vault')} onClick={() => setTab('vault')}>
-            vault
-          </button>
-        )}
+        <button className={tabClass('vault')} onClick={() => setTab('vault')}>
+          vault
+        </button>
         <button className={tabClass('home')} onClick={() => setTab('home')}>
           home page
         </button>
