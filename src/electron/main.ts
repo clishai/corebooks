@@ -1,28 +1,34 @@
-import { app, BrowserWindow, safeStorage } from 'electron';
-import { createServer } from 'net';
-import { randomBytes } from 'crypto';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import { app, BrowserWindow, ipcMain, shell, dialog, safeStorage } from 'electron'
+import { createServer } from 'net'
+import { randomBytes } from 'crypto'
+import fs from 'fs'
+import path from 'path'
+import { fileURLToPath } from 'url'
+import { VaultManager } from './vaultManager.js'
+import type { VaultState } from './vaultTypes.js'
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
-const isDev = process.env['NODE_ENV'] === 'development';
+const isDev = process.env['NODE_ENV'] === 'development'
+
+let currentApiPort: number | null = null
+let mainWindow: BrowserWindow | null = null
+let vaultManager: VaultManager
 
 function findFreePort(): Promise<number> {
   return new Promise((resolve, reject) => {
-    const server = createServer();
+    const server = createServer()
     server.listen(0, '127.0.0.1', () => {
-      const addr = server.address();
+      const addr = server.address()
       if (addr && typeof addr === 'object') {
-        const { port } = addr;
-        server.close(() => resolve(port));
+        const { port } = addr
+        server.close(() => resolve(port))
       } else {
-        server.close(() => reject(new Error('Could not determine a free port')));
+        server.close(() => reject(new Error('Could not determine a free port')))
       }
-    });
-  });
+    })
+  })
 }
 
 // ── At-rest encryption key (SQLCipher infrastructure) ────────────────────────
@@ -37,22 +43,22 @@ function findFreePort(): Promise<number> {
 function getOrCreateEncryptionKey(userData: string): void {
   if (!safeStorage.isEncryptionAvailable()) {
     // safeStorage is unavailable (e.g. headless CI). Skip key setup.
-    return;
+    return
   }
 
-  const keyFile = path.join(userData, '.db.key');
+  const keyFile = path.join(userData, '.db.key')
 
   try {
     if (fs.existsSync(keyFile)) {
-      const encrypted = fs.readFileSync(keyFile);
-      process.env['COREBOOKS_DB_KEY'] = safeStorage.decryptString(encrypted);
+      const encrypted = fs.readFileSync(keyFile)
+      process.env['COREBOOKS_DB_KEY'] = safeStorage.decryptString(encrypted)
     } else {
       // First launch: generate a fresh 256-bit (32-byte) key as a hex string.
-      const key = randomBytes(32).toString('hex');
-      const encrypted = safeStorage.encryptString(key);
+      const key = randomBytes(32).toString('hex')
+      const encrypted = safeStorage.encryptString(key)
       // 0o600 = owner read/write only — no other OS user can read the file.
-      fs.writeFileSync(keyFile, encrypted, { mode: 0o600 });
-      process.env['COREBOOKS_DB_KEY'] = key;
+      fs.writeFileSync(keyFile, encrypted, { mode: 0o600 })
+      process.env['COREBOOKS_DB_KEY'] = key
     }
   } catch {
     // If the OS keychain call fails (e.g. locked keychain at login),
@@ -60,25 +66,17 @@ function getOrCreateEncryptionKey(userData: string): void {
   }
 }
 
-async function startApi(): Promise<number> {
-  const port = await findFreePort();
+async function startApiForVault(vaultPath: string): Promise<number> {
+  const port = await findFreePort()
+  const dbPath = path.join(vaultPath, 'corebooks.db')
+  process.env['DATABASE_URL'] = `file:${dbPath}`
 
-  const userData = app.getPath('userData');
-
-  // Set DATABASE_URL before any Prisma module loads so the client singleton
-  // picks up the userData path rather than a cwd-relative default.
-  if (!process.env['DATABASE_URL']) {
-    const dbPath = path.join(userData, 'corebooks.db');
-    process.env['DATABASE_URL'] = `file:${dbPath}`;
-  }
-
-  // Generate / retrieve the at-rest encryption key from the OS keychain.
-  // Must be called after app.getPath('userData') is available.
-  getOrCreateEncryptionKey(userData);
+  const userData = app.getPath('userData')
+  getOrCreateEncryptionKey(userData)
 
   // Dynamic import ensures all env vars are set before Prisma initialises.
-  const { startServer } = await import('../api/bootstrap.js');
-  await startServer(port);
+  const { startServer } = await import('../api/bootstrap.js')
+  await startServer(port)
 
   // Fire recurring template check on launch, then every 24 hours.
   async function checkRecurring() {
@@ -93,11 +91,11 @@ async function startApi(): Promise<number> {
   checkRecurring()
   setInterval(checkRecurring, 24 * 60 * 60 * 1000)
 
-  return port;
+  return port
 }
 
-async function createWindow(apiPort: number): Promise<void> {
-  const win = new BrowserWindow({
+async function createWindow(): Promise<void> {
+  mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
     minWidth: 900,
@@ -108,31 +106,77 @@ async function createWindow(apiPort: number): Promise<void> {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
-      // Port is passed as a process argument so the preload can read it
-      // synchronously without an async IPC round-trip.
-      additionalArguments: [`--api-port=${apiPort}`],
     },
-  });
+  })
 
   if (isDev) {
-    await win.loadURL('http://localhost:5173');
-    win.webContents.openDevTools();
+    await mainWindow.loadURL('http://localhost:5173')
+    mainWindow.webContents.openDevTools()
   } else {
-    await win.loadFile(path.join(__dirname, '../ui/index.html'));
+    await mainWindow.loadFile(path.join(__dirname, '../ui/index.html'))
   }
 }
 
+function registerIpc(): void {
+  ipcMain.on('vault:getState', (event) => {
+    const state: VaultState = {
+      apiPort: currentApiPort,
+      vaultName: vaultManager.getCurrent()?.name ?? null,
+      vaultPath: vaultManager.getCurrent()?.path ?? null,
+    }
+    event.returnValue = state
+  })
+
+  ipcMain.handle('vault:list', () => vaultManager.list())
+
+  ipcMain.handle('vault:create', async (_event, name: string, dirPath: string) => {
+    const entry = vaultManager.create(name, dirPath)
+    vaultManager.select(entry.path)
+    currentApiPort = await startApiForVault(entry.path)
+    mainWindow?.webContents.send('vault:ready')
+    return entry
+  })
+
+  ipcMain.handle('vault:select', async (_event, vaultPath: string) => {
+    vaultManager.select(vaultPath)
+    currentApiPort = await startApiForVault(vaultPath)
+    mainWindow?.webContents.send('vault:ready')
+  })
+
+  ipcMain.handle('vault:rename', (_event, newName: string) => {
+    const newPath = vaultManager.rename(newName)
+    app.relaunch()
+    app.exit(0)
+    return { newPath }
+  })
+
+  ipcMain.handle('vault:showInExplorer', () => {
+    const current = vaultManager.getCurrent()
+    if (current) shell.showItemInFolder(current.path)
+  })
+
+  ipcMain.handle('vault:chooseDirectory', async () => {
+    const result = await dialog.showOpenDialog({
+      properties: ['openDirectory', 'createDirectory'],
+    })
+    return result.canceled ? null : (result.filePaths[0] ?? null)
+  })
+}
+
 app.whenReady().then(async () => {
-  const port = await startApi();
-  await createWindow(port);
+  const userData = app.getPath('userData')
+  vaultManager = new VaultManager(userData)
+
+  registerIpc()
+  await createWindow()
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
-      void createWindow(port);
+      void createWindow()
     }
-  });
-});
+  })
+})
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit();
-});
+  if (process.platform !== 'darwin') app.quit()
+})
