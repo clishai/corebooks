@@ -39,6 +39,7 @@ declare global {
         readFile: (filePath: string) => Promise<string>
         onFileAdded: (cb: (event: FileAddedEvent) => void) => void
         onFileRemoved: (cb: (event: { path: string }) => void) => void
+        safeStorageAvailable: () => Promise<boolean>
       }
       ollama: {
         start: () => Promise<boolean>
