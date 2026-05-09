@@ -57,7 +57,7 @@ export default function DatabaseTab() {
     vault.listImports().then((files) => setPendingCount(files.length)).catch(() => {})
 
     function refresh() {
-      vault.listImports().then((files) => setPendingCount(files.length)).catch(() => {})
+      vault?.listImports().then((files) => setPendingCount(files.length)).catch(() => {})
     }
     window.addEventListener('cb:vault-imports-changed', refresh)
     return () => window.removeEventListener('cb:vault-imports-changed', refresh)
