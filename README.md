@@ -18,6 +18,8 @@ This is a project by a college accounting major. The goal is to build the ultima
 
 The accounting engine, database, REST API, browser-based UI, and Electron desktop app are all functional. The app uses JetBrains Mono Light throughout for a cypherpunk aesthetic and is fully navigable with spring-animated page transitions. It includes:
 - **Vault-based storage** — each company's books live in a named folder you own; pick or create a vault on every launch; rename a vault from within the app and the folder renames on disk
+- **Vault file sync** — drop files into your vault's `imports/`, `statements/`, `receipts/`, or `exports/` folders and the app detects them instantly (chokidar cross-platform watcher); misplaced files get a guided notification
+- **Ollama AI (optional)** — built-in AI panel powered by a local Ollama instance; no API keys, no cloud; configure endpoint and model in Settings → AI; toolbar status dot shows connection in real time
 - Multi-step onboarding wizard (business name, business type, account template suggestions)
 - Chart of accounts with current/non-current classification, live balances, inline editing, configurable column visibility, and an account template library (42 common accounts)
 - Journal entry creation with draft saving, auto-save, and payment method tracking
@@ -29,7 +31,7 @@ The accounting engine, database, REST API, browser-based UI, and Electron deskto
 - Bulk operations on entries and accounts (reverse, delete, set classification)
 - Multi-user roles (Viewer / Bookkeeper / Admin) in PostgreSQL mode — SQLite stays single-user with no login required
 - Encrypted data export (AES-256-GCM + PBKDF2)
-- Settings covering home page metrics, account columns, payment methods, keyboard shortcuts, user management (PostgreSQL), database stats, JSON export, and data wipe
+- Settings covering general reminders, account columns, payment methods, keyboard shortcuts, AI configuration, user management (PostgreSQL), database stats, JSON export, and data wipe
 - Feature flag system gating optional modules (AR/AP, Inventory) as they ship
 
 ---
@@ -98,7 +100,7 @@ corebooks is designed like an onion. Each layer wraps the one before it without 
 | **Database & API (Layer 2)** | Persistence with SQLite (default) or PostgreSQL (business). REST API. |
 | **UI (Layer 3)** | React + Tailwind browser-based interface. Dark mode. |
 | **Desktop App (Layer 4)** | Electron wrapper — vault picker on launch, named vault folders, `safeStorage` key management. Builds to .dmg / .exe / .AppImage. |
-| **Integrations (Future)** | Bank feed import (OFX/QFX/CSV), Ollama AI categorisation, plugin API, webhooks. |
+| **Integrations** | Vault file sync (chokidar, real-time import notifications), Ollama AI panel (optional, local LLM). Bank feed import (OFX/QFX/CSV), plugin API, webhooks coming next. |
 
 ## Who This Is For
 
@@ -180,8 +182,8 @@ These are areas where community contributions would be most valuable. None are s
 | **Inventory Management** | Item catalog, quantities on hand, receive-goods and sell-goods flows, COGS accounting. Gated to product businesses via the feature flag system. |
 | **Import from other accounting software** | Parse and import data from QuickBooks, Wave, FreshBooks, or CSV exports. Map external account structures to corebooks chart of accounts. |
 | **PostgreSQL migration wizard** | Guided in-app flow to switch from SQLite to a shared PostgreSQL server: validate connection, migrate schema, copy data, confirm, restart. Plain-language UI — no technical jargon. |
-| **Bank feed / transaction import** | Drop OFX/QFX/CSV bank statements into your vault's `imports/` folder and auto-match or create draft entries for review. Imports always create drafts — never auto-post. |
-| **AI-assisted categorisation** | Optional Ollama integration: if Ollama is running locally, corebooks can suggest account mappings during import. No API keys, no data leaves the machine. |
+| **Bank feed / transaction import** | OFX/QFX/CSV bank statements dropped into `imports/` trigger an import modal. Auto-match or create draft entries for review. Imports always create drafts — never auto-post. (Vault file sync is complete; OFX/QFX parsing is next.) |
+| **AI-assisted categorisation** | Ollama AI infrastructure is in place (toolbar button, side panel, Settings → AI tab). Next: use the connected model to suggest account mappings during import. No API keys required — local inference only. |
 | **Plugin API** | Webhook and plugin interface so third-party tools (Stripe, Shopify, payroll providers) can post transactions directly into corebooks. |
 | **Closing entries** | Period-end close that zeroes out Revenue and Expense accounts into Retained Earnings, producing a clean opening balance for the next fiscal year. |
 | **Multi-currency** | Record transactions in foreign currencies with exchange rate tracking and unrealised gain/loss accounts. |

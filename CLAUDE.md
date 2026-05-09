@@ -134,6 +134,42 @@ Key decisions to carry forward:
 
 ---
 
+### Phase 11 — Vault File Sync + Ollama AI Infrastructure (complete)
+
+**Vault file sync:**
+- `src/electron/vaultWatcher.ts` — `VaultWatcher` class (chokidar, depth 1 across all four vault subdirs) + exported `classifyFile(vaultPath, filePath)` pure function. Classification: `imports/` → `'import'`, importable extensions in other subdirs → `'misplaced'`, non-importable → `'filed'`. `'filed'` fires no event.
+- `main.ts` additions: `VaultWatcher` lifecycle tied to `startApiForVault`, 5 new IPC handlers (`vault:listImports`, `vault:listVaultFiles`, `vault:moveFile`, `vault:deleteFile`, `vault:readFile`), `ollama:start` IPC for spawning Ollama, `vault:safeStorageAvailable` IPC.
+- `preload.ts` / `electron.d.ts` updated with full new IPC surface.
+- `src/ui/components/ActionToast.tsx` — toast component with action buttons (separate from the simple `Toast` component). Used for vault file notifications.
+- `Layout.tsx` additions: subscribes to `vault:file-added` / `vault:file-removed` IPC events; maintains `pendingImportCount`; shows `ActionToast` for import-ready and misplaced-file events; renders `ImportModal` with `preloadFile` when vault import triggered; AI panel `<aside>` alongside `<main>`; `AIButtonPopover` in toolbar; 60-second Ollama background ping + focus-based re-check.
+- `ImportModal` gains optional `preloadFile?: { name, path, text }` prop — skips Step 1 when provided, opens on column-mapping (CSV) or options (JSON/IIF); adds post-import archive prompt (Move to statements/ / Leave / Delete) when preloadFile is set.
+- `VaultTab` gains collapsible "Vault contents" panel — lists files from all four subdirs with Import/Move/Delete actions per row.
+- `DatabaseTab` shows a numeric badge on the Import Data button when files are pending in `imports/`.
+
+**Settings changes:**
+- `HomeTab.tsx` deleted; replaced by `GeneralTab.tsx`. Tab label: `home` → `general`. "Alert reminders" section relabeled "Reminder frequency" — now explicitly the global setting for all app reminders. Default tab for Settings changed from `'home'` to `'general'`.
+- `SettingsPage` Tab type gains `'ai'`; `'general'` replaces `'home'`. Tab order: vault · general · accounts · payment-methods · accounting · shortcuts · **ai** · users · database · reports.
+
+**Ollama AI infrastructure:**
+- `src/ui/lib/ollama.ts` — `checkOllama(endpoint)`, `getOllamaConfig()`, `saveOllamaConfig(partial)`. localStorage keys: `cb_ai_enabled`, `cb_ai_endpoint`, `cb_ai_model`.
+- `src/ui/pages/settings/AITab.tsx` — disabled state shows setup guide (install Ollama, `ollama pull llama3.2`); enabled state shows connection status dot, ↺ Refresh, endpoint field (debounced re-check), model dropdown.
+- `src/ui/components/AIButtonPopover.tsx` — toolbar button with inline status dot (green/red when AI enabled). Click when AI disabled → popover: "not enabled" + Settings link. Click when AI enabled but offline → popover: "not activated" + Activate button (spawns `ollama serve` via Electron IPC). Click when connected → opens AI panel directly.
+- `src/ui/components/AIPanel.tsx` — 320px right-side `<aside>`, connection status + model name, placeholder text for future AI features, "Configure AI →" footer link.
+
+**Cross-platform:**
+- `@fontsource/jetbrains-mono` added; imported in `index.css` (weights 300/400/600). Font is now bundled in the Electron binary — no system font or CDN dependency.
+- `vault:safeStorageAvailable` IPC added; `VaultTab` shows amber warning when OS keyring is unavailable (Linux without libsecret/GNOME Keyring/KWallet).
+- `chokidar` added for cross-platform file watching (FSEvents/macOS, ReadDirectoryChangesW/Windows, inotify/Linux).
+
+**Known limitation (carried forward):** Company name (`cb_company_name` in localStorage) is still shared across vaults.
+
+**Upcoming (Phase 12):**
+- In-app Ollama installer — eliminate terminal setup steps entirely
+- Actual AI interaction: transaction categorisation in bank feed import flow
+- AI write-access boundaries and rule set
+
+---
+
 ## The Single Most Important Rule
 
 **Never modify the core to accommodate an outer layer.**
