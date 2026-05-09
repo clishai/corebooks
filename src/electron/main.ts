@@ -229,6 +229,8 @@ function registerIpc(): void {
     return fs.readFileSync(filePath, 'utf-8')
   })
 
+  ipcMain.handle('vault:safeStorageAvailable', () => safeStorage.isEncryptionAvailable())
+
   // ── Ollama process management ────────────────────────────────────────────────
 
   ipcMain.handle('ollama:start', async () => {

@@ -42,6 +42,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     onFileRemoved: (cb: (event: { path: string }) => void) => {
       ipcRenderer.on('vault:file-removed', (_e, payload: { path: string }) => cb(payload))
     },
+    safeStorageAvailable: () => ipcRenderer.invoke('vault:safeStorageAvailable'),
   },
   ollama: {
     start: () => ipcRenderer.invoke('ollama:start'),
