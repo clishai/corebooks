@@ -5,6 +5,7 @@ import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { VaultManager } from './vaultManager.js'
+import { VaultWatcher } from './vaultWatcher.js'
 import type { VaultState } from './vaultTypes.js'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -15,6 +16,7 @@ const isDev = process.env['NODE_ENV'] === 'development'
 let currentApiPort: number | null = null
 let mainWindow: BrowserWindow | null = null
 let vaultManager: VaultManager
+const vaultWatcher = new VaultWatcher()
 
 function findFreePort(): Promise<number> {
   return new Promise((resolve, reject) => {
@@ -77,6 +79,9 @@ async function startApiForVault(vaultPath: string): Promise<number> {
   // Dynamic import ensures all env vars are set before Prisma initialises.
   const { startServer } = await import('../api/bootstrap.js')
   await startServer(port)
+
+  // Start file watcher for the newly selected vault
+  if (mainWindow) vaultWatcher.start(vaultPath, mainWindow)
 
   // Fire recurring template check on launch, then every 24 hours.
   async function checkRecurring() {
@@ -169,6 +174,73 @@ function registerIpc(): void {
     app.relaunch()
     app.exit(0)
   })
+
+  // ── Vault file operations ────────────────────────────────────────────────────
+
+  ipcMain.handle('vault:listImports', () => {
+    const current = vaultManager.getCurrent()
+    if (!current) return []
+    const dir = path.join(current.path, 'imports')
+    try {
+      return fs.readdirSync(dir)
+        .filter((name) => !name.startsWith('.'))
+        .map((name) => {
+          const full = path.join(dir, name)
+          const stat = fs.statSync(full)
+          return { name, path: full, size: stat.size, mtime: stat.mtimeMs }
+        })
+    } catch { return [] }
+  })
+
+  ipcMain.handle('vault:listVaultFiles', () => {
+    const current = vaultManager.getCurrent()
+    if (!current) return []
+    const subdirs = ['imports', 'statements', 'receipts', 'exports']
+    const results: { folder: string; name: string; path: string; size: number; mtime: number }[] = []
+    for (const folder of subdirs) {
+      const dir = path.join(current.path, folder)
+      try {
+        fs.readdirSync(dir)
+          .filter((name) => !name.startsWith('.'))
+          .forEach((name) => {
+            const full = path.join(dir, name)
+            const stat = fs.statSync(full)
+            results.push({ folder, name, path: full, size: stat.size, mtime: stat.mtimeMs })
+          })
+      } catch { /* skip if dir missing */ }
+    }
+    return results
+  })
+
+  ipcMain.handle('vault:moveFile', (_event, srcPath: string, targetFolder: string) => {
+    const current = vaultManager.getCurrent()
+    if (!current) throw new Error('No vault selected')
+    const name = path.basename(srcPath)
+    const dest = path.join(current.path, targetFolder, name)
+    fs.renameSync(srcPath, dest)
+    return dest
+  })
+
+  ipcMain.handle('vault:deleteFile', (_event, filePath: string) => {
+    fs.unlinkSync(filePath)
+  })
+
+  ipcMain.handle('vault:readFile', (_event, filePath: string) => {
+    return fs.readFileSync(filePath, 'utf-8')
+  })
+
+  // ── Ollama process management ────────────────────────────────────────────────
+
+  ipcMain.handle('ollama:start', async () => {
+    const { spawn } = await import('child_process')
+    const binary = process.platform === 'win32' ? 'ollama.exe' : 'ollama'
+    return new Promise<boolean>((resolve) => {
+      const child = spawn(binary, ['serve'], { detached: true, stdio: 'ignore' })
+      child.unref()
+      child.on('error', () => resolve(false))
+      setTimeout(() => resolve(true), 2000)
+    })
+  })
 }
 
 app.whenReady().then(async () => {
@@ -187,4 +259,8 @@ app.whenReady().then(async () => {
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
+})
+
+app.on('before-quit', () => {
+  vaultWatcher.stop()
 })
