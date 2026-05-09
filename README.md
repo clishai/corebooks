@@ -8,7 +8,7 @@
 
 **corebooks** is a privacy-first alternative to cloud accounting platforms. Your financial data lives on your machine — never in someone else's cloud. Each set of books lives in a **vault**: a plain folder you own, name, and control. You can have as many vaults as you have companies, clients, or projects.
 
-This is a project by a college accounting major. The goal is to build the ultimate community-led accounting tool — one that any business owner can download, run, and own completely. Advances in AI and open-source tooling have made it possible for non-technical people to build the software they've always wanted, rather than being stuck with expensive, closed-source SaaS.
+This is a project by a college accounting major. The goal is to build the ultimate community-led accounting tool, one that any business owner can download, run, and own completely. Advances in AI and the open-source toolbelt have made it possible for non-technical people to build the software they've always wanted, rather than being stuck with expensive, closed-source SaaS.
 
 ---
 
@@ -80,7 +80,7 @@ npx prisma migrate deploy
 
 ## For Businesses / Multi-user Setup
 
-By default, corebooks uses **SQLite** — a zero-configuration database stored in a single file on your computer. This is ideal for individual users or small teams on one machine.
+By default, corebooks uses **SQLite**, a zero-configuration database stored in a single file on your computer. This is ideal for individual users or small teams on one machine.
 
 If your business needs **multiple employees to access corebooks simultaneously** from different computers, you can connect to a **PostgreSQL** database on a shared server. PostgreSQL is free, open-source software designed for exactly this.
 
@@ -124,7 +124,7 @@ corebooks is designed like an onion. Each layer wraps the one before it without 
 
 Corebooks is designed with a clear threat model for each of its two operating modes:
 
-### Local mode (SQLite — the default)
+### Local mode (SQLite —> the default)
 
 Your vault is a plain folder on your machine. The database (`corebooks.db`) lives inside it.
 Neither the folder nor the database is reachable from the network — the Fastify API server
