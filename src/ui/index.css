@@ -89,3 +89,8 @@ body,
   to   { transform: translateX(-50%) translateY(0); opacity: 1; }
 }
 .animate-slide-up { animation: slide-up 180ms ease both; }
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
