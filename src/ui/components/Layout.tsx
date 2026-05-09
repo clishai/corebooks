@@ -13,6 +13,7 @@ import { getPinnedReports } from '../lib/sidebarState'
 import { ALL_REPORTS } from '../lib/reports'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { getOllamaConfig, checkOllama, type OllamaConfig } from '../lib/ollama'
+import ImportModal from './ImportModal'
 
 function CogIcon() {
   return (
@@ -348,8 +349,8 @@ export default function Layout() {
         />
       )}
       {vaultImportFile && (
-        <VaultImportShim
-          file={vaultImportFile}
+        <ImportModal
+          preloadFile={vaultImportFile}
           onClose={() => setVaultImportFile(null)}
           onImported={() => {
             setVaultImportFile(null)
@@ -372,16 +373,3 @@ export default function Layout() {
   )
 }
 
-// Temporary shim — replaced when ImportModal gains the preloadFile prop in Task 12
-function VaultImportShim({ file, onClose, onImported }: {
-  file: { name: string; path: string; text: string }
-  onClose: () => void
-  onImported: () => void
-}) {
-  useEffect(() => {
-    console.log('[vault] pre-load import ready for:', file.name)
-  }, [file.name])
-  void onClose
-  void onImported
-  return null
-}

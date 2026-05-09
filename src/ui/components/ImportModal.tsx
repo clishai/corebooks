@@ -59,14 +59,28 @@ const EMPTY_MAPPING: ImportMapping = { date: '', account: '', debit: '', credit:
 interface Props {
   onClose: () => void
   onImported: () => void
+  preloadFile?: { name: string; path: string; text: string }
 }
 
-export default function ImportModal({ onClose, onImported }: Props) {
-  const [step, setStep] = useState<Step>('format-upload')
-  const [format, setFormat] = useState<Format>('corebooks-json')
-  const [fileText, setFileText] = useState('')
-  const [fileName, setFileName] = useState('')
-  const [csvHeaders, setCsvHeaders] = useState<string[]>([])
+export default function ImportModal({ onClose, onImported, preloadFile }: Props) {
+  function detectFormat(name: string): Format {
+    if (name.endsWith('.json')) return 'corebooks-json'
+    if (name.endsWith('.iif')) return 'iif'
+    return 'csv'
+  }
+
+  const initFormat: Format = preloadFile ? detectFormat(preloadFile.name) : 'corebooks-json'
+  const initStep: Step = preloadFile
+    ? (initFormat === 'csv' ? 'column-mapping' : 'options')
+    : 'format-upload'
+
+  const [step, setStep] = useState<Step>(initStep)
+  const [format, setFormat] = useState<Format>(initFormat)
+  const [fileText, setFileText] = useState(preloadFile?.text ?? '')
+  const [fileName, setFileName] = useState(preloadFile?.name ?? '')
+  const [csvHeaders, setCsvHeaders] = useState<string[]>(
+    preloadFile && initFormat === 'csv' ? extractCSVHeaders(preloadFile.text) : []
+  )
   const [mapping, setMapping] = useState<ImportMapping>(EMPTY_MAPPING)
   const [options, setOptions] = useState<ImportOptions>({
     createMissingAccounts: true,
@@ -75,6 +89,7 @@ export default function ImportModal({ onClose, onImported }: Props) {
   const [result, setResult] = useState<ImportResult | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [archiveDone, setArchiveDone] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -406,6 +421,39 @@ export default function ImportModal({ onClose, onImported }: Props) {
                   Go to the <span className="text-chalk">Drafts</span> page to review and post your imported entries.
                 </p>
               )}
+
+              {/* Archive prompt — only shown for vault-triggered imports */}
+              {preloadFile && !archiveDone && (
+                <div className="border-t border-rim pt-4">
+                  <p className="text-sm text-ash mb-3">Archive the source file?</p>
+                  <div className="flex gap-2 flex-wrap">
+                    <button
+                      onClick={async () => {
+                        await window.electronAPI?.vault.moveFile(preloadFile.path, 'statements')
+                        setArchiveDone(true)
+                      }}
+                      className="text-xs px-3 py-1.5 rounded border border-neon/40 text-neon hover:bg-neon/10 transition-colors cursor-pointer"
+                    >
+                      Move to statements/
+                    </button>
+                    <button
+                      onClick={() => setArchiveDone(true)}
+                      className="text-xs px-3 py-1.5 rounded border border-rim text-ash hover:text-chalk transition-colors cursor-pointer"
+                    >
+                      Leave in imports/
+                    </button>
+                    <button
+                      onClick={async () => {
+                        await window.electronAPI?.vault.deleteFile(preloadFile.path)
+                        setArchiveDone(true)
+                      }}
+                      className="text-xs px-3 py-1.5 rounded border border-red-800/60 text-red-400 hover:bg-red-950/50 transition-colors cursor-pointer"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -425,8 +473,15 @@ export default function ImportModal({ onClose, onImported }: Props) {
             <>
               <button
                 onClick={() => {
-                  if (step === 'column-mapping') { setStep('format-upload'); return }
+                  if (step === 'column-mapping') {
+                    if (preloadFile) { onClose(); return }
+                    setStep('format-upload'); return
+                  }
                   if (step === 'options') {
+                    if (preloadFile) {
+                      if (format === 'csv') { setStep('column-mapping'); return }
+                      onClose(); return
+                    }
                     setStep(format === 'csv' ? 'column-mapping' : 'format-upload')
                     return
                   }
