@@ -49,6 +49,19 @@ export default function DatabaseTab() {
   const [wipeDone, setWipeDone] = useState(false)
 
   const [importOpen, setImportOpen] = useState(false)
+  const [pendingCount, setPendingCount] = useState(0)
+
+  useEffect(() => {
+    const vault = window.electronAPI?.vault
+    if (!vault) return
+    vault.listImports().then((files) => setPendingCount(files.length)).catch(() => {})
+
+    function refresh() {
+      vault.listImports().then((files) => setPendingCount(files.length)).catch(() => {})
+    }
+    window.addEventListener('cb:vault-imports-changed', refresh)
+    return () => window.removeEventListener('cb:vault-imports-changed', refresh)
+  }, [])
 
   function loadData() {
     setLoading(true)
@@ -210,9 +223,14 @@ export default function DatabaseTab() {
           </button>
           <button
             onClick={() => setImportOpen(true)}
-            className="px-4 py-2 text-sm font-medium rounded-md border border-neon/40 text-neon hover:bg-neon/10 transition-colors"
+            className="relative px-4 py-2 text-sm font-medium rounded-md border border-neon/40 text-neon hover:bg-neon/10 transition-colors"
           >
             Import Data
+            {pendingCount > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-neon text-void text-[10px] font-bold flex items-center justify-center">
+                {pendingCount > 9 ? '9+' : pendingCount}
+              </span>
+            )}
           </button>
           <button
             onClick={() => { setWipeOpen(true); setWipeError(null) }}
