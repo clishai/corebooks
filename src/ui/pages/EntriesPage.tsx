@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, Fragment, useRef } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { api, JournalEntry, Account } from '../api/client'
 import BulkActionBar from '../components/BulkActionBar'
 
@@ -30,6 +31,10 @@ const PRESET_LABELS: Record<DatePreset, string> = {
   'this-year':  'Year to Date',
   'all-time':   'All Time',
   'custom':     'Custom Range',
+}
+
+function parseDatePreset(value: string | null): DatePreset | null {
+  return value && value in PRESET_LABELS ? value as DatePreset : null
 }
 
 function getPresetRange(preset: DatePreset): { from?: string; to?: string } {
@@ -81,6 +86,8 @@ function computePages(entries: JournalEntry[]): JournalEntry[][] {
 }
 
 export default function EntriesPage() {
+  const [searchParams] = useSearchParams()
+  const initialPreset = parseDatePreset(searchParams.get('preset')) ?? 'this-month'
   const [entries, setEntries] = useState<JournalEntry[]>([])
   const [accountMap, setAccountMap] = useState<Map<string, Account>>(new Map())
   const [accounts, setAccounts] = useState<Account[]>([])
@@ -89,7 +96,7 @@ export default function EntriesPage() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [selected, setSelected] = useState<Set<string>>(new Set())
 
-  const [preset, setPreset] = useState<DatePreset>('this-month')
+  const [preset, setPreset] = useState<DatePreset>(initialPreset)
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
 
@@ -99,6 +106,14 @@ export default function EntriesPage() {
   const filtersRef = useRef<HTMLDivElement>(null)
 
   const [page, setPage] = useState(0)
+
+  useEffect(() => {
+    const urlPreset = parseDatePreset(searchParams.get('preset'))
+    if (urlPreset && urlPreset !== preset) {
+      setPreset(urlPreset)
+      setPage(0)
+    }
+  }, [searchParams, preset])
 
   function toggleSelect(id: string) {
     setSelected((prev) => {
@@ -169,6 +184,27 @@ export default function EntriesPage() {
   const pages = computePages(filteredEntries)
   const currentPageEntries = pages[page] ?? []
   const hasExtraFilters = !!memoFilter || !!accountFilter
+
+  useEffect(() => {
+    const entryId = searchParams.get('entry')
+    if (!entryId || loading) return
+
+    const matchingIndex = filteredEntries.findIndex((entry) => entry.id === entryId)
+    if (matchingIndex === -1) return
+
+    const pageIndex = pages.findIndex((entriesOnPage) =>
+      entriesOnPage.some((entry) => entry.id === entryId),
+    )
+    if (pageIndex >= 0) {
+      setPage((current) => current === pageIndex ? current : pageIndex)
+    }
+    setExpanded((current) => {
+      if (current.has(entryId)) return current
+      const next = new Set(current)
+      next.add(entryId)
+      return next
+    })
+  }, [searchParams, loading, filteredEntries, pages])
 
   return (
     <div>

@@ -58,6 +58,10 @@ export class VaultWatcher {
       ignoreInitial: true,
       depth: 1,
       ignored,
+      awaitWriteFinish: {
+        stabilityThreshold: 2000,
+        pollInterval: 100,
+      },
     })
 
     this.watcher.on('add', (filePath: string) => {

@@ -213,20 +213,22 @@ function registerIpc(): void {
   })
 
   ipcMain.handle('vault:moveFile', (_event, srcPath: string, targetFolder: string) => {
-    const current = vaultManager.getCurrent()
-    if (!current) throw new Error('No vault selected')
-    const name = path.basename(srcPath)
-    const dest = path.join(current.path, targetFolder, name)
-    fs.renameSync(srcPath, dest)
+    const vaultPath = requireCurrentVaultPath()
+    const src = resolveInsideVault(vaultPath, srcPath)
+    const name = path.basename(src)
+    const dest = resolveInsideVault(vaultPath, path.join(targetFolderPath(vaultPath, targetFolder), name))
+    fs.renameSync(src, dest)
     return dest
   })
 
   ipcMain.handle('vault:deleteFile', (_event, filePath: string) => {
-    fs.unlinkSync(filePath)
+    const vaultPath = requireCurrentVaultPath()
+    fs.unlinkSync(resolveInsideVault(vaultPath, filePath))
   })
 
   ipcMain.handle('vault:readFile', (_event, filePath: string) => {
-    return fs.readFileSync(filePath, 'utf-8')
+    const vaultPath = requireCurrentVaultPath()
+    return fs.readFileSync(resolveInsideVault(vaultPath, filePath), 'utf-8')
   })
 
   ipcMain.handle('vault:safeStorageAvailable', () => safeStorage.isEncryptionAvailable())
@@ -234,14 +236,27 @@ function registerIpc(): void {
   // ── Ollama process management ────────────────────────────────────────────────
 
   ipcMain.handle('ollama:start', async () => {
+    if (await isDefaultOllamaReady()) return true
+
     const { spawn } = await import('child_process')
     const binary = process.platform === 'win32' ? 'ollama.exe' : 'ollama'
-    return new Promise<boolean>((resolve) => {
+    let failedToStart = false
+
+    try {
       const child = spawn(binary, ['serve'], { detached: true, stdio: 'ignore' })
       child.unref()
-      child.on('error', () => resolve(false))
-      setTimeout(() => resolve(true), 2000)
-    })
+      child.once('error', () => { failedToStart = true })
+      child.once('exit', () => { failedToStart = true })
+    } catch {
+      return false
+    }
+
+    for (let attempt = 0; attempt < 20; attempt++) {
+      if (await isDefaultOllamaReady()) return true
+      if (failedToStart) return false
+      await sleep(500)
+    }
+    return false
   })
 }
 

@@ -1,4 +1,4 @@
-import { useState, useRef, useLayoutEffect, useEffect, useCallback } from 'react'
+import { useState, useRef, useLayoutEffect, useEffect, useCallback, useMemo } from 'react'
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import NewEntryModal from './NewEntryModal'
 import Toast from './Toast'
@@ -13,6 +13,7 @@ import { getPinnedReports } from '../lib/sidebarState'
 import { ALL_REPORTS } from '../lib/reports'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { getOllamaConfig, checkOllama, type OllamaConfig } from '../lib/ollama'
+import { formatBinding, getShortcuts } from '../lib/shortcuts'
 import ImportModal from './ImportModal'
 
 function CogIcon() {
@@ -73,6 +74,9 @@ export default function Layout() {
   const [companyName, setCompanyName] = useState(getCompanyName)
   const [pinnedReports, setPinnedReports] = useState(getPinnedReports)
   const [pendingImportCount, setPendingImportCount] = useState(0)
+  const [searchShortcutLabel, setSearchShortcutLabel] = useState(
+    () => formatBinding(getShortcuts()['global-search']),
+  )
 
   // AI state
   const [aiConfig, setAiConfig] = useState<OllamaConfig>(getOllamaConfig)
@@ -102,7 +106,12 @@ export default function Layout() {
   }, [aiConfig.enabled, aiConfig.endpoint])
 
   useEffect(() => {
-    if (!aiConfig.enabled) { setOllamaConnected(null); return }
+    if (!aiConfig.enabled) {
+      setOllamaConnected(null)
+      setAiPanelOpen(false)
+      localStorage.setItem('cb_ai_panel_open', 'false')
+      return
+    }
     void pingOllama()
     const interval = setInterval(() => void pingOllama(), 60_000)
     return () => clearInterval(interval)
@@ -122,6 +131,14 @@ export default function Layout() {
     return () => window.removeEventListener('cb:ai-config-changed', handleAiConfigChanged)
   }, [])
 
+  useEffect(() => {
+    function handleShortcutsChanged() {
+      setSearchShortcutLabel(formatBinding(getShortcuts()['global-search']))
+    }
+    window.addEventListener('cb:shortcuts-changed', handleShortcutsChanged)
+    return () => window.removeEventListener('cb:shortcuts-changed', handleShortcutsChanged)
+  }, [])
+
   // Vault file events
   useEffect(() => {
     const vault = window.electronAPI?.vault
@@ -129,10 +146,12 @@ export default function Layout() {
 
     vault.listImports().then((files) => setPendingImportCount(files.length)).catch(() => {})
 
-    vault.onFileAdded((event) => {
+    const unsubscribeAdded = vault.onFileAdded((event) => {
       if (event.hint === 'import') {
-        setPendingImportCount((n) => n + 1)
-        window.dispatchEvent(new CustomEvent('cb:vault-imports-changed'))
+        vault.listImports().then((files) => {
+          setPendingImportCount(files.length)
+          window.dispatchEvent(new CustomEvent('cb:vault-imports-changed'))
+        }).catch(() => {})
         setActionToast({
           id: event.path,
           message: `${event.name} is ready to import`,
@@ -162,7 +181,7 @@ export default function Layout() {
       }
     })
 
-    vault.onFileRemoved(() => {
+    const unsubscribeRemoved = vault.onFileRemoved(() => {
       vault.listImports().then((files) => {
         setPendingImportCount(files.length)
         window.dispatchEvent(new CustomEvent('cb:vault-imports-changed'))
@@ -174,7 +193,11 @@ export default function Layout() {
       void openVaultImport(path, name)
     }
     window.addEventListener('cb:vault-open-import', handleVaultOpenImport)
-    return () => window.removeEventListener('cb:vault-open-import', handleVaultOpenImport)
+    return () => {
+      unsubscribeAdded()
+      unsubscribeRemoved()
+      window.removeEventListener('cb:vault-open-import', handleVaultOpenImport)
+    }
   }, [])
 
   async function openVaultImport(filePath: string, fileName: string) {
@@ -197,13 +220,12 @@ export default function Layout() {
   }
 
   async function handleOllamaActivate(): Promise<boolean> {
-    const started = await window.electronAPI?.ollama.start()
-    if (started) {
-      const result = await checkOllama(aiConfig.endpoint)
-      setOllamaConnected(result.connected)
-      return result.connected
-    }
-    return false
+    const started = window.electronAPI ? await window.electronAPI.ollama.start() : true
+    if (!started) return false
+
+    const result = await checkOllama(aiConfig.endpoint)
+    setOllamaConnected(result.connected)
+    return result.connected
   }
 
   useEffect(() => {
@@ -217,7 +239,7 @@ export default function Layout() {
     }
   }, [])
 
-  useKeyboardShortcuts({
+  const shortcutHandlers = useMemo(() => ({
     'new-entry': () => setShowNewEntry(true),
     'go-home': () => navigate('/home'),
     'go-entries': () => navigate('/entries'),
@@ -226,7 +248,9 @@ export default function Layout() {
     'go-recurring': () => navigate('/extra/recurring'),
     'go-close-period': () => navigate('/extra/close-period'),
     'global-search': () => setShowSearch(true),
-  })
+  }), [navigate])
+
+  useKeyboardShortcuts(shortcutHandlers)
 
   function handlePosted() {
     setShowNewEntry(false)
@@ -304,7 +328,7 @@ export default function Layout() {
               onClick={() => setShowSearch(true)}
               className="w-full bg-surface border border-rim rounded-sm px-3 py-1 text-xs text-ash/50 text-left hover:border-neon/50 transition-colors focus:outline-none cursor-pointer"
             >
-              Press / for global search
+              Press {searchShortcutLabel} for global search
             </button>
           </div>
 
@@ -331,7 +355,7 @@ export default function Layout() {
             <Outlet context={{ pendingImportCount }} />
           </main>
 
-          {aiPanelOpen && (
+          {aiConfig.enabled && aiPanelOpen && (
             <AIPanel
               config={aiConfig}
               ollamaConnected={ollamaConnected}

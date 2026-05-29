@@ -28,6 +28,11 @@ export default function SettingsPage() {
     checkAuthStatus().then(({ active }) => setAuthActive(active)).catch(() => {})
   }, [])
 
+  useEffect(() => {
+    const nextTab = searchParams.get('tab') as Tab | null
+    if (nextTab && VALID_TABS.includes(nextTab)) setTab(nextTab)
+  }, [searchParams])
+
   const tabClass = (t: Tab) =>
     `px-4 py-2 text-sm font-medium rounded-md transition-colors cursor-pointer ${
       tab === t ? 'bg-raised text-chalk' : 'text-ash hover:text-chalk hover:bg-surface'
