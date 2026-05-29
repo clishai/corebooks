@@ -12,6 +12,7 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 const isDev = process.env['NODE_ENV'] === 'development'
+const VAULT_FILE_FOLDERS = new Set(['imports', 'statements', 'receipts', 'exports'])
 
 let currentApiPort: number | null = null
 let mainWindow: BrowserWindow | null = null
@@ -31,6 +32,44 @@ function findFreePort(): Promise<number> {
       }
     })
   })
+}
+
+function requireCurrentVaultPath(): string {
+  const current = vaultManager.getCurrent()
+  if (!current) throw new Error('No vault selected')
+  return current.path
+}
+
+function resolveInsideVault(vaultPath: string, requestedPath: string): string {
+  const root = path.resolve(vaultPath)
+  const resolved = path.resolve(requestedPath)
+  const relative = path.relative(root, resolved)
+  if (relative.startsWith('..') || path.isAbsolute(relative)) {
+    throw new Error('File is outside the current vault')
+  }
+  return resolved
+}
+
+function targetFolderPath(vaultPath: string, targetFolder: string): string {
+  if (!VAULT_FILE_FOLDERS.has(targetFolder)) {
+    throw new Error('Unknown vault folder')
+  }
+  return path.join(vaultPath, targetFolder)
+}
+
+async function sleep(ms: number): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+async function isDefaultOllamaReady(): Promise<boolean> {
+  try {
+    const res = await fetch('http://127.0.0.1:11434/api/tags', {
+      signal: AbortSignal.timeout(1000),
+    })
+    return res.ok
+  } catch {
+    return false
+  }
 }
 
 // ── At-rest encryption key (SQLCipher infrastructure) ────────────────────────
