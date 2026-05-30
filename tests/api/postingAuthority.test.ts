@@ -72,4 +72,4 @@ describe('posting authority boundary', () => {
       postDraftWithAuthority(draft, chart, new Ledger(), aiAuthority),
     ).rejects.toThrow('not allowed')
   })
-}
+})
