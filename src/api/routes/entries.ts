@@ -1,6 +1,5 @@
 import { FastifyPluginAsync } from 'fastify';
 import { EntryStatus } from '../../core/types/journal.js';
-import { reverseEntry } from '../../core/engine/entries.js';
 import { AppContext } from '../server.js';
 import { listAccounts } from '../../db/repositories/accountRepository.js';
 import {
@@ -10,10 +9,9 @@ import {
   createDraftEntry,
   updateDraftEntry,
   deleteDraftEntry,
-  postDraftEntry,
 } from '../../db/repositories/entryRepository.js';
-import { toDbJournalEntry, toCoreJournalEntry, PrismaJournalEntry } from '../../db/mappers.js';
-import { getPrismaClient } from '../../db/client.js';
+import { grantPostingAuthority } from '../posting/authority.js';
+import { postDraftWithAuthority, reverseEntryWithAuthority } from '../services/postingService.js';
 
 interface RouteOptions {
   context: AppContext;
@@ -84,7 +82,12 @@ export const entryRoutes: FastifyPluginAsync<RouteOptions> = async (app, opts) =
     }
 
     const chart = await listAccounts();
-    const result = await postDraftEntry(draft, chart, ledger);
+    const result = await postDraftWithAuthority(
+      draft,
+      chart,
+      ledger,
+      grantPostingAuthority('human'),
+    );
     if (!result.posted) {
       return reply.unprocessableEntity(JSON.stringify(result.errors));
     }
@@ -97,23 +100,18 @@ export const entryRoutes: FastifyPluginAsync<RouteOptions> = async (app, opts) =
     const date = req.body?.date ? new Date(req.body.date) : new Date();
 
     const chart = await listAccounts();
-    const result = reverseEntry(originalId, date, ledger, chart);
+    const result = await reverseEntryWithAuthority(
+      originalId,
+      date,
+      ledger,
+      chart,
+      grantPostingAuthority('reversal'),
+    );
     if (!result.posted) {
       return reply.unprocessableEntity(JSON.stringify(result.errors));
     }
 
-    // Persist the reversal entry created in-memory by reverseEntry.
-    const prisma = getPrismaClient();
-    const data = toDbJournalEntry(result.entry);
-    const row = await prisma.journalEntry.create({
-      data: data as Parameters<typeof prisma.journalEntry.create>[0]['data'],
-      include: { lines: { orderBy: { id: 'asc' } } },
-    });
-    const persisted = toCoreJournalEntry(row as unknown as PrismaJournalEntry);
-    // Sync in-memory ID to DB-assigned cuid.
-    result.entry.id = persisted.id;
-
-    return persisted;
+    return result.entry;
   });
 
   app.delete<{ Params: { id: string } }>('/:id', async (req, reply) => {

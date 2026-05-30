@@ -10,6 +10,10 @@ const KEYS = {
   model: 'cb_ai_model',
 }
 
+// AI may suggest categorisation and draft entries, but official posting stays
+// behind human/system posting authorities in the API layer.
+export const AI_MAY_POST = false as const
+
 const LOCAL_OLLAMA_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '[::1]'])
 
 export function normalizeLocalOllamaEndpoint(endpoint: string): string | null {

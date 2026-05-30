@@ -1,9 +1,11 @@
 // src/api/services/recurringService.ts
 import { getOverdueTemplates, advanceNextDue } from '../../db/repositories/recurringRepository.js'
-import { createDraftEntry, postDraftEntry } from '../../db/repositories/entryRepository.js'
+import { createDraftEntry } from '../../db/repositories/entryRepository.js'
 import { listAccounts } from '../../db/repositories/accountRepository.js'
 import { EntryStatus } from '../../core/types/journal.js'
 import type { Ledger } from '../../core/engine/ledger.js'
+import { grantPostingAuthority } from '../posting/authority.js'
+import { postDraftWithAuthority } from './postingService.js'
 
 export async function fireOverdueTemplates(ledger: Ledger): Promise<number> {
   const overdue = await getOverdueTemplates()
@@ -27,7 +29,12 @@ export async function fireOverdueTemplates(ledger: Ledger): Promise<number> {
 
       if (template.autoPost && draft.id) {
         const accounts = await listAccounts()
-        const result = await postDraftEntry(draft, accounts, ledger)
+        const result = await postDraftWithAuthority(
+          draft,
+          accounts,
+          ledger,
+          grantPostingAuthority('recurring'),
+        )
         if (!result.posted) continue
       }
 
