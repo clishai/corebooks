@@ -35,7 +35,7 @@ export default function SettingsPage() {
 
   const tabClass = (t: Tab) =>
     `px-4 py-2 text-sm font-medium rounded-md transition-colors cursor-pointer ${
-      tab === t ? 'bg-raised text-chalk' : 'text-ash hover:text-chalk hover:bg-surface'
+      tab === t ? 'bg-raised text-neon' : 'text-ash hover:text-chalk hover:bg-surface'
     }`
 
   return (

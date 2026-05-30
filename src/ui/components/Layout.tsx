@@ -56,7 +56,7 @@ function getRouteIndex(pathname: string): number {
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   `flex items-center px-3 py-2 rounded text-sm font-medium transition-colors cursor-pointer ${
-    isActive ? 'bg-raised text-neon border-l-2 border-neon pl-[10px]' : 'text-ash hover:bg-surface hover:text-chalk'
+    isActive ? 'bg-raised text-neon border-l-2 border-neon pl-[10px]' : 'text-ash border-l-2 border-transparent hover:bg-surface hover:text-chalk'
   }`
 
 interface ActionToastState {
@@ -299,7 +299,7 @@ export default function Layout() {
             to="/settings"
             className={({ isActive }) =>
               `settings-link flex items-center gap-0 px-3 py-2 rounded text-sm font-medium transition-colors overflow-hidden cursor-pointer ${
-                isActive ? 'bg-raised text-neon border-l-2 border-neon pl-[10px]' : 'text-ash hover:bg-surface hover:text-chalk'
+                isActive ? 'bg-raised text-neon border-l-2 border-neon pl-[10px]' : 'text-ash border-l-2 border-transparent hover:bg-surface hover:text-chalk'
               }`
             }
           >
@@ -326,9 +326,10 @@ export default function Layout() {
           <div className="w-72">
             <button
               onClick={() => setShowSearch(true)}
-              className="w-full bg-surface border border-rim rounded-sm px-3 py-1 text-xs text-ash/50 text-left hover:border-neon/50 transition-colors focus:outline-none cursor-pointer"
+              className="w-full bg-surface border border-rim rounded-sm px-3 py-1 text-xs text-ash/60 text-left hover:border-neon/50 transition-colors focus:outline-none cursor-pointer flex items-center justify-between gap-3"
             >
-              Press {searchShortcutLabel} for global search
+              <span>Global search</span>
+              <kbd className="kbd-chip">{searchShortcutLabel}</kbd>
             </button>
           </div>
 

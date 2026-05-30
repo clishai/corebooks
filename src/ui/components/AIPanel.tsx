@@ -11,7 +11,7 @@ export default function AIPanel({ config, ollamaConnected, onClose }: Props) {
   const navigate = useNavigate()
 
   return (
-    <aside className="w-80 shrink-0 border-l border-rim bg-void flex flex-col overflow-hidden">
+    <aside className="w-80 shrink-0 border-l border-rim bg-void flex flex-col overflow-hidden animate-fade-in">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-rim shrink-0">
         <span className="text-sm font-medium text-chalk">AI (Beta)</span>
@@ -30,8 +30,8 @@ export default function AIPanel({ config, ollamaConnected, onClose }: Props) {
         ) : ollamaConnected ? (
           <div className="space-y-0.5">
             <div className="flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
-              <span className="text-xs text-emerald-300">Ollama connected</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-neon shrink-0" />
+              <span className="text-xs text-neon">Ollama connected</span>
             </div>
             {config.model && (
               <p className="text-xs text-ash pl-3.5">{config.model}</p>
@@ -47,12 +47,13 @@ export default function AIPanel({ config, ollamaConnected, onClose }: Props) {
 
       {/* Body */}
       <div className="flex-1 px-4 py-4 space-y-4 overflow-y-auto">
-        <div className="bg-surface border border-rim rounded-lg px-4 py-4 space-y-2">
+        <div className="bg-surface border border-rim rounded-sm px-4 py-4 space-y-2">
           <p className="text-xs text-ash leading-relaxed">
             Transaction categorisation and journal suggestions are coming with bank feed import.
           </p>
           <p className="text-xs text-ash/60 leading-relaxed">
-            AI features observe and suggest — they never post entries without your review.
+            AI can create draft suggestions only. Official posting is blocked by design until a
+            human or approved system workflow posts through corebooks.
           </p>
         </div>
       </div>
