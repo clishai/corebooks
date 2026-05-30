@@ -92,9 +92,10 @@ Key decisions to carry forward:
 
 ### Phase 8 — Global Search / Command Palette (complete)
 
-- `src/ui/hooks/useSearch.ts` — debounced (200 ms) search across accounts, entries, and reports. Returns `SearchResult[]` typed `'account' | 'entry' | 'report'`.
-- `src/ui/components/CommandPalette.tsx` — modal overlay; keyboard-navigable (↑/↓/Enter/Esc); grouped type labels; loading indicator.
-- Toolbar search bar is now a button that opens the palette. `/` shortcut wired in `Layout.tsx`.
+- `src/ui/hooks/useSearch.ts` — debounced (200 ms) search across accounts, entries, and reports. Guards against stale async results, clears old matches while loading, and reports API failures instead of showing stale data.
+- Entry search results navigate to `/entries?preset=all-time&entry=...` so older entries are visible and expanded instead of hidden by the default month filter.
+- `src/ui/components/CommandPalette.tsx` — modal overlay; keyboard-navigable (↑/↓/Enter/Esc), terminal-style prompt, result type labels, loading/error states, and kbd footer hints.
+- Toolbar search bar is now a button that opens the palette. It displays the current rebindable `global-search` shortcut from `src/ui/lib/shortcuts.ts`.
 - `src/ui/lib/reports.ts` — `ALL_REPORTS` array (`id`, `label`, `description`, `path`) shared by the Reports Library page and search.
 
 ### Phase 9 — Multi-User Roles (complete, PostgreSQL mode only)
@@ -139,7 +140,8 @@ Key decisions to carry forward:
 **Vault file sync:**
 - `src/electron/vaultWatcher.ts` — `VaultWatcher` class (chokidar, depth 1 across all four vault subdirs) + exported `classifyFile(vaultPath, filePath)` pure function. Classification: `imports/` → `'import'`, importable extensions in other subdirs → `'misplaced'`, non-importable → `'filed'`. `'filed'` fires no event.
 - `main.ts` additions: `VaultWatcher` lifecycle tied to `startApiForVault`, 5 new IPC handlers (`vault:listImports`, `vault:listVaultFiles`, `vault:moveFile`, `vault:deleteFile`, `vault:readFile`), `ollama:start` IPC for spawning Ollama, `vault:safeStorageAvailable` IPC.
-- `preload.ts` / `electron.d.ts` updated with full new IPC surface.
+- Vault file IPC validates paths against the selected vault and restricts move targets to `imports`, `statements`, `receipts`, or `exports`.
+- `preload.ts` / `electron.d.ts` updated with full new IPC surface. File-event subscriptions return cleanup functions; React callers must unsubscribe in effect cleanup.
 - `src/ui/components/ActionToast.tsx` — toast component with action buttons (separate from the simple `Toast` component). Used for vault file notifications.
 - `Layout.tsx` additions: subscribes to `vault:file-added` / `vault:file-removed` IPC events; maintains `pendingImportCount`; shows `ActionToast` for import-ready and misplaced-file events; renders `ImportModal` with `preloadFile` when vault import triggered; AI panel `<aside>` alongside `<main>`; `AIButtonPopover` in toolbar; 60-second Ollama background ping + focus-based re-check.
 - `ImportModal` gains optional `preloadFile?: { name, path, text }` prop — skips Step 1 when provided, opens on column-mapping (CSV) or options (JSON/IIF); adds post-import archive prompt (Move to statements/ / Leave / Delete) when preloadFile is set.
@@ -150,11 +152,15 @@ Key decisions to carry forward:
 - `HomeTab.tsx` deleted; replaced by `GeneralTab.tsx`. Tab label: `home` → `general`. "Alert reminders" section relabeled "Reminder frequency" — now explicitly the global setting for all app reminders. Default tab for Settings changed from `'home'` to `'general'`.
 - `SettingsPage` Tab type gains `'ai'`; `'general'` replaces `'home'`. Tab order: vault · general · accounts · payment-methods · accounting · shortcuts · **ai** · users · database · reports.
 
-**Ollama AI infrastructure:**
-- `src/ui/lib/ollama.ts` — `checkOllama(endpoint)`, `getOllamaConfig()`, `saveOllamaConfig(partial)`. localStorage keys: `cb_ai_enabled`, `cb_ai_endpoint`, `cb_ai_model`.
-- `src/ui/pages/settings/AITab.tsx` — disabled state shows setup guide (install Ollama, `ollama pull llama3.2`); enabled state shows connection status dot, ↺ Refresh, endpoint field (debounced re-check), model dropdown.
-- `src/ui/components/AIButtonPopover.tsx` — toolbar button with inline status dot (green/red when AI enabled). Click when AI disabled → popover: "not enabled" + Settings link. Click when AI enabled but offline → popover: "not activated" + Activate button (spawns `ollama serve` via Electron IPC). Click when connected → opens AI panel directly.
-- `src/ui/components/AIPanel.tsx` — 320px right-side `<aside>`, connection status + model name, placeholder text for future AI features, "Configure AI →" footer link.
+**Ollama AI infrastructure and boundaries:**
+- `src/ui/lib/ollama.ts` — `checkOllama(endpoint)`, `getOllamaConfig()`, `saveOllamaConfig(partial)`, `normalizeLocalOllamaEndpoint()`, `isLocalOllamaEndpoint()`, and `AI_MAY_POST = false`. localStorage keys: `cb_ai_enabled`, `cb_ai_endpoint`, `cb_ai_model`.
+- Ollama endpoints are localhost-only (`http://localhost`, `http://127.0.0.1`, or loopback IPv6) with no path, credentials, query, or hash. Do not add remote/LAN model endpoints without an explicit design conversation and data-flow warning.
+- `src/ui/pages/settings/AITab.tsx` — disabled state shows setup guide (install Ollama, `ollama pull llama3.2`); enabled state shows connection status, ghost Refresh button, endpoint validation, debounced re-check, and model dropdown.
+- `src/ui/components/AIButtonPopover.tsx` — toolbar button with inline status dot. Click when AI disabled → popover: "not enabled" + Settings link. Click when AI enabled but offline → popover: "not activated" + Activate button (spawns `ollama serve` via Electron IPC). Click when connected → opens AI panel directly.
+- `src/ui/components/AIPanel.tsx` — 320px right-side `<aside>`, connection status + model name, draft-only boundary copy, and "Configure AI →" footer link.
+- `src/api/posting/authority.ts` + `src/types/posting.ts` define non-AI posting channels: `human`, `import`, `recurring`, `closing`, `reversal`. There is intentionally no `ai` channel.
+- `src/api/services/postingService.ts` is the posting facade for official ledger writes. Future AI code must not import `postDraftEntry`, `postDraftWithAuthority`, `grantPostingAuthority`, or `reverseEntryWithAuthority`.
+- Tests: `tests/api/postingAuthority.test.ts` verifies AI-shaped authority is rejected; `tests/api/aiPostingBoundary.test.ts` statically guards AI/Ollama modules from importing posting primitives.
 
 **Cross-platform:**
 - `@fontsource/jetbrains-mono` added; imported in `index.css` (weights 300/400/600). Font is now bundled in the Electron binary — no system font or CDN dependency.
@@ -163,10 +169,9 @@ Key decisions to carry forward:
 
 **Known limitation (carried forward):** Company name (`cb_company_name` in localStorage) is still shared across vaults.
 
-**Upcoming (Phase 12):**
-- In-app Ollama installer — eliminate terminal setup steps entirely
-- Actual AI interaction: transaction categorisation in bank feed import flow
-- AI write-access boundaries and rule set
+**Reference docs:**
+- `docs/AI_BOUNDARIES.md` — detailed AI capability and posting-boundary design.
+- `docs/FEATURE_IDEAS.md` — non-binding brainstorm for modules, plugin catalog, payroll, inventory, bank feeds, and smaller first-party ideas.
 
 ---
 
@@ -241,6 +246,9 @@ Tokens defined in `src/ui/index.css` via Tailwind v4 `@theme`. Neon blue: primar
 
 - Drafts may be unbalanced. They don't appear in reports or affect balances.
 - An entry promotes from draft to posted only when debits = credits exactly. Posted entries are permanent and immutable.
+- Official posting requires an explicit non-AI posting authority. Valid channels are `human`, `import`, `recurring`, `closing`, and `reversal`.
+- AI may suggest categorisation and draft entries only. AI must never call posting endpoints, receive a posting authority, mark drafts as `Posted`, create reversals, or bypass period locks/validation.
+- Future AI services should return annotations or draft suggestions and save through the normal draft path. Human/system posting remains a separate action through `src/api/services/postingService.ts`.
 - Closing the New Entry modal with content silently saves a draft and fires the toast (auto-save).
 - "New Entry" button always visible in the top toolbar regardless of page.
 - Drafts can be deleted with a confirmation modal. Posted entries cannot be edited or deleted.
@@ -260,19 +268,23 @@ Tokens defined in `src/ui/index.css` via Tailwind v4 `@theme`. Neon blue: primar
 | Session auth (PostgreSQL mode only) | `src/api/middleware/auth.ts`, `src/api/routes/auth.ts` |
 | Vault registry | `userData/vaults.json` — list of known vault paths + last-opened timestamps |
 | Vault metadata | `<vault>/.corebooks` — name, version, created date (no secrets) |
+| AI posting boundary | `src/api/posting/authority.ts`, `src/api/services/postingService.ts`, `tests/api/aiPostingBoundary.test.ts` |
 
 **Vault and key separation:** The vault folder (`<vault>/corebooks.db`, `<vault>/.corebooks`) contains no key material. The OS-keychain key (`userData/.db.key`) is intentionally outside any vault so vaults can be moved, copied, or backed up independently without compromising the encryption key.
+
+**AI data boundary:** Local AI is opt-in and currently limited to localhost Ollama. AI features may observe, explain, classify, and suggest drafts; they must not post official entries or receive a posting authority. Keep this policy outside `src/core`.
 
 **SQLCipher gap:** Key is in the OS keychain. Blocker: `PrismaBetterSqlite3` creates the `better-sqlite3` instance internally — no way to pass a pre-opened database or run `PRAGMA key` before Prisma opens the file. Fix: swap to `better-sqlite3-sqlcipher` and write a custom Prisma adapter that accepts a pre-opened encrypted instance.
 
 ## Self-Review Checklist
 
 1. **Stale data** — async flows may capture stale state; verify latest values are re-fetched.
-2. **Type-check** — `tsc --noEmit` (server) and `tsc --project src/ui/tsconfig.json --noEmit` (UI). Zero errors.
+2. **Type-check** — `npm run build` (server) and `npx tsc --project src/ui/tsconfig.json --noEmit` (UI). Zero errors.
 3. **Edge cases** — empty lists, undefined optionals, zero amounts, missing IDs.
 4. **Consistency** — follow existing patterns (error handling, naming, file layout).
 5. **Onion rule** — no outer-layer change should touch `src/core/`.
-6. **Fresh diff read** — re-read every changed line for logic inversions, off-by-one, wrong variables, silent no-ops.
+6. **AI boundary** — any AI/Ollama change must remain draft-only and pass `tests/api/aiPostingBoundary.test.ts`.
+7. **Fresh diff read** — re-read every changed line for logic inversions, off-by-one, wrong variables, silent no-ops.
 
 ## What NOT to Do
 
@@ -285,9 +297,9 @@ Tokens defined in `src/ui/index.css` via Tailwind v4 `@theme`. Neon blue: primar
 
 All new modules must gate sidebar items behind `src/ui/lib/featureFlags.ts`. Open a design conversation before building any of these.
 
-**AR/AP Manager:** `Customer`, `Vendor`, `Invoice` models. Invoice creation auto-posts a balanced entry through the existing engine — never writes directly to the ledger. Aging view (30/60/90 days). Gate: `isFeatureEnabled('ar_ap')`.
+**AR/AP Manager:** `Customer`, `Vendor`, `Invoice` models. Invoice creation creates reviewable drafts or posts only through an explicit non-AI posting authority — never writes directly to the ledger. Aging view (30/60/90 days). Gate: `isFeatureEnabled('ar_ap')`.
 
-**Inventory:** `InventoryItem` (SKU, unit cost, qty on hand). Receive/sell goods auto-post COGS entries. First iteration: no FIFO/LIFO, no multi-location. Gate: `isFeatureEnabled('inventory')`.
+**Inventory:** `InventoryItem` (SKU, unit cost, qty on hand). Receive/sell goods can suggest or draft COGS entries; posting must go through the posting facade. First iteration: no FIFO/LIFO, no multi-location. Gate: `isFeatureEnabled('inventory')`. Likely a stronger first-party candidate than payroll because it shapes core accounting workflows.
 
 **Import from Other Software:** CSV column mapping → draft entries for user review before posting. QuickBooks .IIF parsing. Fuzzy account name matching. Imports always create drafts, never auto-post.
 
@@ -295,10 +307,10 @@ All new modules must gate sidebar items behind `src/ui/lib/featureFlags.ts`. Ope
 
 **Bank Feed Import:** OFX/QFX/CSV bank statements → auto-match or create draft entries. Requires vault architecture (Phase 10) — statements land in `<vault>/imports/`, watched by the app, processed into the draft review queue. Imports always create drafts, never auto-post.
 
-**AI-Assisted Categorisation (Ollama):** Optional built-in feature (not a plugin). If Ollama is running at `localhost:11434`, the bank import flow can request account categorisation suggestions for each transaction. Falls back gracefully to manual mapping if Ollama is absent. Configured in Settings → AI tab. Not a plugin — same pattern as PostgreSQL mode (optional, configuration-gated, first-party).
+**AI-Assisted Categorisation (Ollama):** Optional built-in feature (not a plugin). If Ollama is running at `localhost:11434`, the bank import flow can request account categorisation suggestions for each transaction. Falls back gracefully to manual mapping if Ollama is absent. Configured in Settings → AI tab. AI output is draft-only and must never post entries.
 
-**Plugin API:** Webhook interface for Stripe, Shopify, payroll providers.
+**Plugin API / catalog:** Webhook or local extension interface for Stripe, Shopify, payroll providers, ecommerce, tax exports, and country/industry-specific integrations. Plugins should produce source documents, import files, or drafts by default; do not grant posting authority to plugins without a separate permission model.
 
-**Closing Entries:** Period-end close zeroing Revenue/Expense into Retained Earnings.
+**Payroll:** High compliance and jurisdiction-specific complexity make payroll a better plugin-catalog candidate before making it a first-party module.
 
 **Multi-currency:** Foreign currency transactions with exchange rate tracking and unrealised gain/loss accounts.
