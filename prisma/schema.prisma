@@ -50,6 +50,9 @@ model JournalEntry {
   status        EntryStatus
   paymentMethod String?
   reversalOf    String?
+  postedVia     String?
+  sourceType    String?
+  sourceId      String?
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
   lines         JournalLine[]
@@ -111,4 +114,68 @@ model User {
   passwordHash String
   role         String   @default("Viewer")
   createdAt    DateTime @default(now())
+}
+
+model AppSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+model AuditEvent {
+  id         String   @id @default(cuid())
+  action     String
+  entityType String
+  entityId   String?
+  detailJson String?
+  createdAt  DateTime @default(now())
+}
+
+model BankRule {
+  id            String   @id @default(cuid())
+  name          String
+  priority      Int      @default(100)
+  enabled       Boolean  @default(true)
+  matchField    String
+  matchType     String
+  pattern       String
+  accountId     String?
+  entryType     String   @default("expense")
+  memo          String?
+  paymentMethod String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model ReconciliationSession {
+  id                 String   @id @default(cuid())
+  accountId          String
+  statementDate      DateTime
+  endingBalance      Int
+  status             String   @default("open")
+  notes              String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  items              ReconciliationItem[]
+}
+
+model ReconciliationItem {
+  id        String @id @default(cuid())
+  sessionId String
+  entryId   String
+  cleared   Boolean @default(false)
+  session   ReconciliationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, entryId])
+}
+
+model PluginCategory {
+  id          String   @id
+  name        String
+  description String
+  permissions String
+  enabled     Boolean  @default(false)
+  builtIn     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }

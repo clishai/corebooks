@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ALL_METRICS, MetricId, getSelectedMetrics, saveSelectedMetrics, HomeLayout, getHomeLayout, saveHomeLayout } from '../../lib/metrics'
 import { SNOOZE_OPTIONS, getSnoozeDuration, saveSnoozeDuration } from '../../lib/alerts'
+import { api } from '../../api/client'
 
 export default function GeneralTab() {
   const [companyName, setCompanyName] = useState(() => localStorage.getItem('cb_company_name') ?? '')
@@ -9,6 +10,18 @@ export default function GeneralTab() {
   const [layout, setLayout] = useState<HomeLayout>(getHomeLayout)
   const [snooze, setSnooze] = useState<number | null>(getSnoozeDuration)
 
+  useEffect(() => {
+    api.settings.appSettings()
+      .then((settings) => {
+        if (typeof settings['companyName'] === 'string') {
+          setCompanyName(settings['companyName'])
+          localStorage.setItem('cb_company_name', settings['companyName'])
+          window.dispatchEvent(new CustomEvent('cb:company-name-changed'))
+        }
+      })
+      .catch(() => {})
+  }, [])
+
   function handleSaveCompanyName() {
     const trimmed = companyName.trim()
     if (trimmed) {
@@ -16,6 +29,7 @@ export default function GeneralTab() {
     } else {
       localStorage.removeItem('cb_company_name')
     }
+    void api.settings.saveAppSettings({ companyName: trimmed || null })
     window.dispatchEvent(new CustomEvent('cb:company-name-changed'))
     setCompanySaved(true)
     setTimeout(() => setCompanySaved(false), 2000)

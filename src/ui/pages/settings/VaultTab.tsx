@@ -36,7 +36,7 @@ function SafeStorageWarning() {
   useEffect(() => {
     window.electronAPI?.vault.safeStorageAvailable()
       .then(setAvailable)
-      .catch(() => setAvailable(true))
+      .catch(() => setAvailable(false))
   }, [])
 
   if (available !== false) return null

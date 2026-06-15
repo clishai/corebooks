@@ -152,7 +152,10 @@ export async function postDraftEntry(
   // rather than creating a new record — this keeps the DB ID stable.
   await prisma.journalEntry.update({
     where: { id: draft.id! },
-    data: { status: EntryStatus.Posted } as Parameters<typeof prisma.journalEntry.update>[0]['data'],
+    data: {
+      status: EntryStatus.Posted,
+      postedVia: authority.channel,
+    } as Parameters<typeof prisma.journalEntry.update>[0]['data'],
   });
 
   // postEntry assigned a temporary numeric ID from the ledger counter;

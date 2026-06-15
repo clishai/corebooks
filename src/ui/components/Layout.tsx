@@ -47,7 +47,8 @@ function CogIcon() {
 const ROUTE_ORDER = [
   '/home', '/accounts', '/entries', '/drafts',
   '/reports/trial-balance', '/reports/balance-sheet', '/reports/income-statement',
-  '/extra/recurring', '/extra/close-period', '/settings',
+  '/reports/general-ledger', '/reports/account-activity', '/reports/cash-flow',
+  '/extra/bank-feed', '/extra/reconciliation', '/extra/recurring', '/extra/close-period', '/settings',
 ]
 
 function getRouteIndex(pathname: string): number {
@@ -289,6 +290,8 @@ export default function Layout() {
             </button>
           </SidebarSection>
           <SidebarSection id="extra-workflows" label="Extra Workflows">
+            <NavLink to="/extra/bank-feed" className={navLinkClass}>Bank Feed</NavLink>
+            <NavLink to="/extra/reconciliation" className={navLinkClass}>Reconciliation</NavLink>
             <NavLink to="/extra/recurring" className={navLinkClass}>Recurring</NavLink>
             <NavLink to="/extra/close-period" className={navLinkClass}>Close Period</NavLink>
           </SidebarSection>
