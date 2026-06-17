@@ -16,6 +16,7 @@ import ReconciliationPage from './pages/ReconciliationPage'
 import GeneralLedgerPage from './pages/GeneralLedgerPage'
 import AccountActivityPage from './pages/AccountActivityPage'
 import CashFlowPage from './pages/CashFlowPage'
+import ReportsLibraryPage from './pages/ReportsLibraryPage'
 import LoginPage from './pages/LoginPage'
 import VaultPickerPage from './pages/VaultPickerPage'
 import { checkAuthStatus, getAuthToken } from './lib/auth'
@@ -79,7 +80,7 @@ export default function App() {
               <Route path="reports/general-ledger" element={<GeneralLedgerPage />} />
               <Route path="reports/account-activity" element={<AccountActivityPage />} />
               <Route path="reports/cash-flow" element={<CashFlowPage />} />
-              <Route path="reports/library" element={<Navigate to="/settings?tab=reports" replace />} />
+              <Route path="reports/library" element={<ReportsLibraryPage />} />
               <Route path="extra/recurring" element={<RecurringPage />} />
               <Route path="extra/close-period" element={<ClosePeriodPage />} />
               <Route path="extra/bank-feed" element={<BankFeedPage />} />

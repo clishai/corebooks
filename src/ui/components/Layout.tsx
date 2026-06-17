@@ -47,7 +47,7 @@ function CogIcon() {
 const ROUTE_ORDER = [
   '/home', '/accounts', '/entries', '/drafts',
   '/reports/trial-balance', '/reports/balance-sheet', '/reports/income-statement',
-  '/reports/general-ledger', '/reports/account-activity', '/reports/cash-flow',
+  '/reports/general-ledger', '/reports/account-activity', '/reports/cash-flow', '/reports/library',
   '/extra/bank-feed', '/extra/reconciliation', '/extra/recurring', '/extra/close-period', '/settings',
 ]
 
@@ -283,7 +283,7 @@ export default function Layout() {
               <NavLink key={r.id} to={r.path} className={navLinkClass}>{r.label}</NavLink>
             ))}
             <button
-              onClick={() => navigate('/settings?tab=reports')}
+              onClick={() => navigate('/reports/library')}
               className="flex items-center px-3 py-2 rounded text-xs text-ash hover:text-chalk hover:bg-surface transition-colors cursor-pointer w-full text-left"
             >
               Browse all reports...
