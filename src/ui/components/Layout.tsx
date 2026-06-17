@@ -47,7 +47,7 @@ function CogIcon() {
 const ROUTE_ORDER = [
   '/home', '/accounts', '/entries', '/drafts',
   '/reports/trial-balance', '/reports/balance-sheet', '/reports/income-statement',
-  '/reports/general-ledger', '/reports/account-activity', '/reports/cash-flow', '/reports/library',
+  '/reports', '/reports/general-ledger', '/reports/account-activity', '/reports/cash-flow',
   '/extra/bank-feed', '/extra/reconciliation', '/extra/recurring', '/extra/close-period', '/settings',
 ]
 
@@ -279,15 +279,10 @@ export default function Layout() {
             <NavLink to="/drafts" className={navLinkClass}>Drafts</NavLink>
           </SidebarSection>
           <SidebarSection id="reports" label="Reports">
+            <NavLink to="/reports" end className={navLinkClass}>Reports Library</NavLink>
             {pinnedReportMetas.map((r) => (
               <NavLink key={r.id} to={r.path} className={navLinkClass}>{r.label}</NavLink>
             ))}
-            <button
-              onClick={() => navigate('/reports/library')}
-              className="flex items-center px-3 py-2 rounded text-xs text-ash hover:text-chalk hover:bg-surface transition-colors cursor-pointer w-full text-left"
-            >
-              Browse all reports...
-            </button>
           </SidebarSection>
           <SidebarSection id="extra-workflows" label="Extra Workflows">
             <NavLink to="/extra/bank-feed" className={navLinkClass}>Bank Feed</NavLink>

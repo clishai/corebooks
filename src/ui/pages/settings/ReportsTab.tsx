@@ -16,7 +16,14 @@ export default function ReportsTab() {
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-4">
+      <div className="bg-surface border border-rim rounded-sm px-5 py-4">
+        <h3 className="text-sm font-semibold text-chalk">Report visibility</h3>
+        <p className="text-sm text-ash mt-1 leading-relaxed">
+          All reports are available from <button onClick={() => navigate('/reports')} className="text-neon hover:underline cursor-pointer">Reports Library</button>.
+          Starred reports are also pinned directly under Reports in the sidebar.
+        </p>
+      </div>
       {ALL_REPORTS.map((report) => (
         <div
           key={report.id}

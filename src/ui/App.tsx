@@ -74,13 +74,14 @@ export default function App() {
               <Route path="accounts" element={<AccountsPage />} />
               <Route path="entries" element={<EntriesPage />} />
               <Route path="drafts" element={<DraftsPage />} />
+              <Route path="reports" element={<ReportsLibraryPage />} />
               <Route path="reports/trial-balance" element={<TrialBalancePage />} />
               <Route path="reports/balance-sheet" element={<BalanceSheetPage />} />
               <Route path="reports/income-statement" element={<IncomeStatementPage />} />
               <Route path="reports/general-ledger" element={<GeneralLedgerPage />} />
               <Route path="reports/account-activity" element={<AccountActivityPage />} />
               <Route path="reports/cash-flow" element={<CashFlowPage />} />
-              <Route path="reports/library" element={<ReportsLibraryPage />} />
+              <Route path="reports/library" element={<Navigate to="/reports" replace />} />
               <Route path="extra/recurring" element={<RecurringPage />} />
               <Route path="extra/close-period" element={<ClosePeriodPage />} />
               <Route path="extra/bank-feed" element={<BankFeedPage />} />
