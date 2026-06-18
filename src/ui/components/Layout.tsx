@@ -1,4 +1,4 @@
-import { useState, useRef, useLayoutEffect, useEffect, useCallback } from 'react'
+import { useState, useRef, useLayoutEffect, useEffect, useCallback, useMemo } from 'react'
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import NewEntryModal from './NewEntryModal'
 import Toast from './Toast'
@@ -13,6 +13,7 @@ import { getPinnedReports } from '../lib/sidebarState'
 import { ALL_REPORTS } from '../lib/reports'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { getOllamaConfig, checkOllama, type OllamaConfig } from '../lib/ollama'
+import { formatBinding, getShortcuts } from '../lib/shortcuts'
 import ImportModal from './ImportModal'
 
 function CogIcon() {
@@ -46,7 +47,8 @@ function CogIcon() {
 const ROUTE_ORDER = [
   '/home', '/accounts', '/entries', '/drafts',
   '/reports/trial-balance', '/reports/balance-sheet', '/reports/income-statement',
-  '/extra/recurring', '/extra/close-period', '/settings',
+  '/reports', '/reports/general-ledger', '/reports/account-activity', '/reports/cash-flow',
+  '/extra/bank-feed', '/extra/reconciliation', '/extra/recurring', '/extra/close-period', '/settings',
 ]
 
 function getRouteIndex(pathname: string): number {
@@ -55,7 +57,7 @@ function getRouteIndex(pathname: string): number {
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   `flex items-center px-3 py-2 rounded text-sm font-medium transition-colors cursor-pointer ${
-    isActive ? 'bg-raised text-neon border-l-2 border-neon pl-[10px]' : 'text-ash hover:bg-surface hover:text-chalk'
+    isActive ? 'bg-raised text-neon border-l-2 border-neon pl-[10px]' : 'text-ash border-l-2 border-transparent hover:bg-surface hover:text-chalk'
   }`
 
 interface ActionToastState {
@@ -73,6 +75,9 @@ export default function Layout() {
   const [companyName, setCompanyName] = useState(getCompanyName)
   const [pinnedReports, setPinnedReports] = useState(getPinnedReports)
   const [pendingImportCount, setPendingImportCount] = useState(0)
+  const [searchShortcutLabel, setSearchShortcutLabel] = useState(
+    () => formatBinding(getShortcuts()['global-search']),
+  )
 
   // AI state
   const [aiConfig, setAiConfig] = useState<OllamaConfig>(getOllamaConfig)
@@ -102,7 +107,12 @@ export default function Layout() {
   }, [aiConfig.enabled, aiConfig.endpoint])
 
   useEffect(() => {
-    if (!aiConfig.enabled) { setOllamaConnected(null); return }
+    if (!aiConfig.enabled) {
+      setOllamaConnected(null)
+      setAiPanelOpen(false)
+      localStorage.setItem('cb_ai_panel_open', 'false')
+      return
+    }
     void pingOllama()
     const interval = setInterval(() => void pingOllama(), 60_000)
     return () => clearInterval(interval)
@@ -122,6 +132,14 @@ export default function Layout() {
     return () => window.removeEventListener('cb:ai-config-changed', handleAiConfigChanged)
   }, [])
 
+  useEffect(() => {
+    function handleShortcutsChanged() {
+      setSearchShortcutLabel(formatBinding(getShortcuts()['global-search']))
+    }
+    window.addEventListener('cb:shortcuts-changed', handleShortcutsChanged)
+    return () => window.removeEventListener('cb:shortcuts-changed', handleShortcutsChanged)
+  }, [])
+
   // Vault file events
   useEffect(() => {
     const vault = window.electronAPI?.vault
@@ -129,10 +147,12 @@ export default function Layout() {
 
     vault.listImports().then((files) => setPendingImportCount(files.length)).catch(() => {})
 
-    vault.onFileAdded((event) => {
+    const unsubscribeAdded = vault.onFileAdded((event) => {
       if (event.hint === 'import') {
-        setPendingImportCount((n) => n + 1)
-        window.dispatchEvent(new CustomEvent('cb:vault-imports-changed'))
+        vault.listImports().then((files) => {
+          setPendingImportCount(files.length)
+          window.dispatchEvent(new CustomEvent('cb:vault-imports-changed'))
+        }).catch(() => {})
         setActionToast({
           id: event.path,
           message: `${event.name} is ready to import`,
@@ -162,7 +182,7 @@ export default function Layout() {
       }
     })
 
-    vault.onFileRemoved(() => {
+    const unsubscribeRemoved = vault.onFileRemoved(() => {
       vault.listImports().then((files) => {
         setPendingImportCount(files.length)
         window.dispatchEvent(new CustomEvent('cb:vault-imports-changed'))
@@ -174,7 +194,11 @@ export default function Layout() {
       void openVaultImport(path, name)
     }
     window.addEventListener('cb:vault-open-import', handleVaultOpenImport)
-    return () => window.removeEventListener('cb:vault-open-import', handleVaultOpenImport)
+    return () => {
+      unsubscribeAdded()
+      unsubscribeRemoved()
+      window.removeEventListener('cb:vault-open-import', handleVaultOpenImport)
+    }
   }, [])
 
   async function openVaultImport(filePath: string, fileName: string) {
@@ -197,13 +221,12 @@ export default function Layout() {
   }
 
   async function handleOllamaActivate(): Promise<boolean> {
-    const started = await window.electronAPI?.ollama.start()
-    if (started) {
-      const result = await checkOllama(aiConfig.endpoint)
-      setOllamaConnected(result.connected)
-      return result.connected
-    }
-    return false
+    const started = window.electronAPI ? await window.electronAPI.ollama.start() : true
+    if (!started) return false
+
+    const result = await checkOllama(aiConfig.endpoint)
+    setOllamaConnected(result.connected)
+    return result.connected
   }
 
   useEffect(() => {
@@ -217,7 +240,7 @@ export default function Layout() {
     }
   }, [])
 
-  useKeyboardShortcuts({
+  const shortcutHandlers = useMemo(() => ({
     'new-entry': () => setShowNewEntry(true),
     'go-home': () => navigate('/home'),
     'go-entries': () => navigate('/entries'),
@@ -226,7 +249,9 @@ export default function Layout() {
     'go-recurring': () => navigate('/extra/recurring'),
     'go-close-period': () => navigate('/extra/close-period'),
     'global-search': () => setShowSearch(true),
-  })
+  }), [navigate])
+
+  useKeyboardShortcuts(shortcutHandlers)
 
   function handlePosted() {
     setShowNewEntry(false)
@@ -254,17 +279,14 @@ export default function Layout() {
             <NavLink to="/drafts" className={navLinkClass}>Drafts</NavLink>
           </SidebarSection>
           <SidebarSection id="reports" label="Reports">
+            <NavLink to="/reports" end className={navLinkClass}>Reports Library</NavLink>
             {pinnedReportMetas.map((r) => (
               <NavLink key={r.id} to={r.path} className={navLinkClass}>{r.label}</NavLink>
             ))}
-            <button
-              onClick={() => navigate('/settings?tab=reports')}
-              className="flex items-center px-3 py-2 rounded text-xs text-ash hover:text-chalk hover:bg-surface transition-colors cursor-pointer w-full text-left"
-            >
-              Browse all reports...
-            </button>
           </SidebarSection>
           <SidebarSection id="extra-workflows" label="Extra Workflows">
+            <NavLink to="/extra/bank-feed" className={navLinkClass}>Bank Feed</NavLink>
+            <NavLink to="/extra/reconciliation" className={navLinkClass}>Reconciliation</NavLink>
             <NavLink to="/extra/recurring" className={navLinkClass}>Recurring</NavLink>
             <NavLink to="/extra/close-period" className={navLinkClass}>Close Period</NavLink>
           </SidebarSection>
@@ -275,7 +297,7 @@ export default function Layout() {
             to="/settings"
             className={({ isActive }) =>
               `settings-link flex items-center gap-0 px-3 py-2 rounded text-sm font-medium transition-colors overflow-hidden cursor-pointer ${
-                isActive ? 'bg-raised text-neon border-l-2 border-neon pl-[10px]' : 'text-ash hover:bg-surface hover:text-chalk'
+                isActive ? 'bg-raised text-neon border-l-2 border-neon pl-[10px]' : 'text-ash border-l-2 border-transparent hover:bg-surface hover:text-chalk'
               }`
             }
           >
@@ -302,9 +324,10 @@ export default function Layout() {
           <div className="w-72">
             <button
               onClick={() => setShowSearch(true)}
-              className="w-full bg-surface border border-rim rounded-sm px-3 py-1 text-xs text-ash/50 text-left hover:border-neon/50 transition-colors focus:outline-none cursor-pointer"
+              className="w-full bg-surface border border-rim rounded-sm px-3 py-1 text-xs text-ash/60 text-left hover:border-neon/50 transition-colors focus:outline-none cursor-pointer flex items-center justify-between gap-3"
             >
-              Press / for global search
+              <span>Global search</span>
+              <kbd className="kbd-chip">{searchShortcutLabel}</kbd>
             </button>
           </div>
 
@@ -331,7 +354,7 @@ export default function Layout() {
             <Outlet context={{ pendingImportCount }} />
           </main>
 
-          {aiPanelOpen && (
+          {aiConfig.enabled && aiPanelOpen && (
             <AIPanel
               config={aiConfig}
               ollamaConnected={ollamaConnected}

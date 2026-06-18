@@ -14,6 +14,7 @@ import { createAccount } from '../../src/db/repositories/accountRepository.js'
 import { Ledger } from '../../src/core/engine/ledger.js'
 import { AccountType } from '../../src/core/types/account.js'
 import { EntryStatus } from '../../src/core/types/journal.js'
+import { grantPostingAuthority } from '../../src/api/posting/authority.js'
 
 let dbPath: string
 
@@ -76,7 +77,7 @@ describe('listDraftEntries', () => {
   it('returns only drafts, not posted entries', async () => {
     const { cash, revenue } = await seedAccounts()
     const draft = await createDraftEntry(balancedDraft(cash.id, revenue.id))
-    await postDraftEntry(draft, [cash, revenue], new Ledger())
+    await postDraftEntry(draft, [cash, revenue], new Ledger(), grantPostingAuthority('human'))
     expect(await listDraftEntries()).toHaveLength(0)
   })
 
@@ -94,7 +95,7 @@ describe('listPostedEntries', () => {
   it('returns only posted entries, not drafts', async () => {
     const { cash, revenue } = await seedAccounts()
     const draft = await createDraftEntry(balancedDraft(cash.id, revenue.id))
-    await postDraftEntry(draft, [cash, revenue], new Ledger())
+    await postDraftEntry(draft, [cash, revenue], new Ledger(), grantPostingAuthority('human'))
     await createDraftEntry(balancedDraft(cash.id, revenue.id)) // unposted draft
     const posted = await listPostedEntries()
     expect(posted).toHaveLength(1)
@@ -156,7 +157,7 @@ describe('postDraftEntry', () => {
     const { cash, revenue } = await seedAccounts()
     const ledger = new Ledger()
     const draft = await createDraftEntry(balancedDraft(cash.id, revenue.id))
-    const result = await postDraftEntry(draft, [cash, revenue], ledger)
+    const result = await postDraftEntry(draft, [cash, revenue], ledger, grantPostingAuthority('human'))
     expect(result.posted).toBe(true)
     if (!result.posted) return
     expect(result.entry.status).toBe(EntryStatus.Posted)
@@ -166,7 +167,7 @@ describe('postDraftEntry', () => {
     const { cash, revenue } = await seedAccounts()
     const ledger = new Ledger()
     const draft = await createDraftEntry(balancedDraft(cash.id, revenue.id))
-    await postDraftEntry(draft, [cash, revenue], ledger)
+    await postDraftEntry(draft, [cash, revenue], ledger, grantPostingAuthority('human'))
     expect(ledger.getRawBalance(cash.id).debit).toBe(500)
     expect(ledger.getRawBalance(revenue.id).credit).toBe(500)
   })
@@ -183,7 +184,7 @@ describe('postDraftEntry', () => {
         { accountId: revenue.id, amount: 400, type: 'credit' },
       ],
     })
-    const result = await postDraftEntry(unbalanced, [cash, revenue], ledger)
+    const result = await postDraftEntry(unbalanced, [cash, revenue], ledger, grantPostingAuthority('human'))
     expect(result.posted).toBe(false)
     expect(ledger.getRawBalance(cash.id).debit).toBe(0)
   })
@@ -194,7 +195,7 @@ describe('loadLedger', () => {
     const { cash, revenue } = await seedAccounts()
     const ledger = new Ledger()
     const draft = await createDraftEntry(balancedDraft(cash.id, revenue.id))
-    await postDraftEntry(draft, [cash, revenue], ledger)
+    await postDraftEntry(draft, [cash, revenue], ledger, grantPostingAuthority('human'))
     const loaded = await loadLedger()
     expect(loaded.getRawBalance(cash.id).debit).toBe(500)
     expect(loaded.getRawBalance(revenue.id).credit).toBe(500)

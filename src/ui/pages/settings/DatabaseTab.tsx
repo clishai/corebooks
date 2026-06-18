@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { api, DatabaseSettings, DbStats } from '../../api/client'
+import { api, DatabaseSettings, DbStats, type VaultHealth } from '../../api/client'
 import { encryptExport } from '../../lib/crypto'
 import ExportPasswordModal from '../../components/ExportPasswordModal'
 import ImportModal from '../../components/ImportModal'
@@ -34,6 +34,7 @@ function StatPill({ label, value }: { label: string; value: string | number }) {
 export default function DatabaseTab() {
   const [db, setDb] = useState<DatabaseSettings | null>(null)
   const [stats, setStats] = useState<DbStats | null>(null)
+  const [health, setHealth] = useState<VaultHealth | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -66,10 +67,11 @@ export default function DatabaseTab() {
   function loadData() {
     setLoading(true)
     setError(null)
-    Promise.all([api.settings.database(), api.settings.stats()])
-      .then(([dbRes, statsRes]) => {
+    Promise.all([api.settings.database(), api.settings.stats(), api.settings.vaultHealth()])
+      .then(([dbRes, statsRes, healthRes]) => {
         setDb(dbRes)
         setStats(statsRes)
+        setHealth(healthRes)
       })
       .catch((e: unknown) =>
         setError(e instanceof Error ? e.message : 'Failed to load settings.'),
@@ -93,6 +95,26 @@ export default function DatabaseTab() {
       URL.revokeObjectURL(url)
     } catch (e: unknown) {
       setExportError(e instanceof Error ? e.message : 'Export failed.')
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  async function handleBackup() {
+    setExporting(true)
+    setExportError(null)
+    try {
+      const data = await api.settings.backup()
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `corebooks-backup-${new Date().toISOString().slice(0, 10)}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+      api.settings.vaultHealth().then(setHealth).catch(() => {})
+    } catch (e: unknown) {
+      setExportError(e instanceof Error ? e.message : 'Backup failed.')
     } finally {
       setExporting(false)
     }
@@ -188,6 +210,17 @@ export default function DatabaseTab() {
         </div>
       )}
 
+      {health && (
+        <div className="bg-surface border border-rim rounded-sm px-5 py-4">
+          <h3 className="text-sm font-semibold text-chalk mb-2">Vault health</h3>
+          <div className="grid gap-2 text-sm text-ash">
+            <div className="flex justify-between gap-4"><span>Last backup</span><span className="text-chalk">{health.lastBackupAt ? new Date(health.lastBackupAt).toLocaleString() : 'Never'}</span></div>
+            <div className="flex justify-between gap-4"><span>Database file</span><span className="font-mono text-xs text-chalk truncate">{health.databasePath ?? 'External database'}</span></div>
+            <div className="flex justify-between gap-4"><span>Generated</span><span>{new Date(health.generatedAt).toLocaleString()}</span></div>
+          </div>
+        </div>
+      )}
+
       {/* Export + Import + Wipe */}
       <div>
         <h3 className="text-sm font-semibold text-chalk mb-1">Your data</h3>
@@ -213,6 +246,13 @@ export default function DatabaseTab() {
             className="px-4 py-2 text-sm font-medium rounded-md border border-neon/40 text-neon hover:bg-neon/10 disabled:opacity-50 transition-colors"
           >
             {exporting ? 'Exporting…' : 'Export Data'}
+          </button>
+          <button
+            onClick={() => void handleBackup()}
+            disabled={exporting}
+            className="px-4 py-2 text-sm font-medium rounded-md border border-neon/40 text-neon hover:bg-neon/10 disabled:opacity-50 transition-colors"
+          >
+            Backup Now
           </button>
           <button
             onClick={() => { setEncryptModalOpen(true); setEncryptError(null) }}

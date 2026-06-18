@@ -1,5 +1,15 @@
 import { useState, useEffect, useRef } from 'react'
-import { getOllamaConfig, saveOllamaConfig, checkOllama, type OllamaConfig } from '../../lib/ollama'
+import {
+  getOllamaConfig,
+  saveOllamaConfig,
+  checkOllama,
+  isLocalOllamaEndpoint,
+  type OllamaConfig,
+} from '../../lib/ollama'
+
+function notifyAiConfigChanged(): void {
+  window.dispatchEvent(new CustomEvent('cb:ai-config-changed'))
+}
 
 export default function AITab() {
   const [config, setConfig] = useState<OllamaConfig>(getOllamaConfig)
@@ -11,10 +21,21 @@ export default function AITab() {
     if (config.enabled) void runCheck()
   }, [config.enabled])
 
-  async function runCheck() {
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+    }
+  }, [])
+
+  async function runCheck(endpoint = config.endpoint): Promise<void> {
     setChecking(true)
-    const result = await checkOllama(config.endpoint)
+    const result = await checkOllama(endpoint)
     setStatus(result)
+    if (result.connected && config.model && !result.models.includes(config.model)) {
+      setConfig((current) => ({ ...current, model: null }))
+      saveOllamaConfig({ model: null })
+      notifyAiConfigChanged()
+    }
     setChecking(false)
   }
 
@@ -22,6 +43,7 @@ export default function AITab() {
     const next = { ...config, enabled: true }
     setConfig(next)
     saveOllamaConfig({ enabled: true })
+    notifyAiConfigChanged()
   }
 
   function handleDisable() {
@@ -29,22 +51,24 @@ export default function AITab() {
     setConfig(next)
     saveOllamaConfig({ enabled: false })
     setStatus(null)
-    window.dispatchEvent(new CustomEvent('cb:ai-config-changed'))
+    notifyAiConfigChanged()
   }
 
   function handleEndpointChange(endpoint: string) {
     const next = { ...config, endpoint }
     setConfig(next)
     saveOllamaConfig({ endpoint })
+    setStatus(null)
+    notifyAiConfigChanged()
     if (debounceRef.current) clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(() => void runCheck(), 500)
+    debounceRef.current = setTimeout(() => void runCheck(endpoint), 500)
   }
 
   function handleModelChange(model: string) {
     const next = { ...config, model: model || null }
     setConfig(next)
     saveOllamaConfig({ model: model || null })
-    window.dispatchEvent(new CustomEvent('cb:ai-config-changed'))
+    notifyAiConfigChanged()
   }
 
   if (!config.enabled) {
@@ -53,12 +77,13 @@ export default function AITab() {
         <div className="bg-surface border border-rim rounded-lg px-5 py-5 space-y-3">
           <p className="text-sm text-ash leading-relaxed">
             AI assistance connects corebooks to a local Ollama model running on your machine.
-            Your data never leaves your computer — there is no cloud, no account, and no subscription.
+            Keep the endpoint on localhost so financial data stays on this computer — there is no cloud,
+            no account, and no subscription.
           </p>
         </div>
 
         <div className="space-y-3">
-          <h3 className="text-sm font-semibold text-chalk">Setup guide</h3>
+          <h3 className="text-[10px] font-semibold text-ash uppercase tracking-widest">Setup guide</h3>
           <ol className="space-y-3 text-sm text-ash">
             <li className="flex gap-3">
               <span className="text-neon font-semibold shrink-0">1.</span>
@@ -75,7 +100,7 @@ export default function AITab() {
               <span>
                 Open Terminal and run this command to download a model:
                 <br />
-                <code className="inline-block mt-1.5 text-xs text-chalk bg-raised border border-rim px-3 py-1.5 rounded font-mono">
+                <code className="inline-block mt-1.5 text-xs text-chalk bg-raised border border-rim px-3 py-1.5 rounded-sm font-mono select-all cursor-text" title="Select this command">
                   ollama pull llama3.2
                 </code>
               </span>
@@ -108,7 +133,7 @@ export default function AITab() {
     <div className="space-y-6 max-w-lg">
       {/* Connection status */}
       <div className="space-y-2">
-        <h3 className="text-sm font-semibold text-chalk">Connection status</h3>
+        <h3 className="text-[10px] font-semibold text-ash uppercase tracking-widest">Connection status</h3>
         <div className="flex items-center gap-3">
           {checking ? (
             <span className="text-sm text-ash">Checking…</span>
@@ -127,7 +152,7 @@ export default function AITab() {
           <button
             onClick={() => void runCheck()}
             disabled={checking}
-            className="text-xs text-ash hover:text-chalk transition-colors disabled:opacity-40 cursor-pointer"
+            className="text-xs text-ash border border-rim rounded-sm px-2 py-1 hover:text-chalk hover:border-neon/50 transition-colors disabled:opacity-40 cursor-pointer"
           >
             ↺ Refresh
           </button>
@@ -136,19 +161,22 @@ export default function AITab() {
 
       {/* Endpoint */}
       <div className="space-y-2">
-        <h3 className="text-sm font-semibold text-chalk">Endpoint</h3>
+        <h3 className="text-[10px] font-semibold text-ash uppercase tracking-widest">Endpoint</h3>
         <input
           type="text"
           value={config.endpoint}
           onChange={(e) => handleEndpointChange(e.target.value)}
           className="w-full bg-raised border border-rim rounded-md px-3 py-2 text-chalk text-sm focus:outline-none focus:border-neon font-mono"
         />
-        <p className="text-xs text-ash">Default is http://localhost:11434. Change only if Ollama runs on a different port.</p>
+        <p className="text-xs text-ash">Default is http://localhost:11434. Only localhost endpoints are accepted.</p>
+        {!isLocalOllamaEndpoint(config.endpoint) && (
+          <p className="text-xs text-red-300">Use an http://localhost or http://127.0.0.1 endpoint with no path.</p>
+        )}
       </div>
 
       {/* Model */}
       <div className="space-y-2">
-        <h3 className="text-sm font-semibold text-chalk">Model</h3>
+        <h3 className="text-[10px] font-semibold text-ash uppercase tracking-widest">Model</h3>
         <select
           value={config.model ?? ''}
           onChange={(e) => handleModelChange(e.target.value)}

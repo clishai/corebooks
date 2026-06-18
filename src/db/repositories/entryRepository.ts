@@ -6,8 +6,22 @@ import { ValidationError } from '../../core/validation/entry.js';
 import { getPrismaClient } from '../client.js';
 import { PrismaJournalEntry, toCoreJournalEntry, toDbCents, toDbJournalEntry } from '../mappers.js';
 import { isPeriodClosed } from './periodRepository.js';
+import type { PostingAuthority, PostingChannel } from '../../types/posting.js';
 
 const INCLUDE_LINES = { lines: { orderBy: { id: 'asc' as const } } };
+const ALLOWED_POSTING_CHANNELS = new Set<PostingChannel>([
+  'human',
+  'import',
+  'recurring',
+  'closing',
+  'reversal',
+]);
+
+function assertRepositoryPostingAllowed(authority: PostingAuthority): void {
+  if (!ALLOWED_POSTING_CHANNELS.has(authority.channel)) {
+    throw new Error(`Posting channel "${authority.channel as string}" is not allowed.`);
+  }
+}
 
 // ── Read ───────────────────────────────────────────────────────────────────
 
@@ -114,8 +128,11 @@ export type PostPersistedResult =
 export async function postDraftEntry(
   draft: JournalEntry,
   chartOfAccounts: Account[],
-  ledger: Ledger
+  ledger: Ledger,
+  authority: PostingAuthority
 ): Promise<PostPersistedResult> {
+  assertRepositoryPostingAllowed(authority);
+
   const entryDate = new Date(draft.date);
   const locked = await isPeriodClosed(entryDate.getFullYear(), entryDate.getMonth() + 1);
   if (locked) {
@@ -135,7 +152,10 @@ export async function postDraftEntry(
   // rather than creating a new record — this keeps the DB ID stable.
   await prisma.journalEntry.update({
     where: { id: draft.id! },
-    data: { status: EntryStatus.Posted } as Parameters<typeof prisma.journalEntry.update>[0]['data'],
+    data: {
+      status: EntryStatus.Posted,
+      postedVia: authority.channel,
+    } as Parameters<typeof prisma.journalEntry.update>[0]['data'],
   });
 
   // postEntry assigned a temporary numeric ID from the ledger counter;

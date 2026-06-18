@@ -26,4 +26,22 @@ export const ALL_REPORTS: ReportMeta[] = [
     path: '/reports/income-statement',
     description: 'Revenue and expenses over a date range. Shows net income.',
   },
+  {
+    id: 'general-ledger',
+    label: 'General Ledger',
+    path: '/reports/general-ledger',
+    description: 'Line-by-line posted activity across every account.',
+  },
+  {
+    id: 'account-activity',
+    label: 'Account Activity',
+    path: '/reports/account-activity',
+    description: 'Running activity for a selected account.',
+  },
+  {
+    id: 'cash-flow',
+    label: 'Cash Flow Snapshot',
+    path: '/reports/cash-flow',
+    description: 'Net movement across cash and bank-like asset accounts.',
+  },
 ]

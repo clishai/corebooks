@@ -16,8 +16,10 @@ import { EntryStatus } from '../../core/types/journal.js';
 import type { JournalLine } from '../../core/types/journal.js';
 import type { Ledger } from '../../core/engine/ledger.js';
 import { getPeriodConfig, closePeriod, isPeriodClosed } from '../../db/repositories/periodRepository.js';
-import { createDraftEntry, postDraftEntry } from '../../db/repositories/entryRepository.js';
+import { createDraftEntry } from '../../db/repositories/entryRepository.js';
 import { listAccounts } from '../../db/repositories/accountRepository.js';
+import { grantPostingAuthority } from '../posting/authority.js';
+import { postDraftWithAuthority } from './postingService.js';
 
 export interface ClosingEntryResult {
   draftId: string;
@@ -166,9 +168,14 @@ export async function postClosingEntry(
     throw new Error(`Entry "${draftId}" is already posted.`);
   }
 
-  // postDraftEntry includes the period-lock check; since we are posting a
-  // closing entry the check will pass (the period is not yet closed at this point).
-  const result = await postDraftEntry(draft, accounts, ledger);
+  // The posting facade includes the period-lock check; since this is a
+  // closing entry the check will pass before the period is marked closed.
+  const result = await postDraftWithAuthority(
+    draft,
+    accounts,
+    ledger,
+    grantPostingAuthority('closing'),
+  );
 
   if (!result.posted) {
     const messages = result.errors.map((e) => e.message).join('; ');

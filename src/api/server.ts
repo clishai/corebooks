@@ -9,6 +9,10 @@ import { settingsRoutes } from './routes/settings.js';
 import { recurringRoutes } from './routes/recurring.js';
 import { periodRoutes } from './routes/periods.js';
 import { authRoutes } from './routes/auth.js';
+import { auditRoutes } from './routes/audit.js';
+import { bankFeedRoutes } from './routes/bankFeed.js';
+import { pluginRoutes } from './routes/plugins.js';
+import { reconciliationRoutes } from './routes/reconciliation.js';
 
 export interface AppContext {
   ledger: Ledger;
@@ -33,6 +37,10 @@ export function buildApp(context: AppContext, opts: BuildAppOptions = {}) {
   app.register(recurringRoutes, { prefix: '/recurring', context });
   app.register(periodRoutes, { prefix: '/periods', context });
   app.register(authRoutes, { prefix: '/auth' });
+  app.register(auditRoutes, { prefix: '/audit' });
+  app.register(bankFeedRoutes, { prefix: '/bank-feed' });
+  app.register(pluginRoutes, { prefix: '/plugins' });
+  app.register(reconciliationRoutes, { prefix: '/reconciliation' });
 
   return app;
 }

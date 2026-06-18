@@ -17,6 +17,7 @@ const migrationFiles = [
   join(migrationsDir, '20260502180906_add_account_classification/migration.sql'),
   join(migrationsDir, '20260503000000_add_recurring_templates/migration.sql'),
   join(migrationsDir, '20260503100000_add_period_close/migration.sql'),
+  join(migrationsDir, '20260615000000_local_os_foundation/migration.sql'),
 ]
 
 /**
@@ -41,6 +42,12 @@ export function createTestDb(): string {
  */
 export async function clearTestDb(): Promise<void> {
   const prisma = getPrismaClient()
+  await prisma.reconciliationItem.deleteMany()
+  await prisma.reconciliationSession.deleteMany()
+  await prisma.bankRule.deleteMany()
+  await prisma.pluginCategory.deleteMany()
+  await prisma.auditEvent.deleteMany()
+  await prisma.appSetting.deleteMany()
   await prisma.journalLine.deleteMany()
   await prisma.journalEntry.deleteMany()
   await prisma.account.deleteMany()

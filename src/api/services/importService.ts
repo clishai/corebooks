@@ -4,7 +4,9 @@ import type { Account } from '../../core/types/account.js'
 import type { JournalEntry } from '../../core/types/journal.js'
 import type { Ledger } from '../../core/engine/ledger.js'
 import { listAccounts, createAccount } from '../../db/repositories/accountRepository.js'
-import { createDraftEntry, postDraftEntry } from '../../db/repositories/entryRepository.js'
+import { createDraftEntry } from '../../db/repositories/entryRepository.js'
+import { grantPostingAuthority } from '../posting/authority.js'
+import { postDraftWithAuthority } from './postingService.js'
 
 // ── Public interfaces ─────────────────────────────────────────────────────────
 
@@ -178,7 +180,12 @@ async function persistParsedEntries(
     })
 
     if (options.importAs === 'posted') {
-      const result = await postDraftEntry(draft, accounts, ledger)
+      const result = await postDraftWithAuthority(
+        draft,
+        accounts,
+        ledger,
+        grantPostingAuthority('import'),
+      )
       if (!result.posted) {
         const errs = (result.errors as Array<{ message: string }>).map((e) => e.message).join('; ')
         warnings.push(`Entry "${pe.memo || pe.date}": validation failed (${errs}) — left as draft.`)
@@ -303,7 +310,12 @@ export async function importCoreJSON(
     })
 
     if (options.importAs === 'posted') {
-      const result = await postDraftEntry(draft, allAccounts, ledger)
+      const result = await postDraftWithAuthority(
+        draft,
+        allAccounts,
+        ledger,
+        grantPostingAuthority('import'),
+      )
       if (!result.posted) {
         const errs = (result.errors as Array<{ message: string }>).map((e) => e.message).join('; ')
         warnings.push(`Entry "${ee.memo || dateStr}": validation failed (${errs}) — left as draft.`)

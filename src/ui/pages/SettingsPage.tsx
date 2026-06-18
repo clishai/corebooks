@@ -11,10 +11,13 @@ import UsersTab from './settings/UsersTab'
 import DatabaseTab from './settings/DatabaseTab'
 import ReportsTab from './settings/ReportsTab'
 import AITab from './settings/AITab'
+import BankRulesTab from './settings/BankRulesTab'
+import PluginsTab from './settings/PluginsTab'
+import AuditTab from './settings/AuditTab'
 
-type Tab = 'vault' | 'general' | 'accounts' | 'payment-methods' | 'accounting' | 'shortcuts' | 'ai' | 'users' | 'database' | 'reports'
+type Tab = 'vault' | 'general' | 'accounts' | 'payment-methods' | 'accounting' | 'bank-rules' | 'shortcuts' | 'ai' | 'plugins' | 'audit' | 'users' | 'database' | 'reports'
 
-const VALID_TABS: Tab[] = ['vault', 'general', 'accounts', 'payment-methods', 'accounting', 'shortcuts', 'ai', 'users', 'database', 'reports']
+const VALID_TABS: Tab[] = ['vault', 'general', 'accounts', 'payment-methods', 'accounting', 'bank-rules', 'shortcuts', 'ai', 'plugins', 'audit', 'users', 'database', 'reports']
 
 export default function SettingsPage() {
   const [searchParams] = useSearchParams()
@@ -28,9 +31,14 @@ export default function SettingsPage() {
     checkAuthStatus().then(({ active }) => setAuthActive(active)).catch(() => {})
   }, [])
 
+  useEffect(() => {
+    const nextTab = searchParams.get('tab') as Tab | null
+    if (nextTab && VALID_TABS.includes(nextTab)) setTab(nextTab)
+  }, [searchParams])
+
   const tabClass = (t: Tab) =>
     `px-4 py-2 text-sm font-medium rounded-md transition-colors cursor-pointer ${
-      tab === t ? 'bg-raised text-chalk' : 'text-ash hover:text-chalk hover:bg-surface'
+      tab === t ? 'bg-raised text-neon' : 'text-ash hover:text-chalk hover:bg-surface'
     }`
 
   return (
@@ -46,8 +54,11 @@ export default function SettingsPage() {
         <button className={tabClass('accounts')} onClick={() => setTab('accounts')}>accounts</button>
         <button className={tabClass('payment-methods')} onClick={() => setTab('payment-methods')}>payment methods</button>
         <button className={tabClass('accounting')} onClick={() => setTab('accounting')}>accounting</button>
+        <button className={tabClass('bank-rules')} onClick={() => setTab('bank-rules')}>bank rules</button>
         <button className={tabClass('shortcuts')} onClick={() => setTab('shortcuts')}>shortcuts</button>
         <button className={tabClass('ai')} onClick={() => setTab('ai')}>ai</button>
+        <button className={tabClass('plugins')} onClick={() => setTab('plugins')}>plugins</button>
+        <button className={tabClass('audit')} onClick={() => setTab('audit')}>audit</button>
         {authActive && (
           <button className={tabClass('users')} onClick={() => setTab('users')}>users</button>
         )}
@@ -60,8 +71,11 @@ export default function SettingsPage() {
       {tab === 'accounts' && <AccountsTab />}
       {tab === 'payment-methods' && <PaymentMethodsTab />}
       {tab === 'accounting' && <AccountingTab />}
+      {tab === 'bank-rules' && <BankRulesTab />}
       {tab === 'shortcuts' && <ShortcutsTab />}
       {tab === 'ai' && <AITab />}
+      {tab === 'plugins' && <PluginsTab />}
+      {tab === 'audit' && <AuditTab />}
       {tab === 'users' && <UsersTab />}
       {tab === 'database' && <DatabaseTab />}
       {tab === 'reports' && <ReportsTab />}

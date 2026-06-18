@@ -42,7 +42,11 @@ export class VaultManager {
 
   create(name: string, dirPath: string): VaultEntry {
     const folderName = sanitizeVaultName(name)
+    if (!folderName) throw new Error('Vault name is required')
     const vaultPath = path.join(dirPath, folderName)
+    if (fs.existsSync(vaultPath)) {
+      throw new Error('A vault with that name already exists')
+    }
 
     fs.mkdirSync(vaultPath, { recursive: true })
     for (const sub of SUBDIRS) {
@@ -106,15 +110,18 @@ export class VaultManager {
     if (!this.current) throw new Error('No vault selected')
 
     const sanitized = sanitizeVaultName(newName)
+    if (!sanitized) throw new Error('Vault name is required')
     const parentDir = path.dirname(this.current.path)
     const newPath = path.join(parentDir, sanitized)
+    if (path.resolve(newPath) !== path.resolve(this.current.path) && fs.existsSync(newPath)) {
+      throw new Error('A vault with that name already exists')
+    }
 
     const metaPath = path.join(this.current.path, '.corebooks')
     const meta = JSON.parse(fs.readFileSync(metaPath, 'utf-8')) as VaultMetadata
-    meta.name = sanitized
-    fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2))
-
     fs.renameSync(this.current.path, newPath)
+    meta.name = sanitized
+    fs.writeFileSync(path.join(newPath, '.corebooks'), JSON.stringify(meta, null, 2), { mode: 0o600 })
 
     const registry = this.readRegistry()
     const entry = registry.vaults.find((v) => v.path === this.current!.path)

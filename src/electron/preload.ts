@@ -29,7 +29,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     rename: (newName: string) => ipcRenderer.invoke('vault:rename', newName),
     showInExplorer: () => ipcRenderer.invoke('vault:showInExplorer'),
     chooseDirectory: () => ipcRenderer.invoke('vault:chooseDirectory'),
-    onReady: (cb: () => void) => { ipcRenderer.on('vault:ready', cb) },
+    onReady: (cb: () => void) => {
+      ipcRenderer.on('vault:ready', cb)
+      return () => ipcRenderer.removeListener('vault:ready', cb)
+    },
     relaunch: () => ipcRenderer.invoke('vault:relaunch'),
     listImports: () => ipcRenderer.invoke('vault:listImports'),
     listVaultFiles: () => ipcRenderer.invoke('vault:listVaultFiles'),
@@ -37,10 +40,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     deleteFile: (filePath: string) => ipcRenderer.invoke('vault:deleteFile', filePath),
     readFile: (filePath: string) => ipcRenderer.invoke('vault:readFile', filePath),
     onFileAdded: (cb: (event: FileAddedEvent) => void) => {
-      ipcRenderer.on('vault:file-added', (_e, payload: FileAddedEvent) => cb(payload))
+      const listener = (_e: Electron.IpcRendererEvent, payload: FileAddedEvent) => cb(payload)
+      ipcRenderer.on('vault:file-added', listener)
+      return () => ipcRenderer.removeListener('vault:file-added', listener)
     },
     onFileRemoved: (cb: (event: { path: string }) => void) => {
-      ipcRenderer.on('vault:file-removed', (_e, payload: { path: string }) => cb(payload))
+      const listener = (_e: Electron.IpcRendererEvent, payload: { path: string }) => cb(payload)
+      ipcRenderer.on('vault:file-removed', listener)
+      return () => ipcRenderer.removeListener('vault:file-removed', listener)
     },
     safeStorageAvailable: () => ipcRenderer.invoke('vault:safeStorageAvailable'),
   },

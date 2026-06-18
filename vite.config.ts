@@ -19,6 +19,10 @@ export default defineConfig({
       '/periods': { target: 'http://127.0.0.1:3000', changeOrigin: true },
       '/health': 'http://localhost:3000',
       '/auth': { target: 'http://127.0.0.1:3000', changeOrigin: true },
+      '/audit': { target: 'http://127.0.0.1:3000', changeOrigin: true },
+      '/bank-feed': { target: 'http://127.0.0.1:3000', changeOrigin: true },
+      '/plugins': { target: 'http://127.0.0.1:3000', changeOrigin: true },
+      '/reconciliation': { target: 'http://127.0.0.1:3000', changeOrigin: true },
     },
   },
   build: {

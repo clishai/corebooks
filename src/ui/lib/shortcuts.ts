@@ -59,6 +59,7 @@ export function getShortcuts(): Record<ShortcutId, ShortcutBinding> {
 
 export function saveShortcuts(shortcuts: Record<ShortcutId, ShortcutBinding>): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(shortcuts))
+  window.dispatchEvent(new CustomEvent('cb:shortcuts-changed'))
 }
 
 export function formatBinding(b: ShortcutBinding): string {

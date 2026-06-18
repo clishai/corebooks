@@ -24,9 +24,10 @@ export default function VaultPickerPage() {
   }, [])
 
   useEffect(() => {
-    window.electronAPI?.vault.onReady(() => {
+    const unsubscribe = window.electronAPI?.vault.onReady(() => {
       window.location.reload()
     })
+    return () => { unsubscribe?.() }
   }, [])
 
   async function handleSelect(vaultPath: string) {

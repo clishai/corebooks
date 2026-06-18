@@ -13,7 +13,13 @@ vi.stubGlobal('localStorage', {
 })
 
 // Import after mocking
-const { checkOllama, getOllamaConfig, saveOllamaConfig } = await import('../../src/ui/lib/ollama.js')
+const {
+  checkOllama,
+  getOllamaConfig,
+  saveOllamaConfig,
+  normalizeLocalOllamaEndpoint,
+  isLocalOllamaEndpoint,
+} = await import('../../src/ui/lib/ollama.js')
 
 describe('checkOllama', () => {
   beforeEach(() => { mockFetch.mockReset() })
@@ -40,6 +46,27 @@ describe('checkOllama', () => {
     const result = await checkOllama('http://localhost:11434')
     expect(result.connected).toBe(false)
     expect(result.models).toEqual([])
+  })
+
+  it('rejects non-local endpoints without fetching', async () => {
+    const result = await checkOllama('http://example.com:11434')
+    expect(result.connected).toBe(false)
+    expect(result.models).toEqual([])
+    expect(mockFetch).not.toHaveBeenCalled()
+  })
+})
+
+describe('Ollama endpoint validation', () => {
+  it('normalizes localhost endpoints', () => {
+    expect(normalizeLocalOllamaEndpoint('http://localhost:11434/')).toBe('http://localhost:11434')
+    expect(normalizeLocalOllamaEndpoint('http://127.0.0.1:11434')).toBe('http://127.0.0.1:11434')
+  })
+
+  it('rejects remote, credentialed, and path endpoints', () => {
+    expect(isLocalOllamaEndpoint('https://localhost:11434')).toBe(false)
+    expect(isLocalOllamaEndpoint('http://user:pass@localhost:11434')).toBe(false)
+    expect(isLocalOllamaEndpoint('http://localhost:11434/proxy')).toBe(false)
+    expect(isLocalOllamaEndpoint('http://192.168.1.10:11434')).toBe(false)
   })
 })
 

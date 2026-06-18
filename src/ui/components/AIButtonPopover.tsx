@@ -36,7 +36,7 @@ export default function AIButtonPopover({
   const dotColor = !aiEnabled
     ? null
     : ollamaConnected === true
-      ? 'bg-emerald-400'
+      ? 'bg-neon'
       : 'bg-red-400'
 
   function handleButtonClick() {
@@ -67,8 +67,8 @@ export default function AIButtonPopover({
     }
   }
 
-  const buttonOpenClass = 'flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-surface text-chalk border border-rim border-b-0 rounded-t-lg w-full cursor-pointer transition-colors'
-  const buttonClosedClass = 'flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-rim text-ash hover:text-chalk rounded-lg transition-colors cursor-pointer'
+  const buttonOpenClass = 'flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-surface text-chalk border border-rim border-b-0 rounded-t-sm w-full cursor-pointer transition-colors'
+  const buttonClosedClass = 'flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-rim text-ash hover:text-chalk rounded-sm transition-colors cursor-pointer'
 
   const isOpen = popoverOpen && !panelOpen
 
@@ -86,8 +86,7 @@ export default function AIButtonPopover({
 
       {isOpen && (
         <div
-          className="absolute top-full right-0 bg-surface border border-rim border-t-0 rounded-b-lg w-60 px-4 py-4 space-y-3 z-50 shadow-2xl"
-          style={{ animation: 'fadeIn 150ms ease' }}
+          className="absolute top-full right-0 bg-surface border border-rim border-t-0 rounded-b-sm w-60 px-4 py-4 space-y-3 z-50 shadow-2xl animate-fade-in"
         >
           {!aiEnabled ? (
             <>

@@ -10,6 +10,29 @@ const KEYS = {
   model: 'cb_ai_model',
 }
 
+// AI may suggest categorisation and draft entries, but official posting stays
+// behind human/system posting authorities in the API layer.
+export const AI_MAY_POST = false as const
+
+const LOCAL_OLLAMA_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '[::1]'])
+
+export function normalizeLocalOllamaEndpoint(endpoint: string): string | null {
+  try {
+    const url = new URL(endpoint.trim())
+    if (url.protocol !== 'http:') return null
+    if (!LOCAL_OLLAMA_HOSTS.has(url.hostname)) return null
+    if (url.username || url.password) return null
+    if (url.pathname !== '/' || url.search || url.hash) return null
+    return url.origin
+  } catch {
+    return null
+  }
+}
+
+export function isLocalOllamaEndpoint(endpoint: string): boolean {
+  return normalizeLocalOllamaEndpoint(endpoint) !== null
+}
+
 export function getOllamaConfig(): OllamaConfig {
   return {
     enabled: localStorage.getItem(KEYS.enabled) === 'true',
@@ -37,8 +60,11 @@ export function saveOllamaConfig(config: Partial<OllamaConfig>): void {
 export async function checkOllama(
   endpoint: string,
 ): Promise<{ connected: boolean; models: string[] }> {
+  const normalized = normalizeLocalOllamaEndpoint(endpoint)
+  if (!normalized) return { connected: false, models: [] }
+
   try {
-    const res = await fetch(`${endpoint}/api/tags`, {
+    const res = await fetch(`${normalized}/api/tags`, {
       signal: AbortSignal.timeout(2000),
     })
     if (!res.ok) return { connected: false, models: [] }
