@@ -14,13 +14,17 @@ export const reconciliationRoutes: FastifyPluginAsync = async (app) => {
   app.get('/sessions', async () => listReconciliationSessions())
 
   app.post<{ Body: { accountId?: string; statementDate?: string; endingBalance?: number; notes?: string } }>('/sessions', async (req, reply) => {
-    if (!req.body.accountId || !req.body.statementDate || typeof req.body.endingBalance !== 'number') {
+    if (!req.body.accountId || !req.body.statementDate || !Number.isFinite(req.body.endingBalance)) {
       return reply.badRequest('accountId, statementDate, and endingBalance are required.')
     }
+    const endingBalance = req.body.endingBalance
+    if (endingBalance === undefined) return reply.badRequest('endingBalance is required.')
+    const statementDate = new Date(req.body.statementDate)
+    if (Number.isNaN(statementDate.getTime())) return reply.badRequest('statementDate must be a valid date.')
     const session = await createReconciliationSession({
       accountId: req.body.accountId,
-      statementDate: new Date(req.body.statementDate),
-      endingBalance: req.body.endingBalance,
+      statementDate,
+      endingBalance,
       notes: req.body.notes,
     })
     await logAuditEvent({

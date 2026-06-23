@@ -10,6 +10,7 @@ const TYPE_LABEL: Record<SearchResult['type'], string> = {
   account: 'Account',
   entry: 'Entry',
   report: 'Report',
+  destination: 'Go',
 }
 
 export default function CommandPalette({ onClose }: Props) {

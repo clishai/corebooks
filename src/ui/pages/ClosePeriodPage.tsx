@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import {
   getPeriodConfig,
   getClosedPeriods,
@@ -185,7 +186,7 @@ export default function ClosePeriodPage() {
             <p className="text-sm text-amber-300 font-medium">Retained earnings account not set</p>
             <p className="text-sm text-ash mt-1 leading-relaxed">
               Before closing a period, go to{' '}
-              <a href="/settings" className="text-neon hover:underline">Settings → Accounting</a>{' '}
+              <Link to="/settings?tab=accounting" className="text-neon hover:underline">Settings → Accounting</Link>{' '}
               and select the equity account that should receive net income at period end.
             </p>
           </div>

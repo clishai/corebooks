@@ -25,7 +25,7 @@ export default function BankFeedPage() {
     setResult(null)
     try {
       setResult(await api.bankFeed.importCsv(csv, bankAccountId))
-      window.dispatchEvent(new Event('cb:entry-posted'))
+      window.dispatchEvent(new Event('cb:drafts-changed'))
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Bank feed import failed.')
     } finally {

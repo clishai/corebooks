@@ -87,7 +87,7 @@ export default function App() {
               <Route path="extra/bank-feed" element={<BankFeedPage />} />
               <Route path="extra/reconciliation" element={<ReconciliationPage />} />
               <Route path="settings" element={<SettingsPage />} />
-              <Route path="settings/database" element={<Navigate to="/settings" replace />} />
+              <Route path="settings/database" element={<Navigate to="/settings?tab=database" replace />} />
             </Route>
           </Routes>
         </BrowserRouter>

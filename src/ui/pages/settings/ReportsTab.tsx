@@ -43,7 +43,7 @@ export default function ReportsTab() {
             className="ml-4 leading-none focus:outline-none cursor-pointer"
             title={pinned[report.id] ? 'Unpin from sidebar' : 'Pin to sidebar'}
           >
-            <span className={`text-5xl transition-colors ${pinned[report.id] ? 'text-neon star-zap' : 'text-ash'}`}>
+            <span className={`text-2xl transition-colors ${pinned[report.id] ? 'text-neon star-zap' : 'text-ash hover:text-chalk'}`}>
               ★
             </span>
           </button>

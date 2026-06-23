@@ -1,4 +1,4 @@
-import { useState, useEffect, ReactNode } from 'react'
+import { useState, useEffect, useCallback, ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { api, TrialBalanceRow, JournalEntry, Account } from '../api/client'
 import { MetricId, MetricDef, ALL_METRICS, getSelectedMetrics, getHomeLayout, HomeLayout } from '../lib/metrics'
@@ -374,10 +374,11 @@ export default function HomePage() {
     Promise.all(fetches).then(() => setMetricValues({ ...result }))
   }, [selectedMetrics])
 
-  useEffect(() => {
+  const loadHomeActivity = useCallback(() => {
+    setRecentEntryLoading(true)
     Promise.all([api.entries.list(), api.accounts.list(), api.entries.listDrafts()])
       .then(([entries, accounts, drafts]) => {
-        setRecentEntry(entries.length > 0 ? entries[entries.length - 1] : null)
+        setRecentEntry(entries.length > 0 ? entries[0] : null)
 
         const map = new Map<string, Account>()
         accounts.forEach((a) => map.set(a.id, a))
@@ -389,6 +390,16 @@ export default function HomePage() {
       .catch(() => setRecentEntry(null))
       .finally(() => setRecentEntryLoading(false))
   }, [])
+
+  useEffect(() => {
+    loadHomeActivity()
+    window.addEventListener('cb:entry-posted', loadHomeActivity)
+    window.addEventListener('cb:drafts-changed', loadHomeActivity)
+    return () => {
+      window.removeEventListener('cb:entry-posted', loadHomeActivity)
+      window.removeEventListener('cb:drafts-changed', loadHomeActivity)
+    }
+  }, [loadHomeActivity])
 
   function handleDismiss(id: AlertId) {
     dismissAlert(id)
@@ -423,8 +434,8 @@ export default function HomePage() {
       {selectedMetrics.length === 0 ? (
         <p className="text-sm text-ash">
           no metrics selected.{' '}
-          <Link to="/settings" className="text-neon hover:underline">
-            settings → home page
+          <Link to="/settings?tab=general" className="text-neon hover:underline">
+            settings → general
           </Link>{' '}
           to choose some.
         </p>

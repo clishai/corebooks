@@ -24,6 +24,21 @@ function parseRuleInput(body: Record<string, unknown>): BankRuleInput {
   }
 }
 
+function parseRulePatch(body: Record<string, unknown>): Partial<BankRuleInput> {
+  const patch: Partial<BankRuleInput> = {}
+  if ('name' in body) patch.name = String(body['name'] ?? '').trim()
+  if ('priority' in body) patch.priority = Number(body['priority'])
+  if ('enabled' in body) patch.enabled = body['enabled'] !== false
+  if ('matchField' in body) patch.matchField = String(body['matchField']) as BankRuleInput['matchField']
+  if ('matchType' in body) patch.matchType = String(body['matchType']) as BankRuleInput['matchType']
+  if ('pattern' in body) patch.pattern = String(body['pattern'] ?? '').trim()
+  if ('accountId' in body) patch.accountId = typeof body['accountId'] === 'string' && body['accountId'] ? body['accountId'] : null
+  if ('entryType' in body) patch.entryType = String(body['entryType']) as BankRuleInput['entryType']
+  if ('memo' in body) patch.memo = typeof body['memo'] === 'string' && body['memo'] ? body['memo'] : null
+  if ('paymentMethod' in body) patch.paymentMethod = typeof body['paymentMethod'] === 'string' && body['paymentMethod'] ? body['paymentMethod'] : null
+  return patch
+}
+
 export const bankFeedRoutes: FastifyPluginAsync = async (app) => {
   app.get('/rules', async () => listBankRules())
   app.get('/rule-templates', async () => BANK_RULE_TEMPLATES)
@@ -35,7 +50,7 @@ export const bankFeedRoutes: FastifyPluginAsync = async (app) => {
   })
 
   app.patch<{ Params: { id: string }; Body: Record<string, unknown> }>('/rules/:id', async (req) => {
-    return updateBankRule(req.params.id, parseRuleInput(req.body))
+    return updateBankRule(req.params.id, parseRulePatch(req.body))
   })
 
   app.delete<{ Params: { id: string } }>('/rules/:id', async (req, reply) => {

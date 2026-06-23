@@ -2,6 +2,10 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
+function bypassSpaNavigation(req: import('http').IncomingMessage): string | undefined {
+  return req.headers.accept?.includes('text/html') ? '/index.html' : undefined
+}
+
 export default defineConfig({
   root: 'src/ui',
   // Relative asset paths so the built HTML loads correctly from file://
@@ -11,10 +15,10 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      '/accounts': 'http://localhost:3000',
-      '/entries': 'http://localhost:3000',
-      '/reports': 'http://localhost:3000',
-      '/settings': 'http://localhost:3000',
+      '/accounts': { target: 'http://127.0.0.1:3000', changeOrigin: true, bypass: bypassSpaNavigation },
+      '/entries': { target: 'http://127.0.0.1:3000', changeOrigin: true, bypass: bypassSpaNavigation },
+      '/reports': { target: 'http://127.0.0.1:3000', changeOrigin: true, bypass: bypassSpaNavigation },
+      '/settings': { target: 'http://127.0.0.1:3000', changeOrigin: true, bypass: bypassSpaNavigation },
       '/recurring': { target: 'http://127.0.0.1:3000', changeOrigin: true },
       '/periods': { target: 'http://127.0.0.1:3000', changeOrigin: true },
       '/health': 'http://localhost:3000',

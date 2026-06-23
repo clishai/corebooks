@@ -29,45 +29,70 @@ export default function ReconciliationPage() {
   useEffect(() => { load() }, [])
 
   async function openSession(session: ReconciliationSession): Promise<void> {
-    const [fresh, sessionItems] = await Promise.all([
-      api.reconciliation.getSession(session.id),
-      api.reconciliation.items(session.id),
-    ])
-    setActive(fresh)
-    setItems(sessionItems)
+    try {
+      const [fresh, sessionItems] = await Promise.all([
+        api.reconciliation.getSession(session.id),
+        api.reconciliation.items(session.id),
+      ])
+      setActive(fresh)
+      setItems(sessionItems)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to open reconciliation session.')
+    }
   }
 
   async function createSession(): Promise<void> {
-    const session = await api.reconciliation.createSession({
-      accountId,
-      statementDate,
-      endingBalance: Number(endingBalance),
-    })
-    setEndingBalance('')
-    load()
-    await openSession(session)
+    const parsedBalance = Number(endingBalance)
+    if (!Number.isFinite(parsedBalance)) {
+      setError('Ending balance must be a number.')
+      return
+    }
+    try {
+      const session = await api.reconciliation.createSession({
+        accountId,
+        statementDate,
+        endingBalance: parsedBalance,
+      })
+      setEndingBalance('')
+      load()
+      await openSession(session)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to create reconciliation session.')
+    }
   }
 
   async function setCleared(item: ReconciliationItem, cleared: boolean): Promise<void> {
     if (!active) return
-    const updated = await api.reconciliation.setItem(active.id, item.entryId, cleared)
-    setActive(updated)
-    setItems((current) => current.map((candidate) => candidate.entryId === item.entryId ? { ...candidate, cleared } : candidate))
+    try {
+      const updated = await api.reconciliation.setItem(active.id, item.entryId, cleared)
+      setActive(updated)
+      setItems((current) => current.map((candidate) => candidate.entryId === item.entryId ? { ...candidate, cleared } : candidate))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to update cleared state.')
+    }
   }
 
   async function closeActive(): Promise<void> {
     if (!active) return
-    const updated = await api.reconciliation.close(active.id)
-    setActive(updated)
-    load()
+    try {
+      const updated = await api.reconciliation.close(active.id)
+      setActive(updated)
+      load()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to close reconciliation session.')
+    }
   }
 
   async function deleteActive(): Promise<void> {
     if (!active || !confirm('Delete this reconciliation session?')) return
-    await api.reconciliation.delete(active.id)
-    setActive(null)
-    setItems([])
-    load()
+    try {
+      await api.reconciliation.delete(active.id)
+      setActive(null)
+      setItems([])
+      load()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to delete reconciliation session.')
+    }
   }
 
   return (
@@ -92,7 +117,9 @@ export default function ReconciliationPage() {
           <div className="bg-surface border border-rim rounded-sm divide-y divide-rim">
             {sessions.map((session) => (
               <button key={session.id} onClick={() => void openSession(session)} className="w-full text-left px-4 py-3 hover:bg-raised/50 transition-colors cursor-pointer">
-                <span className="block text-sm text-chalk">{new Date(session.statementDate).toLocaleDateString()}</span>
+                <span className="block text-sm text-chalk">
+                  {accounts.find((account) => account.id === session.accountId)?.name ?? 'Account'} · {new Date(session.statementDate).toLocaleDateString()}
+                </span>
                 <span className="block text-xs text-ash">{session.status} · diff {fmt(session.difference)}</span>
               </button>
             ))}

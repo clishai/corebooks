@@ -64,9 +64,18 @@ function fromRow(row: {
     id: row.id,
     name: row.name,
     description: row.description,
-    permissions: JSON.parse(row.permissions) as string[],
+    permissions: parsePermissions(row.permissions),
     enabled: row.enabled,
     builtIn: row.builtIn,
+  }
+}
+
+function parsePermissions(raw: string): string[] {
+  try {
+    const parsed = JSON.parse(raw) as unknown
+    return Array.isArray(parsed) ? parsed.map(String) : []
+  } catch {
+    return []
   }
 }
 

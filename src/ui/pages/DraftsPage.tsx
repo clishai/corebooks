@@ -48,6 +48,11 @@ export default function DraftsPage() {
   }, [loadDrafts])
 
   useEffect(() => {
+    window.addEventListener('cb:drafts-changed', loadDrafts)
+    return () => window.removeEventListener('cb:drafts-changed', loadDrafts)
+  }, [loadDrafts])
+
+  useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') clearSelection()
     }

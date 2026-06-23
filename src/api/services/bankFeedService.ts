@@ -86,7 +86,8 @@ function matchesRule(rule: BankRule, tx: BankTransaction): boolean {
 function buildDraft(tx: BankTransaction, bankAccountId: string, rule: BankRule): JournalEntry | null {
   if (!rule.accountId) return null
   const amount = Math.abs(tx.amount)
-  const isInflow = tx.amount > 0
+  if (rule.entryType === 'transfer') return null
+  const isInflow = rule.entryType === 'income' ? true : rule.entryType === 'expense' ? false : tx.amount > 0
   const memo = rule.memo || tx.memo || tx.payee || 'Bank feed transaction'
   const lines: JournalEntry['lines'] = isInflow
     ? [

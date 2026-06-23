@@ -12,8 +12,12 @@ export default function PluginsTab() {
   }, [])
 
   async function toggle(category: PluginCategory): Promise<void> {
-    const updated = await api.plugins.setCategoryEnabled(category.id, !category.enabled)
-    setCategories((current) => current.map((item) => item.id === updated.id ? updated : item))
+    try {
+      const updated = await api.plugins.setCategoryEnabled(category.id, !category.enabled)
+      setCategories((current) => current.map((item) => item.id === updated.id ? updated : item))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to update plugin category.')
+    }
   }
 
   return (

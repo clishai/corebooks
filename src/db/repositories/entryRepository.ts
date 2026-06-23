@@ -31,7 +31,7 @@ export async function listPostedEntries(from?: string, to?: string): Promise<Jou
   if (from) dateFilter['gte'] = new Date(from)
   if (to) {
     const d = new Date(to)
-    d.setHours(23, 59, 59, 999)
+    d.setUTCHours(23, 59, 59, 999)
     dateFilter['lte'] = d
   }
   const rows = await prisma.journalEntry.findMany({

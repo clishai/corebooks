@@ -38,14 +38,22 @@ export default function BankRulesTab() {
       setError('Rule name and pattern are required.')
       return
     }
-    await api.bankFeed.createRule({ ...draft, accountId: draft.accountId || null })
-    setDraft(blankRule)
-    load()
+    try {
+      await api.bankFeed.createRule({ ...draft, accountId: draft.accountId || null })
+      setDraft(blankRule)
+      load()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to save bank rule.')
+    }
   }
 
   async function deleteRule(id: string): Promise<void> {
-    await api.bankFeed.deleteRule(id)
-    setRules((current) => current.filter((rule) => rule.id !== id))
+    try {
+      await api.bankFeed.deleteRule(id)
+      setRules((current) => current.filter((rule) => rule.id !== id))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to delete bank rule.')
+    }
   }
 
   function applyTemplate(template: Omit<BankRuleInput, 'accountId'>): void {

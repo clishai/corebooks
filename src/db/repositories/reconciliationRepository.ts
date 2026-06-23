@@ -120,6 +120,11 @@ export async function setReconciliationItem(sessionId: string, entryId: string, 
 
 export async function closeReconciliationSession(id: string): Promise<ReconciliationSessionSummary> {
   const prisma = getPrismaClient()
+  const current = await getReconciliationSession(id)
+  if (current.status === 'closed') return current
+  if (Math.abs(current.difference) > 0.009) {
+    throw new Error('Reconciliation cannot be closed until the difference is zero.')
+  }
   await prisma.reconciliationSession.update({
     where: { id },
     data: { status: 'closed', updatedAt: new Date() },

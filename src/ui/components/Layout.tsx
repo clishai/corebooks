@@ -9,7 +9,7 @@ import OnboardingWizard, { shouldShowOnboarding, getCompanyName } from './Onboar
 import CommandPalette from './CommandPalette'
 import SidebarSection from './SidebarSection'
 import logoSrc from '../assets/logo.png'
-import { getPinnedReports } from '../lib/sidebarState'
+import { getPinnedReports, togglePinnedReport } from '../lib/sidebarState'
 import { ALL_REPORTS } from '../lib/reports'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { getOllamaConfig, checkOllama, type OllamaConfig } from '../lib/ollama'
@@ -249,7 +249,14 @@ export default function Layout() {
     'go-recurring': () => navigate('/extra/recurring'),
     'go-close-period': () => navigate('/extra/close-period'),
     'global-search': () => setShowSearch(true),
-  }), [navigate])
+    'pin-report': () => {
+      const report = ALL_REPORTS.find((candidate) => location.pathname === candidate.path)
+      if (!report) return
+      togglePinnedReport(report.id)
+      setPinnedReports(getPinnedReports())
+      window.dispatchEvent(new Event('cb:pinned-reports-changed'))
+    },
+  }), [location.pathname, navigate])
 
   useKeyboardShortcuts(shortcutHandlers)
 

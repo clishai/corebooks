@@ -137,6 +137,16 @@ export const settingsRoutes: FastifyPluginAsync<RouteOptions> = async (app, opts
 
   app.post('/wipe', async () => {
     const prisma = getPrismaClient();
+    await prisma.reconciliationItem.deleteMany({});
+    await prisma.reconciliationSession.deleteMany({});
+    await prisma.bankRule.deleteMany({});
+    await prisma.pluginCategory.deleteMany({});
+    await prisma.appSetting.deleteMany({});
+    await prisma.auditEvent.deleteMany({});
+    await prisma.recurringLine.deleteMany({});
+    await prisma.recurringTemplate.deleteMany({});
+    await prisma.closedPeriod.deleteMany({});
+    await prisma.periodConfig.deleteMany({});
     await prisma.journalEntry.deleteMany({});  // cascades to JournalLine
     await prisma.account.deleteMany({});
     ledger.reset();

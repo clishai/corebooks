@@ -4,11 +4,20 @@ import { ALL_REPORTS, type ReportMeta } from '../lib/reports'
 
 export interface SearchResult {
   id: string
-  type: 'account' | 'entry' | 'report'
+  type: 'account' | 'entry' | 'report' | 'destination'
   label: string
   sublabel?: string
   path: string
 }
+
+const SEARCH_DESTINATIONS = [
+  { id: 'reports-library', label: 'Reports Library', path: '/reports', description: 'Browse every report, including unpinned reports.' },
+  { id: 'bank-feed', label: 'Bank Feed Import', path: '/extra/bank-feed', description: 'Import bank CSV rows using draft-only rules.' },
+  { id: 'reconciliation', label: 'Reconciliation', path: '/extra/reconciliation', description: 'Clear entries against bank statements.' },
+  { id: 'bank-rules', label: 'Bank Rules Settings', path: '/settings?tab=bank-rules', description: 'Create, template, and delete bank feed rules.' },
+  { id: 'plugins', label: 'Plugin Categories', path: '/settings?tab=plugins', description: 'Manage optional plugin category foundations.' },
+  { id: 'audit', label: 'Audit Log', path: '/settings?tab=audit', description: 'Review recent posting and workflow activity.' },
+]
 
 function matchesQuery(text: string, query: string): boolean {
   return text.toLowerCase().includes(query.toLowerCase())
@@ -87,8 +96,17 @@ export function useSearch(query: string): { results: SearchResult[]; loading: bo
           sublabel: r.description,
           path: r.path,
         }))
+      const destinationResults: SearchResult[] = SEARCH_DESTINATIONS
+        .filter((destination) => matchesQuery(destination.label, q) || matchesQuery(destination.description, q))
+        .map((destination) => ({
+          id: destination.id,
+          type: 'destination',
+          label: destination.label,
+          sublabel: destination.description,
+          path: destination.path,
+        }))
       if (requestId !== requestIdRef.current) return
-      setResults([...accountResults, ...entryResults, ...reportResults])
+      setResults([...accountResults, ...entryResults, ...reportResults, ...destinationResults])
     } catch {
       if (requestId !== requestIdRef.current) return
       setResults([])
