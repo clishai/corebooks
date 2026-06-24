@@ -331,10 +331,9 @@ export default function Layout() {
           <div className="w-72">
             <button
               onClick={() => setShowSearch(true)}
-              className="w-full bg-surface border border-rim rounded-sm px-3 py-1 text-xs text-ash/60 text-left hover:border-neon/50 transition-colors focus:outline-none cursor-pointer flex items-center justify-between gap-3"
+              className="w-full bg-surface border border-rim rounded-sm px-3 py-1 text-xs text-ash/50 text-left hover:border-neon/50 transition-colors focus:outline-none cursor-pointer"
             >
-              <span>Global search</span>
-              <kbd className="kbd-chip">{searchShortcutLabel}</kbd>
+              Press / for global search
             </button>
           </div>
 
@@ -398,7 +397,6 @@ export default function Layout() {
         />
       )}
       {showWelcome && <OnboardingWizard onDismiss={() => { setShowWelcome(false); setCompanyName(getCompanyName()) }} />}
-      {showSearch && <CommandPalette onClose={() => setShowSearch(false)} />}
     </div>
   )
 }

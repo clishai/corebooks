@@ -11,9 +11,12 @@ interface Props {
 export default function AccountSelect({ accounts, value, onChange }: Props) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
+  const [activeIdx, setActiveIdx] = useState(0)
   const [pos, setPos] = useState({ top: 0, left: 0, width: 0 })
   const triggerRef = useRef<HTMLButtonElement>(null)
   const searchRef = useRef<HTMLInputElement>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+  const activeItemRef = useRef<HTMLButtonElement>(null)
 
   const selected = accounts.find((a) => a.id === value)
 
@@ -25,10 +28,18 @@ export default function AccountSelect({ accounts, value, onChange }: Props) {
       )
     : accounts
 
+  useEffect(() => { setActiveIdx(0) }, [search])
+
+  useEffect(() => {
+    activeItemRef.current?.scrollIntoView({ block: 'nearest' })
+  }, [activeIdx])
+
   function openDropdown() {
     if (!triggerRef.current) return
     const rect = triggerRef.current.getBoundingClientRect()
     setPos({ top: rect.bottom + 2, left: rect.left, width: rect.width })
+    setSearch('')
+    setActiveIdx(0)
     setOpen(true)
   }
 
@@ -43,6 +54,7 @@ export default function AccountSelect({ accounts, value, onChange }: Props) {
     if (!open) return
     function handlePointerDown(e: PointerEvent) {
       if (triggerRef.current?.contains(e.target as Node)) return
+      if (dropdownRef.current?.contains(e.target as Node)) return
       setOpen(false)
       setSearch('')
     }
@@ -54,6 +66,23 @@ export default function AccountSelect({ accounts, value, onChange }: Props) {
     onChange(id)
     setOpen(false)
     setSearch('')
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.key === 'Escape') { setOpen(false); setSearch(''); return }
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setActiveIdx((i) => Math.min(i + 1, filtered.length - 1))
+      return
+    }
+    if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setActiveIdx((i) => Math.max(i - 1, 0))
+      return
+    }
+    if (e.key === 'Enter' && filtered[activeIdx]) {
+      select(filtered[activeIdx].id)
+    }
   }
 
   return (
@@ -78,6 +107,7 @@ export default function AccountSelect({ accounts, value, onChange }: Props) {
       {open &&
         createPortal(
           <div
+            ref={dropdownRef}
             style={{ top: pos.top, left: pos.left, width: Math.max(pos.width, 260) }}
             className="fixed z-[9999] bg-surface border border-rim rounded shadow-2xl flex flex-col max-h-60"
           >
@@ -87,10 +117,7 @@ export default function AccountSelect({ accounts, value, onChange }: Props) {
                 placeholder="Search accounts…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Escape') { setOpen(false); setSearch('') }
-                  if (e.key === 'Enter' && filtered.length === 1) select(filtered[0].id)
-                }}
+                onKeyDown={handleKeyDown}
                 className="w-full bg-raised border border-rim rounded px-2 py-1 text-xs text-chalk placeholder:text-ash focus:outline-none focus:border-neon"
               />
             </div>
@@ -101,13 +128,19 @@ export default function AccountSelect({ accounts, value, onChange }: Props) {
               >
                 — select —
               </button>
-              {filtered.map((a) => (
+              {filtered.map((a, i) => (
                 <button
                   key={a.id}
-                  className={`w-full text-left px-3 py-1.5 text-sm flex items-center gap-2 hover:bg-raised transition-colors cursor-pointer ${
-                    a.id === value ? 'text-neon' : 'text-chalk'
-                  }`}
+                  ref={i === activeIdx ? activeItemRef : null}
+                  onMouseEnter={() => setActiveIdx(i)}
                   onClick={() => select(a.id)}
+                  className={`w-full text-left px-3 py-1.5 text-sm flex items-center gap-2 transition-colors cursor-pointer ${
+                    i === activeIdx
+                      ? 'bg-raised text-neon'
+                      : a.id === value
+                        ? 'text-neon hover:bg-raised'
+                        : 'text-chalk hover:bg-raised'
+                  }`}
                 >
                   <span className="text-ash text-xs font-mono w-12 shrink-0">{a.number}</span>
                   <span className="truncate">{a.name}</span>
