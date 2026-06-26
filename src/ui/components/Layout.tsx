@@ -346,9 +346,7 @@ export default function Layout() {
               <NavLink to="/home" className={navLinkClass}>Home</NavLink>
 
               {/* Reorderable sections */}
-              {navOrder.map((sectionId) => {
-                const isDragOver = dragOverId === sectionId
-
+              {(() => {
                 const sectionContent: Record<NavSectionId, React.ReactNode> = {
                   ledger: (
                     <SidebarSection id="ledger" label="Ledger">
@@ -374,7 +372,8 @@ export default function Layout() {
                     </SidebarSection>
                   ),
                 }
-
+                return navOrder.map((sectionId) => {
+                const isDragOver = dragOverId === sectionId
                 return (
                   <div
                     key={sectionId}
@@ -397,7 +396,8 @@ export default function Layout() {
                     {sectionContent[sectionId]}
                   </div>
                 )
-              })}
+              })
+              })()}
             </div>
           ) : (
             <div className="flex flex-col items-center gap-1 pt-1">
