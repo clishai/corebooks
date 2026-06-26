@@ -1,6 +1,9 @@
 # Superpowers brainstorm sessions (local only, never commit)
 .superpowers/
 
+# Git worktrees (local only, never commit)
+.worktrees/
+
 # Dependencies
 node_modules/
 
