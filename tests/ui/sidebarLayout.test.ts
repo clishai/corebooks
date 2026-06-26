@@ -52,4 +52,8 @@ describe('getNavSectionOrder', () => {
     store['cb_nav_order'] = 'not-json{'
     expect(getNavSectionOrder()).toEqual(DEFAULT_NAV_ORDER)
   })
+  it('returns default on non-array valid JSON', () => {
+    store['cb_nav_order'] = '"a string"'
+    expect(getNavSectionOrder()).toEqual(DEFAULT_NAV_ORDER)
+  })
 })
