@@ -1,3 +1,6 @@
+# Superpowers brainstorm sessions (local only, never commit)
+.superpowers/
+
 # Dependencies
 node_modules/
 
