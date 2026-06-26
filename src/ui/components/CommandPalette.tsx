@@ -19,6 +19,7 @@ export default function CommandPalette({ onClose }: Props) {
   const { results, loading, error } = useSearch(query)
   const navigate = useNavigate()
   const inputRef = useRef<HTMLInputElement>(null)
+  const activeRef = useRef<HTMLLIElement>(null)
 
   useEffect(() => { inputRef.current?.focus() }, [])
   useEffect(() => { setActiveIdx(0) }, [results])
