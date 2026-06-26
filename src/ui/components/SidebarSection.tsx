@@ -1,5 +1,4 @@
-// src/ui/components/SidebarSection.tsx
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { isSectionCollapsed, toggleSectionCollapsed } from '../lib/sidebarState'
 
 interface Props {
@@ -10,6 +9,15 @@ interface Props {
 
 export default function SidebarSection({ id, label, children }: Props) {
   const [collapsed, setCollapsed] = useState(() => isSectionCollapsed(id))
+
+  useEffect(() => {
+    function handleExpand(e: Event) {
+      const detail = (e as CustomEvent<{ id: string }>).detail
+      if (detail.id === id) setCollapsed(false)
+    }
+    window.addEventListener('cb:expand-section', handleExpand)
+    return () => window.removeEventListener('cb:expand-section', handleExpand)
+  }, [id])
 
   function toggle() {
     toggleSectionCollapsed(id)

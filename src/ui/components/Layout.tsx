@@ -8,8 +8,10 @@ import AIPanel from './AIPanel'
 import OnboardingWizard, { shouldShowOnboarding, getCompanyName } from './OnboardingWizard'
 import CommandPalette from './CommandPalette'
 import SidebarSection from './SidebarSection'
-import logoSrc from '../assets/logo.png'
-import { getPinnedReports, togglePinnedReport } from '../lib/sidebarState'
+import SidebarWordmark from './SidebarWordmark'
+import SidebarCollapseToggle from './SidebarCollapseToggle'
+import { getPinnedReports, togglePinnedReport, expandSection } from '../lib/sidebarState'
+import { getSidebarWide, setSidebarWide } from '../lib/sidebarLayout'
 import { ALL_REPORTS } from '../lib/reports'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { getOllamaConfig, checkOllama, type OllamaConfig } from '../lib/ollama'
@@ -83,6 +85,16 @@ export default function Layout() {
   const [aiConfig, setAiConfig] = useState<OllamaConfig>(getOllamaConfig)
   const [ollamaConnected, setOllamaConnected] = useState<boolean | null>(null)
   const [aiPanelOpen, setAiPanelOpen] = useState(() => localStorage.getItem('cb_ai_panel_open') === 'true')
+
+  const [sidebarWide, setSidebarWideState] = useState(getSidebarWide)
+
+  function toggleSidebar() {
+    setSidebarWideState((prev) => {
+      const next = !prev
+      setSidebarWide(next)
+      return next
+    })
+  }
 
   // Vault-triggered import (pre-loaded file)
   const [vaultImportFile, setVaultImportFile] = useState<{ name: string; path: string; text: string } | null>(null)
@@ -270,48 +282,109 @@ export default function Layout() {
   return (
     <div className="flex h-screen bg-base overflow-hidden">
       {/* Sidebar */}
-      <aside className="w-52 bg-void flex flex-col shrink-0 border-r border-rim">
-        <button
-          onClick={() => navigate('/home')}
-          className="px-4 py-3 border-b border-rim w-full text-left hover:opacity-80 transition-opacity cursor-pointer"
-        >
-          <img src={logoSrc} alt="corebooks" className="w-full" />
-        </button>
+      <aside className={`sidebar-transition bg-void flex flex-col shrink-0 border-r border-rim overflow-hidden ${sidebarWide ? 'w-52' : 'w-[52px]'}`}>
+        {/* Zone 1: Logo */}
+        <SidebarWordmark wide={sidebarWide} onClick={() => navigate('/home')} />
 
-        <nav className="flex-1 py-4 px-2 overflow-y-auto space-y-1">
-          <NavLink to="/home" className={navLinkClass}>Home</NavLink>
-          <SidebarSection id="ledger" label="Ledger">
-            <NavLink to="/accounts" className={navLinkClass}>Chart of Accounts</NavLink>
-            <NavLink to="/entries" className={navLinkClass}>Entries</NavLink>
-            <NavLink to="/drafts" className={navLinkClass}>Drafts</NavLink>
-          </SidebarSection>
-          <SidebarSection id="reports" label="Reports">
-            <NavLink to="/reports" end className={navLinkClass}>Reports Library</NavLink>
-            {pinnedReportMetas.map((r) => (
-              <NavLink key={r.id} to={r.path} className={navLinkClass}>{r.label}</NavLink>
-            ))}
-          </SidebarSection>
-          <SidebarSection id="extra-workflows" label="Extra Workflows">
-            <NavLink to="/extra/bank-feed" className={navLinkClass}>Bank Feed</NavLink>
-            <NavLink to="/extra/reconciliation" className={navLinkClass}>Reconciliation</NavLink>
-            <NavLink to="/extra/recurring" className={navLinkClass}>Recurring</NavLink>
-            <NavLink to="/extra/close-period" className={navLinkClass}>Close Period</NavLink>
-          </SidebarSection>
+        {/* Zone 2: Scrollable nav */}
+        <nav className="flex-1 py-4 px-2 overflow-y-auto min-h-0">
+          {sidebarWide ? (
+            <div className="space-y-1">
+              <NavLink to="/home" className={navLinkClass}>Home</NavLink>
+              <SidebarSection id="ledger" label="Ledger">
+                <NavLink to="/accounts" className={navLinkClass}>Chart of Accounts</NavLink>
+                <NavLink to="/entries" className={navLinkClass}>Entries</NavLink>
+                <NavLink to="/drafts" className={navLinkClass}>Drafts</NavLink>
+              </SidebarSection>
+              <SidebarSection id="reports" label="Reports">
+                <NavLink to="/reports" end className={navLinkClass}>Reports Library</NavLink>
+                {pinnedReportMetas.map((r) => (
+                  <NavLink key={r.id} to={r.path} className={navLinkClass}>{r.label}</NavLink>
+                ))}
+              </SidebarSection>
+              <SidebarSection id="extra-workflows" label="Extra Workflows">
+                <NavLink to="/extra/bank-feed" className={navLinkClass}>Bank Feed</NavLink>
+                <NavLink to="/extra/reconciliation" className={navLinkClass}>Reconciliation</NavLink>
+                <NavLink to="/extra/recurring" className={navLinkClass}>Recurring</NavLink>
+                <NavLink to="/extra/close-period" className={navLinkClass}>Close Period</NavLink>
+              </SidebarSection>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center gap-1 pt-1">
+              <NavLink
+                to="/home"
+                title="Home"
+                className={({ isActive }) =>
+                  `flex items-center justify-center w-8 h-8 rounded transition-colors ${isActive ? 'text-neon bg-raised' : 'text-ash hover:text-chalk hover:bg-surface'}`
+                }
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                  <polyline points="9 22 9 12 15 12 15 22"/>
+                </svg>
+              </NavLink>
+              <div className="w-6 border-t border-rim my-1" />
+              <button
+                title="Ledger"
+                onClick={() => { expandSection('ledger'); toggleSidebar() }}
+                className="flex items-center justify-center w-8 h-8 rounded text-ash hover:text-chalk hover:bg-surface transition-colors"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/>
+                  <line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
+                </svg>
+              </button>
+              <button
+                title="Reports"
+                onClick={() => { expandSection('reports'); toggleSidebar() }}
+                className="flex items-center justify-center w-8 h-8 rounded text-ash hover:text-chalk hover:bg-surface transition-colors"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
+                </svg>
+              </button>
+              <button
+                title="Extra Workflows"
+                onClick={() => { expandSection('extra-workflows'); toggleSidebar() }}
+                className="flex items-center justify-center w-8 h-8 rounded text-ash hover:text-chalk hover:bg-surface transition-colors"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                </svg>
+              </button>
+            </div>
+          )}
         </nav>
 
-        <div className="border-t border-rim px-2 py-3">
-          <NavLink
-            to="/settings"
-            className={({ isActive }) =>
-              `settings-link flex items-center gap-0 px-3 py-2 rounded text-sm font-medium transition-colors overflow-hidden cursor-pointer ${
-                isActive ? 'bg-raised text-neon border-l-2 border-neon pl-[10px]' : 'text-ash border-l-2 border-transparent hover:bg-surface hover:text-chalk'
-              }`
-            }
-          >
-            <CogIcon />
-            <span className="settings-label ml-2.5">Settings</span>
-          </NavLink>
+        {/* Zone 3a: Pinned Settings */}
+        <div className="shrink-0 border-t border-rim px-2 py-1">
+          {sidebarWide ? (
+            <NavLink
+              to="/settings"
+              className={({ isActive }) =>
+                `settings-link flex items-center gap-0 px-3 py-2 rounded text-sm font-medium transition-colors overflow-hidden cursor-pointer ${
+                  isActive ? 'bg-raised text-neon border-l-2 border-neon pl-[10px]' : 'text-ash border-l-2 border-transparent hover:bg-surface hover:text-chalk'
+                }`
+              }
+            >
+              <CogIcon />
+              <span className="settings-label ml-2.5">Settings</span>
+            </NavLink>
+          ) : (
+            <NavLink
+              to="/settings"
+              title="Settings"
+              className={({ isActive }) =>
+                `flex items-center justify-center w-8 h-8 rounded mx-auto transition-colors ${isActive ? 'text-neon bg-raised' : 'text-ash hover:text-chalk hover:bg-surface'}`
+              }
+            >
+              <CogIcon />
+            </NavLink>
+          )}
         </div>
+
+        {/* Zone 3b: Collapse toggle */}
+        <SidebarCollapseToggle wide={sidebarWide} onToggle={toggleSidebar} />
       </aside>
 
       {/* Right column */}
