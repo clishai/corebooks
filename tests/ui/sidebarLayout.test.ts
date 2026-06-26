@@ -40,13 +40,14 @@ describe('getNavSectionOrder', () => {
   })
   it('returns stored order with appended missing sections', () => {
     saveNavSectionOrder(['reports', 'ledger'])
-    expect(getNavSectionOrder()).toEqual(['reports', 'ledger', 'workflows', 'modules'])
+    expect(getNavSectionOrder()).toEqual(['reports', 'ledger', 'extra-workflows'])
   })
   it('appends sections missing from stored order', () => {
     saveNavSectionOrder(['reports'])
     const order = getNavSectionOrder()
     expect(order[0]).toBe('reports')
     expect(order).toContain('ledger')
+    expect(order).toContain('extra-workflows')
   })
   it('returns default on corrupt JSON', () => {
     store['cb_nav_order'] = 'not-json{'

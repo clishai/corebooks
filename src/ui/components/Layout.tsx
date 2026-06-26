@@ -11,7 +11,7 @@ import SidebarSection from './SidebarSection'
 import SidebarWordmark from './SidebarWordmark'
 import SidebarCollapseToggle from './SidebarCollapseToggle'
 import { getPinnedReports, togglePinnedReport, expandSection } from '../lib/sidebarState'
-import { getSidebarWide, setSidebarWide } from '../lib/sidebarLayout'
+import { getSidebarWide, setSidebarWide, getNavSectionOrder, saveNavSectionOrder, type NavSectionId } from '../lib/sidebarLayout'
 import { ALL_REPORTS } from '../lib/reports'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { getOllamaConfig, checkOllama, type OllamaConfig } from '../lib/ollama'
@@ -94,6 +94,40 @@ export default function Layout() {
       setSidebarWide(next)
       return next
     })
+  }
+
+  const [navOrder, setNavOrder] = useState(getNavSectionOrder)
+  const [navEditMode, setNavEditMode] = useState(false)
+  const [dragOverId, setDragOverId] = useState<NavSectionId | null>(null)
+
+  function handleDragStart(e: React.DragEvent, id: NavSectionId) {
+    e.dataTransfer.setData('text/plain', id)
+    e.dataTransfer.effectAllowed = 'move'
+  }
+
+  function handleDragOver(e: React.DragEvent, id: NavSectionId) {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    setDragOverId(id)
+  }
+
+  function handleDrop(e: React.DragEvent, targetId: NavSectionId) {
+    e.preventDefault()
+    setDragOverId(null)
+    const draggedId = e.dataTransfer.getData('text/plain') as NavSectionId
+    if (draggedId === targetId) return
+    const next = [...navOrder]
+    const from = next.indexOf(draggedId)
+    const to = next.indexOf(targetId)
+    if (from === -1 || to === -1) return
+    next.splice(from, 1)
+    next.splice(to, 0, draggedId)
+    setNavOrder(next)
+    saveNavSectionOrder(next)
+  }
+
+  function handleDragEnd() {
+    setDragOverId(null)
   }
 
   // Vault-triggered import (pre-loaded file)
@@ -252,6 +286,12 @@ export default function Layout() {
     }
   }, [])
 
+  useEffect(() => {
+    function handleOpenNavEdit() { setNavEditMode(true) }
+    window.addEventListener('cb:open-nav-edit', handleOpenNavEdit)
+    return () => window.removeEventListener('cb:open-nav-edit', handleOpenNavEdit)
+  }, [])
+
   const shortcutHandlers = useMemo(() => ({
     'new-entry': () => setShowNewEntry(true),
     'go-home': () => navigate('/home'),
@@ -290,24 +330,74 @@ export default function Layout() {
         <nav className="flex-1 py-4 px-2 overflow-y-auto min-h-0">
           {sidebarWide ? (
             <div className="space-y-1">
+              {navEditMode && (
+                <div className="flex items-center justify-between px-3 py-1 mb-2 bg-violet/10 border border-violet/30 rounded text-[10px] text-violet">
+                  <span className="uppercase tracking-wider">editing nav</span>
+                  <button
+                    onClick={() => setNavEditMode(false)}
+                    className="border border-violet/40 px-2 py-0.5 rounded hover:bg-violet/20 transition-colors cursor-pointer"
+                  >
+                    Done
+                  </button>
+                </div>
+              )}
+
+              {/* Home — always first, pinned */}
               <NavLink to="/home" className={navLinkClass}>Home</NavLink>
-              <SidebarSection id="ledger" label="Ledger">
-                <NavLink to="/accounts" className={navLinkClass}>Chart of Accounts</NavLink>
-                <NavLink to="/entries" className={navLinkClass}>Entries</NavLink>
-                <NavLink to="/drafts" className={navLinkClass}>Drafts</NavLink>
-              </SidebarSection>
-              <SidebarSection id="reports" label="Reports">
-                <NavLink to="/reports" end className={navLinkClass}>Reports Library</NavLink>
-                {pinnedReportMetas.map((r) => (
-                  <NavLink key={r.id} to={r.path} className={navLinkClass}>{r.label}</NavLink>
-                ))}
-              </SidebarSection>
-              <SidebarSection id="extra-workflows" label="Extra Workflows">
-                <NavLink to="/extra/bank-feed" className={navLinkClass}>Bank Feed</NavLink>
-                <NavLink to="/extra/reconciliation" className={navLinkClass}>Reconciliation</NavLink>
-                <NavLink to="/extra/recurring" className={navLinkClass}>Recurring</NavLink>
-                <NavLink to="/extra/close-period" className={navLinkClass}>Close Period</NavLink>
-              </SidebarSection>
+
+              {/* Reorderable sections */}
+              {navOrder.map((sectionId) => {
+                const isDragOver = dragOverId === sectionId
+
+                const sectionContent: Record<NavSectionId, React.ReactNode> = {
+                  ledger: (
+                    <SidebarSection id="ledger" label="Ledger">
+                      <NavLink to="/accounts" className={navLinkClass}>Chart of Accounts</NavLink>
+                      <NavLink to="/entries" className={navLinkClass}>Entries</NavLink>
+                      <NavLink to="/drafts" className={navLinkClass}>Drafts</NavLink>
+                    </SidebarSection>
+                  ),
+                  reports: (
+                    <SidebarSection id="reports" label="Reports">
+                      <NavLink to="/reports" end className={navLinkClass}>Reports Library</NavLink>
+                      {pinnedReportMetas.map((r) => (
+                        <NavLink key={r.id} to={r.path} className={navLinkClass}>{r.label}</NavLink>
+                      ))}
+                    </SidebarSection>
+                  ),
+                  'extra-workflows': (
+                    <SidebarSection id="extra-workflows" label="Extra Workflows">
+                      <NavLink to="/extra/bank-feed" className={navLinkClass}>Bank Feed</NavLink>
+                      <NavLink to="/extra/reconciliation" className={navLinkClass}>Reconciliation</NavLink>
+                      <NavLink to="/extra/recurring" className={navLinkClass}>Recurring</NavLink>
+                      <NavLink to="/extra/close-period" className={navLinkClass}>Close Period</NavLink>
+                    </SidebarSection>
+                  ),
+                }
+
+                return (
+                  <div
+                    key={sectionId}
+                    draggable={navEditMode}
+                    onDragStart={navEditMode ? (e) => handleDragStart(e, sectionId) : undefined}
+                    onDragOver={navEditMode ? (e) => handleDragOver(e, sectionId) : undefined}
+                    onDrop={navEditMode ? (e) => handleDrop(e, sectionId) : undefined}
+                    onDragEnd={navEditMode ? handleDragEnd : undefined}
+                    className={`rounded transition-colors ${navEditMode ? 'cursor-grab border border-transparent' : ''} ${isDragOver && navEditMode ? 'border-violet/50 bg-violet/5' : ''}`}
+                  >
+                    {navEditMode && (
+                      <div className="flex items-center gap-1.5 px-3 py-1">
+                        <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" className="text-violet/50">
+                          <circle cx="9" cy="5" r="1.5"/><circle cx="15" cy="5" r="1.5"/>
+                          <circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/>
+                          <circle cx="9" cy="19" r="1.5"/><circle cx="15" cy="19" r="1.5"/>
+                        </svg>
+                      </div>
+                    )}
+                    {sectionContent[sectionId]}
+                  </div>
+                )
+              })}
             </div>
           ) : (
             <div className="flex flex-col items-center gap-1 pt-1">

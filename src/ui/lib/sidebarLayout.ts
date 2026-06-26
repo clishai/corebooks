@@ -1,6 +1,6 @@
-export type NavSectionId = 'ledger' | 'reports' | 'workflows' | 'modules'
+export type NavSectionId = 'ledger' | 'reports' | 'extra-workflows'
 
-export const DEFAULT_NAV_ORDER: NavSectionId[] = ['ledger', 'reports', 'workflows', 'modules']
+export const DEFAULT_NAV_ORDER: NavSectionId[] = ['ledger', 'reports', 'extra-workflows']
 
 const WIDE_KEY = 'cb_sidebar_wide'
 const ORDER_KEY = 'cb_nav_order'
