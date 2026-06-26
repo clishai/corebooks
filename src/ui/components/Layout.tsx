@@ -292,6 +292,14 @@ export default function Layout() {
     return () => window.removeEventListener('cb:open-nav-edit', handleOpenNavEdit)
   }, [])
 
+  useEffect(() => {
+    function handleSidebarWidthChange(e: Event) {
+      setSidebarWideState((e as CustomEvent<{ wide: boolean }>).detail.wide)
+    }
+    window.addEventListener('cb:sidebar-wide-changed', handleSidebarWidthChange)
+    return () => window.removeEventListener('cb:sidebar-wide-changed', handleSidebarWidthChange)
+  }, [])
+
   const shortcutHandlers = useMemo(() => ({
     'new-entry': () => setShowNewEntry(true),
     'go-home': () => navigate('/home'),

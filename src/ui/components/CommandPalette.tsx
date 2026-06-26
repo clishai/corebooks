@@ -24,10 +24,6 @@ export default function CommandPalette({ onClose }: Props) {
   useEffect(() => { inputRef.current?.focus() }, [])
   useEffect(() => { setActiveIdx(0) }, [results])
 
-  useEffect(() => {
-    setActiveIdx(0)
-  }, [results])
-
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === 'Escape') {
       onClose()
