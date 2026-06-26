@@ -26,6 +26,14 @@ export function isSectionCollapsed(id: SectionId): boolean {
   return getCollapsedSections().includes(id)
 }
 
+export function expandSection(id: SectionId): void {
+  const current = getCollapsedSections()
+  if (!current.includes(id)) return
+  const next = current.filter((s) => s !== id)
+  localStorage.setItem(COLLAPSED_KEY, JSON.stringify(next))
+  window.dispatchEvent(new CustomEvent('cb:expand-section', { detail: { id } }))
+}
+
 export function getPinnedReports(): string[] {
   try {
     const raw = localStorage.getItem(PINNED_KEY)
