@@ -31,6 +31,10 @@ export function isFeatureEnabled(key: keyof FeatureFlags): boolean {
   return getFeatureFlags()[key]
 }
 
+export function setFeatureEnabled(key: keyof FeatureFlags, value: boolean): void {
+  saveFeatureFlags({ ...getFeatureFlags(), [key]: value })
+}
+
 export function getBusinessType(): BusinessType | null {
   return (localStorage.getItem(BUSINESS_TYPE_KEY) as BusinessType | null)
 }
