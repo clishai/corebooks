@@ -43,5 +43,5 @@ export const SLASH_COMMANDS: SlashCommand[] = [
 export function matchSlashCommands(query: string): SlashCommand[] {
   const q = query.toLowerCase().trim()
   if (!q.startsWith('/')) return []
-  return SLASH_COMMANDS.filter((cmd) => cmd.trigger.startsWith(q))
+  return SLASH_COMMANDS.filter((cmd) => cmd.trigger.toLowerCase().startsWith(q))
 }

@@ -44,6 +44,7 @@ describe('matchSlashCommands', () => {
     const results = matchSlashCommands('/set ar-ap on')
     expect(results).toHaveLength(1)
     expect(results[0].id).toBe('set-ar-ap-on')
+    expect(results[0].action.type).toBe('setFlag')
     if (results[0].action.type === 'setFlag') {
       expect(results[0].action.key).toBe('ar_ap')
       expect(results[0].action.value).toBe(true)
