@@ -29,6 +29,9 @@ export default function CommandPalette({ onClose }: Props) {
 
   useEffect(() => { inputRef.current?.focus() }, [])
   useEffect(() => { setActiveIdx(0) }, [query])
+  useEffect(() => {
+    activeRef.current?.scrollIntoView({ block: 'nearest' })
+  }, [activeIdx])
 
   function executeSlashCommand(cmd: SlashCommand) {
     if (cmd.action.type === 'navigate') {
