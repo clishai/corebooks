@@ -293,6 +293,12 @@ export default function Layout() {
   }, [])
 
   useEffect(() => {
+    function handleOpenNewEntry() { setShowNewEntry(true) }
+    window.addEventListener('cb:open-new-entry', handleOpenNewEntry)
+    return () => window.removeEventListener('cb:open-new-entry', handleOpenNewEntry)
+  }, [])
+
+  useEffect(() => {
     function handleSidebarWidthChange(e: Event) {
       setSidebarWideState((e as CustomEvent<{ wide: boolean }>).detail.wide)
     }
