@@ -95,6 +95,12 @@ export default function CommandPalette({ onClose }: Props) {
           <kbd className="text-ash text-[10px] border border-rim rounded px-1 ml-2">Esc</kbd>
         </div>
 
+        {/* Slash mode: namespace hint when query is just "/" */}
+        {isSlashMode && query.trim() === '/' && (
+          <p className="text-ash text-[10px] px-4 pt-2 pb-1 border-b border-rim">
+            Namespaces: <span className="text-neon font-mono">/go</span> · <span className="text-neon font-mono">/new</span> · <span className="text-neon font-mono">/open</span> · <span className="text-neon font-mono">/set</span>
+          </p>
+        )}
         {/* Slash mode: command list */}
         {isSlashMode && slashMatches.length > 0 && (
           <ul className="max-h-64 overflow-y-auto py-1">
@@ -117,12 +123,7 @@ export default function CommandPalette({ onClose }: Props) {
             ))}
           </ul>
         )}
-        {isSlashMode && slashMatches.length === 0 && query.trim().length <= 1 && (
-          <p className="text-ash text-xs px-4 py-3">
-            Try <span className="text-neon font-mono">/go</span>, <span className="text-neon font-mono">/new</span>, <span className="text-neon font-mono">/open</span>, or <span className="text-neon font-mono">/set</span>
-          </p>
-        )}
-        {isSlashMode && slashMatches.length === 0 && query.trim().length > 1 && (
+        {isSlashMode && slashMatches.length === 0 && (
           <p className="text-ash text-sm px-4 py-3">No commands match &ldquo;{query}&rdquo;</p>
         )}
 
