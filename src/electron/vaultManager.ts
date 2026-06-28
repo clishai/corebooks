@@ -1,6 +1,11 @@
 import fs from 'fs'
 import path from 'path'
-import type { VaultEntry, VaultMetadata, VaultRegistry } from './vaultTypes.js'
+import type {
+  VaultEncryption,
+  VaultEntry,
+  VaultMetadata,
+  VaultRegistry,
+} from './vaultTypes.js'
 
 const SUBDIRS = ['imports', 'statements', 'receipts', 'exports']
 
@@ -33,6 +38,19 @@ export class VaultManager {
     fs.writeFileSync(this.registryPath, JSON.stringify(registry, null, 2), { mode: 0o600 })
   }
 
+  private readMetadata(vaultPath: string): VaultMetadata {
+    const metaPath = path.join(vaultPath, '.corebooks')
+    if (!fs.existsSync(metaPath)) {
+      throw new Error(`Not a corebooks vault: ${vaultPath}`)
+    }
+    return JSON.parse(fs.readFileSync(metaPath, 'utf-8')) as VaultMetadata
+  }
+
+  private writeMetadata(vaultPath: string, meta: VaultMetadata): void {
+    const metaPath = path.join(vaultPath, '.corebooks')
+    fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2), { mode: 0o600 })
+  }
+
   list(): VaultEntry[] {
     const { vaults } = this.readRegistry()
     return [...vaults].sort(
@@ -58,11 +76,7 @@ export class VaultManager {
       name: folderName,
       created: new Date().toISOString(),
     }
-    fs.writeFileSync(
-      path.join(vaultPath, '.corebooks'),
-      JSON.stringify(metadata, null, 2),
-      { mode: 0o600 },
-    )
+    this.writeMetadata(vaultPath, metadata)
 
     const entry: VaultEntry = {
       path: vaultPath,
@@ -78,12 +92,7 @@ export class VaultManager {
   }
 
   select(vaultPath: string): VaultEntry {
-    const metaPath = path.join(vaultPath, '.corebooks')
-    if (!fs.existsSync(metaPath)) {
-      throw new Error(`Not a corebooks vault: ${vaultPath}`)
-    }
-
-    const meta = JSON.parse(fs.readFileSync(metaPath, 'utf-8')) as VaultMetadata
+    const meta = this.readMetadata(vaultPath)
     const now = new Date().toISOString()
 
     const registry = this.readRegistry()
@@ -117,11 +126,10 @@ export class VaultManager {
       throw new Error('A vault with that name already exists')
     }
 
-    const metaPath = path.join(this.current.path, '.corebooks')
-    const meta = JSON.parse(fs.readFileSync(metaPath, 'utf-8')) as VaultMetadata
+    const meta = this.readMetadata(this.current.path)
     fs.renameSync(this.current.path, newPath)
     meta.name = sanitized
-    fs.writeFileSync(path.join(newPath, '.corebooks'), JSON.stringify(meta, null, 2), { mode: 0o600 })
+    this.writeMetadata(newPath, meta)
 
     const registry = this.readRegistry()
     const entry = registry.vaults.find((v) => v.path === this.current!.path)
@@ -153,5 +161,26 @@ export class VaultManager {
       registry.skipPickerUntil = until
     }
     this.writeRegistry(registry)
+  }
+
+  // ── Vault encryption metadata ──────────────────────────────────────────────
+
+  getEncryption(): VaultEncryption | null {
+    if (!this.current) return null
+    return this.readMetadata(this.current.path).encryption ?? null
+  }
+
+  setEncryption(enc: VaultEncryption): void {
+    if (!this.current) throw new Error('No vault selected')
+    const meta = this.readMetadata(this.current.path)
+    meta.encryption = enc
+    this.writeMetadata(this.current.path, meta)
+  }
+
+  removeEncryption(): void {
+    if (!this.current) throw new Error('No vault selected')
+    const meta = this.readMetadata(this.current.path)
+    delete meta.encryption
+    this.writeMetadata(this.current.path, meta)
   }
 }
