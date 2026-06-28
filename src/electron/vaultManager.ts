@@ -165,9 +165,29 @@ export class VaultManager {
 
   // ── Vault encryption metadata ──────────────────────────────────────────────
 
+  private isValidEncryption(enc: unknown): enc is VaultEncryption {
+    if (!enc || typeof enc !== 'object') return false
+    const e = enc as Record<string, unknown>
+    if (e['algorithm'] !== 'argon2id-aes256-gcm') return false
+    if (!e['argon2'] || typeof e['argon2'] !== 'object') return false
+    const slots = e['slots'] as Record<string, unknown> | undefined
+    if (!slots) return false
+    for (const slotKey of ['password', 'recovery'] as const) {
+      const slot = slots[slotKey]
+      if (!slot || typeof slot !== 'object') return false
+      const s = slot as Record<string, unknown>
+      if (typeof s['salt'] !== 'string') return false
+      if (typeof s['iv'] !== 'string') return false
+      if (typeof s['ct'] !== 'string') return false
+    }
+    return true
+  }
+
   getEncryption(): VaultEncryption | null {
     if (!this.current) return null
-    return this.readMetadata(this.current.path).encryption ?? null
+    const enc = this.readMetadata(this.current.path).encryption
+    if (!this.isValidEncryption(enc)) return null
+    return enc
   }
 
   setEncryption(enc: VaultEncryption): void {
@@ -180,6 +200,7 @@ export class VaultManager {
   removeEncryption(): void {
     if (!this.current) throw new Error('No vault selected')
     const meta = this.readMetadata(this.current.path)
+    if (!meta.encryption) return
     delete meta.encryption
     this.writeMetadata(this.current.path, meta)
   }
