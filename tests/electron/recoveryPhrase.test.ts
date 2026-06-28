@@ -53,8 +53,11 @@ describe('recoveryPhraseToEntropy', () => {
   })
 
   it('throws on a phrase with a bad checksum', () => {
+    // Corrupt an interior word — the checksum (encoded in the last word) will
+    // no longer match the entropy, so validateMnemonic must reject it.
     const phrase = generateRecoveryPhrase()
-    phrase[11] = phrase[11] === 'abandon' ? 'ability' : 'abandon'
+    // Replace position 0 with 'zoo' (valid BIP-39 word, but changes entropy so checksum breaks)
+    phrase[0] = phrase[0] === 'zoo' ? 'zone' : 'zoo'
     expect(() => recoveryPhraseToEntropy(phrase)).toThrow(/Invalid BIP-39 phrase/)
   })
 })

@@ -7,7 +7,7 @@ export function generateRecoveryPhrase(): string[] {
 
 export function recoveryPhraseToEntropy(words: string[]): Buffer {
   const mnemonic = words.join(' ')
-  if (!validateMnemonic(mnemonic, wordlist)) {
+  if (words.length !== 12 || !validateMnemonic(mnemonic, wordlist)) {
     throw new Error('Invalid BIP-39 phrase')
   }
   return Buffer.from(mnemonicToEntropy(mnemonic, wordlist))
