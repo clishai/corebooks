@@ -113,6 +113,7 @@ export function isFeatureActive(id: string): boolean {
 
 export function enableFeature(id: string): void {
   const statuses = getFeatureStatuses()
+  if (statuses[id] === 'enabled') return
   const wasHidden = statuses[id] === 'hidden'
   statuses[id] = 'enabled'
   saveFeatureStatuses(statuses)

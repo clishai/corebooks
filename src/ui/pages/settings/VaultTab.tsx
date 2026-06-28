@@ -307,8 +307,8 @@ export default function VaultTab() {
             {log.length === 0 ? (
               <p className="px-5 py-4 text-sm text-ash">No feature changes recorded yet.</p>
             ) : (
-              [...log].reverse().map((entry, i) => (
-                <div key={i} className="flex items-center justify-between px-5 py-3">
+              [...log].reverse().map((entry) => (
+                <div key={`${entry.featureId}-${entry.event}-${entry.timestamp}`} className="flex items-center justify-between px-5 py-3">
                   <div>
                     <span className="text-sm text-chalk">{entry.featureName}</span>
                     <span className="text-xs text-ash ml-2">
