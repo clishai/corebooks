@@ -17,6 +17,7 @@ import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { getOllamaConfig, checkOllama, type OllamaConfig } from '../lib/ollama'
 import { formatBinding, getShortcuts } from '../lib/shortcuts'
 import ImportModal from './ImportModal'
+import { isFeatureActive } from '../lib/features'
 
 function CogIcon() {
   return (
@@ -87,6 +88,8 @@ export default function Layout() {
   const [aiPanelOpen, setAiPanelOpen] = useState(() => localStorage.getItem('cb_ai_panel_open') === 'true')
 
   const [sidebarWide, setSidebarWideState] = useState(getSidebarWide)
+  const [featureVersion, setFeatureVersion] = useState(0)
+  void featureVersion
 
   function toggleSidebar() {
     setSidebarWideState((prev) => {
@@ -306,6 +309,12 @@ export default function Layout() {
     return () => window.removeEventListener('cb:sidebar-wide-changed', handleSidebarWidthChange)
   }, [])
 
+  useEffect(() => {
+    function handleFeatureChange() { setFeatureVersion((v) => v + 1) }
+    window.addEventListener('cb:feature-state-changed', handleFeatureChange)
+    return () => window.removeEventListener('cb:feature-state-changed', handleFeatureChange)
+  }, [])
+
   const shortcutHandlers = useMemo(() => ({
     'new-entry': () => setShowNewEntry(true),
     'go-home': () => navigate('/home'),
@@ -377,14 +386,22 @@ export default function Layout() {
                       ))}
                     </SidebarSection>
                   ),
-                  'extra-workflows': (
-                    <SidebarSection id="extra-workflows" label="Extra Workflows">
-                      <NavLink to="/extra/bank-feed" className={navLinkClass}>Bank Feed</NavLink>
-                      <NavLink to="/extra/reconciliation" className={navLinkClass}>Reconciliation</NavLink>
-                      <NavLink to="/extra/recurring" className={navLinkClass}>Recurring</NavLink>
-                      <NavLink to="/extra/close-period" className={navLinkClass}>Close Period</NavLink>
-                    </SidebarSection>
-                  ),
+                  'extra-workflows': (() => {
+                    const workflowLinks = [
+                      { id: 'bank-feed',      to: '/extra/bank-feed',      label: 'Bank Feed' },
+                      { id: 'reconciliation', to: '/extra/reconciliation', label: 'Reconciliation' },
+                      { id: 'recurring',      to: '/extra/recurring',      label: 'Recurring' },
+                      { id: 'close-period',   to: '/extra/close-period',   label: 'Close Period' },
+                    ].filter((w) => isFeatureActive(w.id))
+                    if (workflowLinks.length === 0) return null
+                    return (
+                      <SidebarSection id="extra-workflows" label="Extra Workflows">
+                        {workflowLinks.map((w) => (
+                          <NavLink key={w.id} to={w.to} className={navLinkClass}>{w.label}</NavLink>
+                        ))}
+                      </SidebarSection>
+                    )
+                  })(),
                 }
                 return navOrder.map((sectionId) => {
                 const isDragOver = dragOverId === sectionId
@@ -447,15 +464,17 @@ export default function Layout() {
                   <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
                 </svg>
               </button>
-              <button
-                title="Extra Workflows"
-                onClick={() => { expandSection('extra-workflows'); toggleSidebar() }}
-                className="flex items-center justify-center w-8 h-8 rounded text-ash hover:text-chalk hover:bg-surface transition-colors"
-              >
-                <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
-                </svg>
-              </button>
+              {['bank-feed', 'reconciliation', 'recurring', 'close-period'].some((id) => isFeatureActive(id)) && (
+                <button
+                  title="Extra Workflows"
+                  onClick={() => { expandSection('extra-workflows'); toggleSidebar() }}
+                  className="flex items-center justify-center w-8 h-8 rounded text-ash hover:text-chalk hover:bg-surface transition-colors"
+                >
+                  <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                  </svg>
+                </button>
+              )}
             </div>
           )}
         </nav>
