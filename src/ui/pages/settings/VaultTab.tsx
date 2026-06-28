@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { getLifecycleLog, type LifecycleEvent } from '../../lib/features'
 
 interface VaultFile {
   folder: string
@@ -65,6 +66,9 @@ export default function VaultTab() {
   const [files, setFiles] = useState<VaultFile[]>([])
   const [loadingFiles, setLoadingFiles] = useState(false)
   const [moveTarget, setMoveTarget] = useState<Record<string, string>>({})
+  const [fileError, setFileError] = useState<string | null>(null)
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const [log, setLog] = useState<LifecycleEvent[]>([])
 
   useEffect(() => {
     if (!filesOpen || !vault) return
@@ -83,6 +87,10 @@ export default function VaultTab() {
     window.addEventListener('cb:vault-imports-changed', refresh)
     return () => window.removeEventListener('cb:vault-imports-changed', refresh)
   }, [filesOpen])
+
+  useEffect(() => {
+    if (historyOpen) setLog(getLifecycleLog())
+  }, [historyOpen])
 
   if (!vault || !state) {
     return (
@@ -121,16 +129,26 @@ export default function VaultTab() {
   async function handleMove(file: VaultFile) {
     const target = moveTarget[file.path]
     if (!target || target === file.folder) return
-    await vault!.moveFile(file.path, target)
-    const updated = await vault!.listVaultFiles()
-    setFiles(updated)
-    setMoveTarget((prev) => { const next = { ...prev }; delete next[file.path]; return next })
+    setFileError(null)
+    try {
+      await vault!.moveFile(file.path, target)
+      const updated = await vault!.listVaultFiles()
+      setFiles(updated)
+      setMoveTarget((prev) => { const next = { ...prev }; delete next[file.path]; return next })
+    } catch (e) {
+      setFileError(e instanceof Error ? e.message : 'Failed to move file')
+    }
   }
 
   async function handleDelete(file: VaultFile) {
     if (!confirm(`Delete ${file.name}? This cannot be undone.`)) return
-    await vault!.deleteFile(file.path)
-    setFiles((prev) => prev.filter((f) => f.path !== file.path))
+    setFileError(null)
+    try {
+      await vault!.deleteFile(file.path)
+      setFiles((prev) => prev.filter((f) => f.path !== file.path))
+    } catch (e) {
+      setFileError(e instanceof Error ? e.message : 'Failed to delete file')
+    }
   }
 
   function handleImportFile(file: VaultFile) {
@@ -204,6 +222,9 @@ export default function VaultTab() {
           Vault contents
         </button>
 
+        {filesOpen && fileError && (
+          <p className="mt-2 text-xs text-red-400">{fileError}</p>
+        )}
         {filesOpen && (
           <div className="mt-3 bg-surface border border-rim rounded-lg divide-y divide-rim">
             {loadingFiles ? (
@@ -267,6 +288,44 @@ export default function VaultTab() {
                   </div>
                 )
               })
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Feature history */}
+      <div>
+        <button
+          onClick={() => setHistoryOpen((v) => !v)}
+          className="flex items-center gap-2 text-sm font-semibold text-chalk hover:text-neon transition-colors cursor-pointer"
+        >
+          <span>{historyOpen ? '▾' : '▸'}</span>
+          Feature history
+        </button>
+        {historyOpen && (
+          <div className="mt-3 bg-surface border border-rim rounded-lg divide-y divide-rim">
+            {log.length === 0 ? (
+              <p className="px-5 py-4 text-sm text-ash">No feature changes recorded yet.</p>
+            ) : (
+              [...log].reverse().map((entry, i) => (
+                <div key={i} className="flex items-center justify-between px-5 py-3">
+                  <div>
+                    <span className="text-sm text-chalk">{entry.featureName}</span>
+                    <span className="text-xs text-ash ml-2">
+                      {entry.event === 'enabled' ? 'Enabled'
+                        : entry.event === 'hidden' ? 'Hidden'
+                        : 'Re-enabled'}
+                    </span>
+                  </div>
+                  <span className="text-xs text-ash font-mono">
+                    {new Date(entry.timestamp).toLocaleDateString('en-US', {
+                      year: 'numeric',
+                      month: 'short',
+                      day: 'numeric',
+                    })}
+                  </span>
+                </div>
+              ))
             )}
           </div>
         )}
