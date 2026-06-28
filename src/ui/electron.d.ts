@@ -40,6 +40,8 @@ declare global {
         onFileAdded: (cb: (event: FileAddedEvent) => void) => () => void
         onFileRemoved: (cb: (event: { path: string }) => void) => () => void
         safeStorageAvailable: () => Promise<boolean>
+        setSkipUntil: (until: string | null) => Promise<void>
+        getSkipUntil: () => Promise<string | null>
       }
       ollama: {
         start: () => Promise<boolean>

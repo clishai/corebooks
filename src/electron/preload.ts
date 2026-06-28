@@ -50,6 +50,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       return () => ipcRenderer.removeListener('vault:file-removed', listener)
     },
     safeStorageAvailable: () => ipcRenderer.invoke('vault:safeStorageAvailable'),
+    setSkipUntil: (until: string | null) => ipcRenderer.invoke('vault:setSkipUntil', until),
+    getSkipUntil: () => ipcRenderer.invoke('vault:getSkipUntil'),
   },
   ollama: {
     start: () => ipcRenderer.invoke('ollama:start'),

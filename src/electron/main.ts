@@ -18,6 +18,7 @@ let currentApiPort: number | null = null
 let mainWindow: BrowserWindow | null = null
 let vaultManager: VaultManager
 const vaultWatcher = new VaultWatcher()
+let recurringIntervalId: ReturnType<typeof setInterval> | null = null
 
 function findFreePort(): Promise<number> {
   return new Promise((resolve, reject) => {
@@ -132,8 +133,9 @@ async function startApiForVault(vaultPath: string): Promise<number> {
       console.error('[recurring] check failed:', err)
     }
   }
+  if (recurringIntervalId !== null) clearInterval(recurringIntervalId)
   checkRecurring()
-  setInterval(checkRecurring, 24 * 60 * 60 * 1000)
+  recurringIntervalId = setInterval(checkRecurring, 24 * 60 * 60 * 1000)
 
   return port
 }
@@ -210,8 +212,17 @@ function registerIpc(): void {
   // Required because the Prisma client singleton can't be re-pointed to a
   // different database within the same process.
   ipcMain.handle('vault:relaunch', () => {
+    vaultManager.setSkipPickerUntil(null)
     app.relaunch()
     app.exit(0)
+  })
+
+  ipcMain.handle('vault:setSkipUntil', (_event, until: string | null) => {
+    vaultManager.setSkipPickerUntil(until)
+  })
+
+  ipcMain.handle('vault:getSkipUntil', () => {
+    return vaultManager.getSkipPickerUntil()
   })
 
   // ── Vault file operations ────────────────────────────────────────────────────
@@ -304,7 +315,32 @@ app.whenReady().then(async () => {
   vaultManager = new VaultManager(userData)
 
   registerIpc()
+
+  // If the user requested "skip picker for 30 days", auto-select the last vault
+  // before creating the window. This means the preload's sendSync('vault:getState')
+  // will see a non-null apiPort, so VaultGate renders the app directly.
+  const skipUntil = vaultManager.getSkipPickerUntil()
+  if (skipUntil && new Date(skipUntil) > new Date()) {
+    const knownVaults = vaultManager.list()
+    if (knownVaults.length > 0) {
+      try {
+        vaultManager.select(knownVaults[0].path)
+        currentApiPort = await startApiForVault(knownVaults[0].path)
+      } catch {
+        // Vault unavailable (moved or deleted) — fall through to show picker
+        currentApiPort = null
+      }
+    }
+  }
+
   await createWindow()
+
+  // If a vault was auto-selected above, mainWindow now exists but the file
+  // watcher was not started (mainWindow was null during startApiForVault).
+  // Start it now.
+  if (currentApiPort !== null && vaultManager.getCurrent() && mainWindow) {
+    vaultWatcher.start(vaultManager.getCurrent()!.path, mainWindow)
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
