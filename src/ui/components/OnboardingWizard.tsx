@@ -71,9 +71,7 @@ export default function OnboardingWizard({ onDismiss }: Props) {
   }
 
   function handleTypeNext() {
-    const bt = businessTypeUI ? BUSINESS_TYPE_MAP[businessTypeUI] : 'other'
-    const templates = getTemplatesForBusinessType(bt).slice(0, 12)
-    setSelectedTemplates(new Set(templates.map((t) => t.number)))
+    setSelectedTemplates(new Set(suggestedTemplates.map((t) => t.number)))
     setStep('accounts')
   }
 
