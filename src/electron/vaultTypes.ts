@@ -18,4 +18,5 @@ export interface VaultMetadata {
 
 export interface VaultRegistry {
   vaults: VaultEntry[]
+  skipPickerUntil?: string // ISO 8601 — if in future, auto-open last vault on startup
 }

@@ -140,4 +140,18 @@ export class VaultManager {
     registry.vaults = registry.vaults.filter((v) => v.path !== vaultPath)
     this.writeRegistry(registry)
   }
+
+  getSkipPickerUntil(): string | null {
+    return this.readRegistry().skipPickerUntil ?? null
+  }
+
+  setSkipPickerUntil(until: string | null): void {
+    const registry = this.readRegistry()
+    if (until === null) {
+      delete registry.skipPickerUntil
+    } else {
+      registry.skipPickerUntil = until
+    }
+    this.writeRegistry(registry)
+  }
 }
