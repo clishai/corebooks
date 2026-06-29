@@ -1,4 +1,6 @@
-import Database from 'better-sqlite3';
+import type Database from 'better-sqlite3-multiple-ciphers';
+
+type Db = InstanceType<typeof Database>;
 
 const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS "Account" (
@@ -59,10 +61,8 @@ CREATE TABLE IF NOT EXISTS "RecurringLine" (
 );
 `;
 
-export function ensureSchema(dbPath: string): void {
-  const db = new Database(dbPath);
-  try {
-    db.exec(SCHEMA_SQL);
+export function ensureSchema(db: Db): void {
+  db.exec(SCHEMA_SQL);
     // Idempotent column migrations for databases created before this column existed.
     const cols = (db.prepare('PRAGMA table_info(Account)').all() as { name: string }[]).map(c => c.name);
     if (!cols.includes('classification')) {
@@ -83,8 +83,5 @@ export function ensureSchema(dbPath: string): void {
     db.exec(`CREATE TABLE IF NOT EXISTS "ReconciliationSession" ("id" TEXT NOT NULL PRIMARY KEY, "accountId" TEXT NOT NULL, "statementDate" DATETIME NOT NULL, "endingBalance" INTEGER NOT NULL, "status" TEXT NOT NULL DEFAULT 'open', "notes" TEXT, "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)`);
     db.exec(`CREATE TABLE IF NOT EXISTS "ReconciliationItem" ("id" TEXT NOT NULL PRIMARY KEY, "sessionId" TEXT NOT NULL, "entryId" TEXT NOT NULL, "cleared" BOOLEAN NOT NULL DEFAULT 0, FOREIGN KEY ("sessionId") REFERENCES "ReconciliationSession"("id") ON DELETE CASCADE)`);
     db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS "ReconciliationItem_sessionId_entryId_key" ON "ReconciliationItem"("sessionId", "entryId")`);
-    db.exec(`CREATE TABLE IF NOT EXISTS "PluginCategory" ("id" TEXT NOT NULL PRIMARY KEY, "name" TEXT NOT NULL, "description" TEXT NOT NULL, "permissions" TEXT NOT NULL, "enabled" BOOLEAN NOT NULL DEFAULT 0, "builtIn" BOOLEAN NOT NULL DEFAULT 1, "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)`);
-  } finally {
-    db.close();
-  }
+  db.exec(`CREATE TABLE IF NOT EXISTS "PluginCategory" ("id" TEXT NOT NULL PRIMARY KEY, "name" TEXT NOT NULL, "description" TEXT NOT NULL, "permissions" TEXT NOT NULL, "enabled" BOOLEAN NOT NULL DEFAULT 0, "builtIn" BOOLEAN NOT NULL DEFAULT 1, "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)`);
 }

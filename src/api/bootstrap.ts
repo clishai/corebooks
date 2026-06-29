@@ -6,6 +6,7 @@ import { listAccounts } from '../db/repositories/accountRepository.js';
 import { disconnectPrisma } from '../db/client.js';
 import { buildApp } from './server.js';
 import { ensureSchema } from '../db/ensureSchema.js';
+import { openDatabase } from '../db/openDatabase.js';
 
 // Module-level ledger reference — populated by startServer() so that
 // callers (e.g. the Electron main process recurring check) can access it
@@ -17,7 +18,12 @@ export async function startServer(port: number): Promise<void> {
   if (!rawUrl.startsWith('postgresql://') && !rawUrl.startsWith('postgres://')) {
     const filePath = rawUrl.startsWith('file:') ? rawUrl.slice(5) : rawUrl;
     const dbPath = path.isAbsolute(filePath) ? filePath : path.resolve(process.cwd(), filePath);
-    ensureSchema(dbPath);
+    const schemaDb = openDatabase(dbPath, process.env['COREBOOKS_DB_KEY'] ?? '');
+    try {
+      ensureSchema(schemaDb);
+    } finally {
+      schemaDb.close();
+    }
   }
 
   const [loadedLedger, chartOfAccounts] = await Promise.all([
