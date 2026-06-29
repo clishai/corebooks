@@ -32,6 +32,8 @@ The vault password protects the key slots stored in `.corebooks` and gates the e
 
 12 BIP-39 words (128 bits of entropy). Generated using a cryptographically secure random number generator. The phrase is shown once and never stored by the app. Write it on paper and keep it physically separate from your computer.
 
+> The recovery phrase format is directly inspired by [BIP-39](https://github.com/bitcoin/bips/blob/master/bip-0039.mediawiki), the Bitcoin Improvement Proposal that standardised mnemonic seed phrases for cryptocurrency wallets. We liked the idea so much we borrowed it for accounting.
+
 ## Export encryption
 
 Exported files are encrypted with AES-256-GCM using a per-export key derived via Argon2id (same parameters as vault key derivation). The output envelope records the algorithm and KDF parameters in plaintext so decryption tools can verify them.
