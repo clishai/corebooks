@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { VaultEntry } from '../../electron/vaultTypes'
+import { UnlockVaultModal } from '../components/UnlockVaultModal'
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', {
@@ -19,6 +20,7 @@ export default function VaultPickerPage() {
   const [opening, setOpening] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [skipFor30Days, setSkipFor30Days] = useState(false)
+  const [unlockVault, setUnlockVault] = useState<{ name: string; path: string } | null>(null)
 
   useEffect(() => {
     window.electronAPI?.vault.list().then((list) => {
@@ -42,12 +44,17 @@ export default function VaultPickerPage() {
           new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
         )
       }
-      await window.electronAPI?.vault.select(vaultPath)
+      const result = await window.electronAPI?.vault.select(vaultPath)
+      if (result?.needsPassword) {
+        const vault = vaults.find((v) => v.path === vaultPath)
+        setUnlockVault({ name: vault?.name ?? vaultPath, path: vaultPath })
+        return // Don't proceed — show unlock modal
+      }
       // vault:ready fires → onReady callback → window.location.reload()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to open vault')
     }
-  }, [skipFor30Days])
+  }, [skipFor30Days, vaults])
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -264,6 +271,21 @@ export default function VaultPickerPage() {
           </p>
         )}
       </div>
+
+      {unlockVault && (
+        <UnlockVaultModal
+          vaultName={unlockVault.name}
+          onSuccess={() => {
+            setUnlockVault(null)
+            // vault:ready will fire and the app will transition automatically
+          }}
+          onCancel={() => {
+            setUnlockVault(null)
+            setSelectedPath(null)
+            setError(null)
+          }}
+        />
+      )}
     </div>
   )
 }
