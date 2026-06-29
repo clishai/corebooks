@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
 import { getLifecycleLog, type LifecycleEvent } from '../../lib/features'
+import VaultPasswordSetup from '../../components/VaultPasswordSetup'
+import VaultRecoverModal from '../../components/VaultRecoverModal'
 
 interface VaultFile {
   folder: string
@@ -69,6 +71,22 @@ export default function VaultTab() {
   const [fileError, setFileError] = useState<string | null>(null)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [log, setLog] = useState<LifecycleEvent[]>([])
+  const [encrypted, setEncrypted] = useState<boolean>(false)
+  const [setupOpen, setSetupOpen] = useState(false)
+  const [recoverOpen, setRecoverOpen] = useState(false)
+  const [changeOpen, setChangeOpen] = useState(false)
+  const [regenOpen, setRegenOpen] = useState(false)
+  const [removeOpen, setRemoveOpen] = useState(false)
+  const [regeneratedPhrase, setRegeneratedPhrase] = useState<string[] | null>(null)
+
+  useEffect(() => {
+    if (!vault) return
+    vault.getEncryptionStatus().then((s) => setEncrypted(s.encrypted)).catch(() => {})
+  }, [])
+
+  function refreshStatus(): void {
+    vault?.getEncryptionStatus().then((s) => setEncrypted(s.encrypted)).catch(() => {})
+  }
 
   useEffect(() => {
     if (!filesOpen || !vault) return
@@ -209,6 +227,95 @@ export default function VaultTab() {
         </button>
       </div>
 
+      {/* Vault password */}
+      <div>
+        <h3 className="text-sm font-semibold text-chalk mb-2">Vault password</h3>
+        {encrypted ? (
+          <>
+            <p className="text-sm text-ash mb-3">
+              Vault key is protected by your password. Full database encryption (SQLCipher) is
+              pending a future update — for now, the password gates exports and protects the
+              vault key inside <code className="text-xs bg-raised px-1.5 py-0.5 rounded">.corebooks</code>.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setChangeOpen(true)}
+                className="px-3 py-1.5 bg-raised border border-rim rounded text-xs text-ash hover:text-chalk hover:border-neon/50 transition-colors cursor-pointer"
+              >
+                Change password
+              </button>
+              <button
+                onClick={() => setRegenOpen(true)}
+                className="px-3 py-1.5 bg-raised border border-rim rounded text-xs text-ash hover:text-chalk hover:border-neon/50 transition-colors cursor-pointer"
+              >
+                Regenerate recovery phrase
+              </button>
+              <button
+                onClick={() => setRemoveOpen(true)}
+                className="px-3 py-1.5 bg-raised border border-rim rounded text-xs text-ash hover:text-red-400 hover:border-red-500/50 transition-colors cursor-pointer"
+              >
+                Remove encryption
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="text-sm text-ash mb-3">
+              This vault is unencrypted — data is protected by your OS file permissions only.
+              Set a password to enable strong encryption and require it on every open and export.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setSetupOpen(true)}
+                className="px-3 py-1.5 bg-neon hover:bg-neon-dim text-void text-xs font-semibold rounded transition-colors cursor-pointer"
+              >
+                Set vault password
+              </button>
+              <button
+                onClick={() => setRecoverOpen(true)}
+                className="px-3 py-1.5 bg-raised border border-rim rounded text-xs text-ash hover:text-chalk hover:border-neon/50 transition-colors cursor-pointer"
+              >
+                Recover with 12-word phrase
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+
+      {setupOpen && (
+        <VaultPasswordSetup
+          onComplete={() => { setSetupOpen(false); refreshStatus() }}
+          onCancel={() => setSetupOpen(false)}
+        />
+      )}
+      {recoverOpen && (
+        <VaultRecoverModal
+          onComplete={() => { setRecoverOpen(false); refreshStatus() }}
+          onCancel={() => setRecoverOpen(false)}
+        />
+      )}
+      {changeOpen && (
+        <ChangePasswordModal
+          onComplete={() => setChangeOpen(false)}
+          onCancel={() => setChangeOpen(false)}
+        />
+      )}
+      {regenOpen && (
+        <RegenerateRecoveryModal
+          onComplete={(phrase) => { setRegenOpen(false); setRegeneratedPhrase(phrase) }}
+          onCancel={() => setRegenOpen(false)}
+        />
+      )}
+      {regeneratedPhrase && (
+        <DisplayPhraseModal phrase={regeneratedPhrase} onClose={() => setRegeneratedPhrase(null)} />
+      )}
+      {removeOpen && (
+        <RemoveEncryptionModal
+          onComplete={() => { setRemoveOpen(false); refreshStatus() }}
+          onCancel={() => setRemoveOpen(false)}
+        />
+      )}
+
       {/* safeStorage warning */}
       <SafeStorageWarning />
 
@@ -329,6 +436,220 @@ export default function VaultTab() {
             )}
           </div>
         )}
+      </div>
+    </div>
+  )
+}
+
+interface SimpleModalProps {
+  onComplete: () => void
+  onCancel: () => void
+}
+
+function ChangePasswordModal({ onComplete, onCancel }: SimpleModalProps) {
+  const vault = window.electronAPI?.vault
+  const [oldPassword, setOldPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirm, setConfirm] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const valid = newPassword.length >= 8 && newPassword === confirm && oldPassword.length > 0
+
+  async function handleSubmit() {
+    if (!vault || !valid) return
+    setSubmitting(true); setError(null)
+    try {
+      const ok = await vault.verifyPassword(oldPassword)
+      if (!ok) throw new Error('Current password is incorrect')
+      await vault.changePassword(oldPassword, newPassword)
+      onComplete()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to change password')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-void/80 backdrop-blur-sm flex items-center justify-center z-50 p-6">
+      <div className="bg-surface border border-rim rounded-lg w-full max-w-md">
+        <div className="px-6 py-4 border-b border-rim flex items-center justify-between">
+          <h2 className="text-base font-semibold text-chalk">Change password</h2>
+          <button onClick={onCancel} className="text-ash hover:text-chalk text-sm cursor-pointer">Cancel</button>
+        </div>
+        <div className="px-6 py-6 space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-chalk mb-1">Current password</label>
+            <input type="password" value={oldPassword} onChange={(e) => setOldPassword(e.target.value)} autoFocus autoComplete="current-password"
+              className="w-full bg-raised border border-rim rounded px-3 py-2 text-sm text-chalk focus:outline-none focus:border-neon/50" />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-chalk mb-1">New password (min. 8 characters)</label>
+            <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} autoComplete="new-password"
+              className="w-full bg-raised border border-rim rounded px-3 py-2 text-sm text-chalk focus:outline-none focus:border-neon/50" />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-chalk mb-1">Confirm new password</label>
+            <input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} autoComplete="new-password"
+              className="w-full bg-raised border border-rim rounded px-3 py-2 text-sm text-chalk focus:outline-none focus:border-neon/50" />
+          </div>
+          {error && <p className="text-xs text-red-400">{error}</p>}
+          <div className="flex justify-end">
+            <button onClick={() => void handleSubmit()} disabled={!valid || submitting}
+              className="px-4 py-2 bg-neon hover:bg-neon-dim text-void text-sm font-semibold rounded transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
+              {submitting ? 'Changing…' : 'Change password'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+interface RegenerateRecoveryModalProps {
+  onComplete: (phrase: string[]) => void
+  onCancel: () => void
+}
+
+function RegenerateRecoveryModal({ onComplete, onCancel }: RegenerateRecoveryModalProps) {
+  const vault = window.electronAPI?.vault
+  const [password, setPassword] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function handleSubmit() {
+    if (!vault) return
+    setSubmitting(true); setError(null)
+    try {
+      const ok = await vault.verifyPassword(password)
+      if (!ok) throw new Error('Password is incorrect')
+      const result = await vault.regenerateRecovery(password)
+      onComplete(result.phraseWords)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to regenerate phrase')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-void/80 backdrop-blur-sm flex items-center justify-center z-50 p-6">
+      <div className="bg-surface border border-rim rounded-lg w-full max-w-md">
+        <div className="px-6 py-4 border-b border-rim flex items-center justify-between">
+          <h2 className="text-base font-semibold text-chalk">Regenerate recovery phrase</h2>
+          <button onClick={onCancel} className="text-ash hover:text-chalk text-sm cursor-pointer">Cancel</button>
+        </div>
+        <div className="px-6 py-6 space-y-4">
+          <div className="bg-amber-950/40 border border-amber-700 rounded-lg px-4 py-3">
+            <p className="text-sm text-amber-300 font-medium">Warning</p>
+            <p className="text-xs text-amber-200/80 mt-1">
+              Your old 12-word phrase will stop working immediately. Make sure to write down the new
+              phrase and destroy the old one.
+            </p>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-chalk mb-1">Current password</label>
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoFocus autoComplete="current-password"
+              className="w-full bg-raised border border-rim rounded px-3 py-2 text-sm text-chalk focus:outline-none focus:border-neon/50" />
+          </div>
+          {error && <p className="text-xs text-red-400">{error}</p>}
+          <div className="flex justify-end">
+            <button onClick={() => void handleSubmit()} disabled={!password || submitting}
+              className="px-4 py-2 bg-neon hover:bg-neon-dim text-void text-sm font-semibold rounded transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
+              {submitting ? 'Generating…' : 'Generate new phrase'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function DisplayPhraseModal({ phrase, onClose }: { phrase: string[]; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 bg-void/80 backdrop-blur-sm flex items-center justify-center z-50 p-6">
+      <div className="bg-surface border border-rim rounded-lg w-full max-w-2xl">
+        <div className="px-6 py-4 border-b border-rim">
+          <h2 className="text-base font-semibold text-chalk">New recovery phrase</h2>
+        </div>
+        <div className="px-6 py-6 space-y-4">
+          <div className="bg-emerald-950/40 border border-emerald-700 rounded-lg px-4 py-3">
+            <p className="text-sm text-emerald-300 font-medium">Write this on paper right now.</p>
+            <p className="text-xs text-emerald-200/80 mt-1">Do not screenshot. Your old phrase no longer works.</p>
+          </div>
+          <div
+            className="grid grid-cols-3 gap-2"
+            onCopy={(e) => e.preventDefault()}
+            onCut={(e) => e.preventDefault()}
+            style={{ userSelect: 'none' }}
+          >
+            {phrase.map((word, i) => (
+              <div key={i} className="flex items-center gap-2 bg-raised border border-rim rounded px-3 py-2">
+                <span className="text-xs text-ash font-mono w-5 text-right">{i + 1}.</span>
+                <span className="text-sm text-chalk font-mono">{word}</span>
+              </div>
+            ))}
+          </div>
+          <div className="flex justify-end">
+            <button onClick={onClose}
+              className="px-4 py-2 bg-neon hover:bg-neon-dim text-void text-sm font-semibold rounded transition-colors cursor-pointer">
+              I've written it down
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function RemoveEncryptionModal({ onComplete, onCancel }: SimpleModalProps) {
+  const vault = window.electronAPI?.vault
+  const [password, setPassword] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function handleSubmit() {
+    if (!vault || !password) return
+    setSubmitting(true); setError(null)
+    try {
+      await vault.removeEncryption(password)
+      onComplete()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to remove encryption')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-void/80 backdrop-blur-sm flex items-center justify-center z-50 p-6">
+      <div className="bg-surface border border-rim rounded-lg w-full max-w-md">
+        <div className="px-6 py-4 border-b border-rim flex items-center justify-between">
+          <h2 className="text-base font-semibold text-chalk">Remove encryption</h2>
+          <button onClick={onCancel} className="text-ash hover:text-chalk text-sm cursor-pointer">Cancel</button>
+        </div>
+        <div className="px-6 py-6 space-y-4">
+          <div className="bg-red-950/40 border border-red-700 rounded-lg px-4 py-3">
+            <p className="text-sm text-red-300 font-medium">This removes password protection.</p>
+            <p className="text-xs text-red-200/80 mt-1">
+              The vault key wrap and recovery phrase are deleted from
+              <code className="text-xs bg-raised px-1 py-0.5 rounded ml-1">.corebooks</code>.
+              The vault is again protected only by OS file permissions.
+            </p>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-chalk mb-1">Current password</label>
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoFocus autoComplete="current-password"
+              className="w-full bg-raised border border-rim rounded px-3 py-2 text-sm text-chalk focus:outline-none focus:border-neon/50" />
+          </div>
+          {error && <p className="text-xs text-red-400">{error}</p>}
+          <div className="flex justify-end">
+            <button onClick={() => void handleSubmit()} disabled={!password || submitting}
+              className="px-4 py-2 bg-red-600 hover:bg-red-500 text-chalk text-sm font-semibold rounded transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
+              {submitting ? 'Removing…' : 'Remove encryption'}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   )
