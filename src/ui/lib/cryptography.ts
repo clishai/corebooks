@@ -21,7 +21,9 @@ const ARGON2_PARAMS = { m: 65536, t: 3, p: 4 } as const
 
 function b64(buf: ArrayBuffer | Uint8Array): string {
   const bytes = buf instanceof Uint8Array ? buf : new Uint8Array(buf)
-  return btoa(String.fromCharCode(...bytes))
+  let s = ''
+  for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]!)
+  return btoa(s)
 }
 
 function unb64(s: string): Uint8Array<ArrayBuffer> {
@@ -69,7 +71,10 @@ export async function decryptExport(envelope: EncryptedExport, password: string)
   const salt = unb64(envelope.salt)
   const iv = unb64(envelope.iv)
   const ct = unb64(envelope.ct)
-  const params = envelope.argon2 ?? ARGON2_PARAMS
+  const params = envelope.argon2
+  if (!params?.m || !params?.t || !params?.p) {
+    throw new Error('Envelope is missing Argon2id parameters')
+  }
 
   const rawKeyBytes = argon2id(
     new TextEncoder().encode(password),

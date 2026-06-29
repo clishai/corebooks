@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { api, DatabaseSettings, DbStats, type VaultHealth } from '../../api/client'
-import { encryptExport } from '../../lib/crypto'
+import { encryptExport } from '../../lib/cryptography'
 import ExportPasswordModal from '../../components/ExportPasswordModal'
 import ImportModal from '../../components/ImportModal'
 

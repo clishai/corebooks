@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { encryptExport, decryptExport, type EncryptedExport } from '../../src/ui/lib/crypto.js'
+import { encryptExport, decryptExport, type EncryptedExport } from '../../src/ui/lib/cryptography.js'
 
 describe('encryptExport', () => {
   it('produces a v:2 Argon2id envelope', async () => {
