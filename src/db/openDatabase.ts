@@ -4,10 +4,8 @@ type Db = InstanceType<typeof Database>
 
 export function openDatabase(filePath: string, key: string): Db {
   if (!key) {
-    // No key — open plaintext (non-password vault or safeStorage unavailable)
     const db = new Database(filePath)
     db.defaultSafeIntegers(true)
-    // Verify the file is actually plaintext (not encrypted with a missing key)
     try {
       db.prepare('SELECT count(*) FROM sqlite_master').get()
     } catch {
@@ -20,36 +18,52 @@ export function openDatabase(filePath: string, key: string): Db {
     return db
   }
 
-  // Apply SQLCipher key
   const db = new Database(filePath)
   db.pragma(`key = "x'${key}'"`)
   db.defaultSafeIntegers(true)
 
   try {
     db.prepare('SELECT count(*) FROM sqlite_master').get()
-    return db // Key correct — already encrypted or new file
+    return db
   } catch {
-    // Key failed — database is plaintext; migrate it in-place using PRAGMA rekey.
-    // Open without a key (plaintext), then rekey to encrypt the file.
     db.close()
     migrateToSqlCipher(filePath, key)
-    // Re-open with key after migration
-    const encrypted = new Database(filePath)
-    encrypted.pragma(`key = "x'${key}'"`)
-    encrypted.defaultSafeIntegers(true)
-    encrypted.prepare('SELECT count(*) FROM sqlite_master').get() // must succeed now
-    return encrypted
+    return openEncrypted(filePath, key)
   }
 }
 
+function openEncrypted(filePath: string, key: string): Db {
+  const db = new Database(filePath)
+  db.pragma(`key = "x'${key}'"`)
+  db.defaultSafeIntegers(true)
+  try {
+    db.prepare('SELECT count(*) FROM sqlite_master').get()
+  } catch (err) {
+    db.close()
+    throw err
+  }
+  return db
+}
+
 /**
- * Encrypt a plaintext SQLite database in-place using PRAGMA rekey.
+ * Migrate a plaintext SQLite database to SQLCipher encryption in-place.
  *
- * WHY rekey instead of sqlcipher_export:
- * `better-sqlite3-multiple-ciphers` does not expose the `sqlcipher_export()`
- * SQL function. `PRAGMA rekey` achieves the same result — it re-encrypts the
- * database file in-place and is the recommended migration path when
- * `sqlcipher_export` is unavailable.
+ * WHY this approach:
+ * `sqlcipher_export` is not exposed as a SQL function in
+ * `better-sqlite3-multiple-ciphers`. The correct migration path is:
+ *
+ * 1. Open the plaintext file without a key (so the SQLCipher driver sees it
+ *    as an unencrypted database).
+ * 2. Apply `PRAGMA rekey` — this is valid because `PRAGMA rekey` encrypts
+ *    a database that is currently open in plaintext mode. It is only invalid
+ *    when applied to a connection that already has a `key` set (which would
+ *    attempt to re-encrypt an already-encrypted file). Opening without a key
+ *    first avoids that error.
+ * 3. Close the connection; the file is now encrypted on disk.
+ *
+ * The original code incorrectly tried to apply `PRAGMA rekey` to a
+ * connection that had already been opened with `PRAGMA key`, which only
+ * works for already-encrypted files.
  */
 function migrateToSqlCipher(filePath: string, key: string): void {
   const plain = new Database(filePath)
