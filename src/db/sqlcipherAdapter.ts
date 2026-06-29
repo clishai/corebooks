@@ -9,9 +9,10 @@
  * `better-sqlite3-multiple-ciphers`) and hand it to Prisma.
  *
  * This file is a faithful TypeScript reimplementation of the official adapter
- * that accepts an optional pre-opened Database instance. When no instance is
- * provided it opens a plain (unencrypted) database, so the factory can also
- * replace the official adapter in dev/test scenarios.
+ * (@prisma/adapter-better-sqlite3 v7.8.0) that accepts an optional pre-opened
+ * Database instance. When no instance is provided it opens a plain
+ * (unencrypted) database, so the factory can also replace the official adapter
+ * in dev/test scenarios.
  *
  * Interface contracts come from `@prisma/driver-adapter-utils`:
  *   - SqlDriverAdapterFactory   → connect(): Promise<SqlDriverAdapter>
@@ -31,6 +32,7 @@ import { Mutex } from 'async-mutex'
 import {
   ColumnTypeEnum,
   DriverAdapterError,
+  type ArgScalarType,
   type ColumnType,
   type ConnectionInfo,
   type IsolationLevel,
@@ -171,7 +173,7 @@ function mapRow(row: unknown[], columnTypes: ColumnType[]): unknown[] {
   })
 }
 
-function mapArg(arg: unknown, argType: { scalarType: string }): unknown {
+function mapArg(arg: unknown, argType: { scalarType: ArgScalarType }): unknown {
   if (arg === null) return null
   if (typeof arg === 'string' && argType.scalarType === 'int') return Number.parseInt(arg)
   if (typeof arg === 'string' && argType.scalarType === 'float') return Number.parseFloat(arg)
@@ -331,13 +333,12 @@ class SqlCipherAdapter extends SqlCipherQueryable implements SqlDriverAdapter {
     return { schemaName: undefined, supportsRelationJoins: false }
   }
 
-  executeScript(script: string): Promise<void> {
+  async executeScript(script: string): Promise<void> {
     try {
       this.db.exec(script)
     } catch (e) {
       throw convertError(e)
     }
-    return Promise.resolve()
   }
 
   async startTransaction(isolationLevel?: IsolationLevel): Promise<Transaction> {
