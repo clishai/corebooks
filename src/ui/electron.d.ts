@@ -42,6 +42,13 @@ declare global {
         safeStorageAvailable: () => Promise<boolean>
         setSkipUntil: (until: string | null) => Promise<void>
         getSkipUntil: () => Promise<string | null>
+        getEncryptionStatus: () => Promise<{ encrypted: boolean }>
+        setupEncryption: (password: string) => Promise<{ phraseWords: string[] }>
+        verifyPassword: (password: string) => Promise<boolean>
+        changePassword: (oldPassword: string, newPassword: string) => Promise<void>
+        removeEncryption: (password: string) => Promise<void>
+        regenerateRecovery: (password: string) => Promise<{ phraseWords: string[] }>
+        resetPasswordAfterRecovery: (words: string[], newPassword: string) => Promise<void>
       }
       ollama: {
         start: () => Promise<boolean>

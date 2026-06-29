@@ -52,6 +52,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     safeStorageAvailable: () => ipcRenderer.invoke('vault:safeStorageAvailable'),
     setSkipUntil: (until: string | null) => ipcRenderer.invoke('vault:setSkipUntil', until),
     getSkipUntil: () => ipcRenderer.invoke('vault:getSkipUntil'),
+    getEncryptionStatus: () => ipcRenderer.invoke('vault:getEncryptionStatus'),
+    setupEncryption: (password: string) => ipcRenderer.invoke('vault:setupEncryption', password),
+    verifyPassword: (password: string) => ipcRenderer.invoke('vault:verifyPassword', password),
+    changePassword: (oldPassword: string, newPassword: string) => ipcRenderer.invoke('vault:changePassword', oldPassword, newPassword),
+    removeEncryption: (password: string) => ipcRenderer.invoke('vault:removeEncryption', password),
+    regenerateRecovery: (password: string) => ipcRenderer.invoke('vault:regenerateRecovery', password),
+    resetPasswordAfterRecovery: (words: string[], newPassword: string) =>
+      ipcRenderer.invoke('vault:resetPasswordAfterRecovery', words, newPassword),
   },
   ollama: {
     start: () => ipcRenderer.invoke('ollama:start'),

@@ -4,9 +4,18 @@ import { randomBytes } from 'crypto'
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import { argon2id } from '@noble/hashes/argon2.js'
 import { VaultManager } from './vaultManager.js'
 import { VaultWatcher } from './vaultWatcher.js'
-import type { VaultState } from './vaultTypes.js'
+import { encryptVaultKey, decryptVaultKey } from './vaultCrypto.js'
+import {
+  generateRecoveryPhrase,
+  recoveryPhraseToEntropy,
+  isValidPhrase,
+} from './recoveryPhrase.js'
+import type { VaultEncryption, VaultState } from './vaultTypes.js'
+
+const ARGON2_PARAMS = { m: 65536, t: 3, p: 4 } as const
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -223,6 +232,143 @@ function registerIpc(): void {
 
   ipcMain.handle('vault:getSkipUntil', () => {
     return vaultManager.getSkipPickerUntil()
+  })
+
+  // ── Vault encryption operations ────────────────────────────────────────────
+
+  ipcMain.handle('vault:getEncryptionStatus', () => {
+    const enc = vaultManager.getEncryption()
+    return { encrypted: enc !== null }
+  })
+
+  ipcMain.handle('vault:setupEncryption', (_event, password: string) => {
+    if (vaultManager.getEncryption() !== null) {
+      throw new Error('Vault is already encrypted')
+    }
+    const vaultKey = randomBytes(32)
+    const phrase = generateRecoveryPhrase()
+    const entropy = recoveryPhraseToEntropy(phrase)
+
+    const saltA = randomBytes(32); const ivA = randomBytes(12)
+    const derivedA = Buffer.from(
+      argon2id(Buffer.from(password, 'utf-8'), saltA, { ...ARGON2_PARAMS, dkLen: 32 }),
+    )
+    const slotA = encryptVaultKey(vaultKey, derivedA, ivA)
+
+    const saltB = randomBytes(32); const ivB = randomBytes(12)
+    const derivedB = Buffer.from(
+      argon2id(entropy, saltB, { ...ARGON2_PARAMS, dkLen: 32 }),
+    )
+    const slotB = encryptVaultKey(vaultKey, derivedB, ivB)
+
+    const enc: VaultEncryption = {
+      algorithm: 'argon2id-aes256-gcm',
+      argon2: { ...ARGON2_PARAMS },
+      slots: {
+        password: { salt: saltA.toString('hex'), iv: ivA.toString('hex'), ct: slotA.toString('hex') },
+        recovery: { salt: saltB.toString('hex'), iv: ivB.toString('hex'), ct: slotB.toString('hex') },
+      },
+    }
+    vaultManager.setEncryption(enc)
+    return { phraseWords: phrase }
+  })
+
+  ipcMain.handle('vault:verifyPassword', (_event, password: string) => {
+    const enc = vaultManager.getEncryption()
+    if (!enc) return false
+    try {
+      const { salt, iv, ct } = enc.slots.password
+      const derivedKey = Buffer.from(
+        argon2id(Buffer.from(password, 'utf-8'), Buffer.from(salt, 'hex'), { ...ARGON2_PARAMS, dkLen: 32 }),
+      )
+      decryptVaultKey(Buffer.from(ct, 'hex'), derivedKey, Buffer.from(iv, 'hex'))
+      return true
+    } catch {
+      return false
+    }
+  })
+
+  ipcMain.handle('vault:changePassword', (_event, oldPassword: string, newPassword: string) => {
+    const enc = vaultManager.getEncryption()
+    if (!enc) throw new Error('Vault is not encrypted')
+    const { salt, iv, ct } = enc.slots.password
+    const derivedOld = Buffer.from(
+      argon2id(Buffer.from(oldPassword, 'utf-8'), Buffer.from(salt, 'hex'), { ...ARGON2_PARAMS, dkLen: 32 }),
+    )
+    const vaultKey = decryptVaultKey(Buffer.from(ct, 'hex'), derivedOld, Buffer.from(iv, 'hex'))
+
+    const saltA = randomBytes(32); const ivA = randomBytes(12)
+    const derivedNew = Buffer.from(
+      argon2id(Buffer.from(newPassword, 'utf-8'), saltA, { ...ARGON2_PARAMS, dkLen: 32 }),
+    )
+    const newSlot = encryptVaultKey(vaultKey, derivedNew, ivA)
+    enc.slots.password = {
+      salt: saltA.toString('hex'),
+      iv: ivA.toString('hex'),
+      ct: newSlot.toString('hex'),
+    }
+    vaultManager.setEncryption(enc)
+  })
+
+  ipcMain.handle('vault:removeEncryption', (_event, password: string) => {
+    const enc = vaultManager.getEncryption()
+    if (!enc) throw new Error('Vault is not encrypted')
+    const { salt, iv, ct } = enc.slots.password
+    const derivedKey = Buffer.from(
+      argon2id(Buffer.from(password, 'utf-8'), Buffer.from(salt, 'hex'), { ...ARGON2_PARAMS, dkLen: 32 }),
+    )
+    // Throws on wrong password — guards against unauthorized removal.
+    decryptVaultKey(Buffer.from(ct, 'hex'), derivedKey, Buffer.from(iv, 'hex'))
+    vaultManager.removeEncryption()
+  })
+
+  ipcMain.handle('vault:regenerateRecovery', (_event, password: string) => {
+    const enc = vaultManager.getEncryption()
+    if (!enc) throw new Error('Vault is not encrypted')
+    const { salt, iv, ct } = enc.slots.password
+    const derivedKey = Buffer.from(
+      argon2id(Buffer.from(password, 'utf-8'), Buffer.from(salt, 'hex'), { ...ARGON2_PARAMS, dkLen: 32 }),
+    )
+    const vaultKey = decryptVaultKey(Buffer.from(ct, 'hex'), derivedKey, Buffer.from(iv, 'hex'))
+
+    const phrase = generateRecoveryPhrase()
+    const entropy = recoveryPhraseToEntropy(phrase)
+    const saltB = randomBytes(32); const ivB = randomBytes(12)
+    const derivedB = Buffer.from(
+      argon2id(entropy, saltB, { ...ARGON2_PARAMS, dkLen: 32 }),
+    )
+    const slotB = encryptVaultKey(vaultKey, derivedB, ivB)
+    enc.slots.recovery = {
+      salt: saltB.toString('hex'),
+      iv: ivB.toString('hex'),
+      ct: slotB.toString('hex'),
+    }
+    vaultManager.setEncryption(enc)
+    return { phraseWords: phrase }
+  })
+
+  ipcMain.handle('vault:resetPasswordAfterRecovery', (_event, words: string[], newPassword: string) => {
+    const enc = vaultManager.getEncryption()
+    if (!enc) throw new Error('Vault is not encrypted')
+    if (!isValidPhrase(words)) throw new Error('Invalid recovery phrase')
+    const entropy = recoveryPhraseToEntropy(words)
+    const { salt, iv, ct } = enc.slots.recovery
+    const derivedB = Buffer.from(
+      argon2id(entropy, Buffer.from(salt, 'hex'), { ...ARGON2_PARAMS, dkLen: 32 }),
+    )
+    const vaultKey = decryptVaultKey(Buffer.from(ct, 'hex'), derivedB, Buffer.from(iv, 'hex'))
+
+    const saltA = randomBytes(32); const ivA = randomBytes(12)
+    const derivedA = Buffer.from(
+      argon2id(Buffer.from(newPassword, 'utf-8'), saltA, { ...ARGON2_PARAMS, dkLen: 32 }),
+    )
+    const newSlot = encryptVaultKey(vaultKey, derivedA, ivA)
+    enc.slots.password = {
+      salt: saltA.toString('hex'),
+      iv: ivA.toString('hex'),
+      ct: newSlot.toString('hex'),
+    }
+    vaultManager.setEncryption(enc)
   })
 
   // ── Vault file operations ────────────────────────────────────────────────────
