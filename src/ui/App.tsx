@@ -1,6 +1,6 @@
 import { useState, useEffect, Component } from 'react'
 import type { ReactNode } from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Layout from './components/Layout'
 import HomePage from './pages/HomePage'
 import AccountsPage from './pages/AccountsPage'
@@ -105,7 +105,7 @@ export default function App() {
     <ErrorBoundary>
       <VaultGate>
         <AuthGate>
-          <BrowserRouter>
+          <HashRouter>
             <Routes>
               <Route path="/" element={<Layout />}>
                 <Route index element={<Navigate to="/home" replace />} />
@@ -129,7 +129,7 @@ export default function App() {
                 <Route path="settings/database" element={<Navigate to="/settings?tab=database" replace />} />
               </Route>
             </Routes>
-          </BrowserRouter>
+          </HashRouter>
         </AuthGate>
       </VaultGate>
     </ErrorBoundary>
