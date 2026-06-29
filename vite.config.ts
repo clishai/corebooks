@@ -14,6 +14,11 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
     port: 5173,
+    // Looser CSP for dev: allows unsafe-eval (Vite HMR) and WS connections.
+    // In production the strict meta tag in index.html takes effect instead.
+    headers: {
+      'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' http://127.0.0.1:* ws://localhost:5173 http://localhost:5173;",
+    },
     proxy: {
       '/accounts': { target: 'http://127.0.0.1:3000', changeOrigin: true, bypass: bypassSpaNavigation },
       '/entries': { target: 'http://127.0.0.1:3000', changeOrigin: true, bypass: bypassSpaNavigation },

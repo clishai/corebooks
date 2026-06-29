@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import type { VaultEntry } from '../../electron/vaultTypes'
 import { UnlockVaultModal } from '../components/UnlockVaultModal'
+import VaultPasswordSetup from '../components/VaultPasswordSetup'
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', {
@@ -21,6 +22,9 @@ export default function VaultPickerPage() {
   const [error, setError] = useState<string | null>(null)
   const [skipFor30Days, setSkipFor30Days] = useState(false)
   const [unlockVault, setUnlockVault] = useState<{ name: string; path: string } | null>(null)
+  const [showPasswordWizard, setShowPasswordWizard] = useState(false)
+  // Set true before vault.create() so the vault:ready handler can intercept.
+  const pendingNewVaultWizard = useRef(false)
 
   useEffect(() => {
     window.electronAPI?.vault.list().then((list) => {
@@ -33,7 +37,14 @@ export default function VaultPickerPage() {
 
   useEffect(() => {
     const unsubscribe = window.electronAPI?.vault.onReady(() => {
-      window.location.reload()
+      if (pendingNewVaultWizard.current) {
+        // New vault just opened — show password setup wizard before entering app
+        pendingNewVaultWizard.current = false
+        setCreating(false)
+        setShowPasswordWizard(true)
+      } else {
+        window.location.reload()
+      }
     })
     return () => { unsubscribe?.() }
   }, [])
@@ -86,6 +97,8 @@ export default function VaultPickerPage() {
     if (!newName.trim() || !newDir.trim()) return
     setCreating(true)
     setError(null)
+    // Flag must be set before create() so the vault:ready handler sees it
+    pendingNewVaultWizard.current = true
     try {
       if (skipFor30Days) {
         await window.electronAPI?.vault.setSkipUntil(
@@ -93,8 +106,9 @@ export default function VaultPickerPage() {
         )
       }
       await window.electronAPI?.vault.create(newName.trim(), newDir.trim())
-      // vault:ready fires → onReady callback → window.location.reload()
+      // vault:ready fires → onReady handler intercepts → shows password wizard
     } catch (e) {
+      pendingNewVaultWizard.current = false
       setError(e instanceof Error ? e.message : 'Failed to create vault')
       setCreating(false)
     }
@@ -291,6 +305,19 @@ export default function VaultPickerPage() {
             setUnlockVault(null)
             setSelectedPath(null)
             setError(null)
+          }}
+        />
+      )}
+
+      {showPasswordWizard && (
+        <VaultPasswordSetup
+          onComplete={() => {
+            setShowPasswordWizard(false)
+            window.location.reload()
+          }}
+          onCancel={() => {
+            setShowPasswordWizard(false)
+            window.location.reload()
           }}
         />
       )}

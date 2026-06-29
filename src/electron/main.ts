@@ -67,21 +67,6 @@ function targetFolderPath(vaultPath: string, targetFolder: string): string {
   return path.join(vaultPath, targetFolder)
 }
 
-async function sleep(ms: number): Promise<void> {
-  await new Promise((resolve) => setTimeout(resolve, ms))
-}
-
-async function isDefaultOllamaReady(): Promise<boolean> {
-  try {
-    const res = await fetch('http://127.0.0.1:11434/api/tags', {
-      signal: AbortSignal.timeout(1000),
-    })
-    return res.ok
-  } catch {
-    return false
-  }
-}
-
 // ── At-rest encryption key (SQLCipher infrastructure) ────────────────────────
 // Generates a 256-bit random key on first launch, encrypts it with the OS
 // credential store (macOS Keychain / Windows DPAPI / Linux libsecret) via
@@ -539,31 +524,6 @@ function registerIpc(): void {
     return base
   })
 
-  // ── Ollama process management ────────────────────────────────────────────────
-
-  ipcMain.handle('ollama:start', async () => {
-    if (await isDefaultOllamaReady()) return true
-
-    const { spawn } = await import('child_process')
-    const binary = process.platform === 'win32' ? 'ollama.exe' : 'ollama'
-    let failedToStart = false
-
-    try {
-      const child = spawn(binary, ['serve'], { detached: true, stdio: 'ignore' })
-      child.unref()
-      child.once('error', () => { failedToStart = true })
-      child.once('exit', () => { failedToStart = true })
-    } catch {
-      return false
-    }
-
-    for (let attempt = 0; attempt < 20; attempt++) {
-      if (await isDefaultOllamaReady()) return true
-      if (failedToStart) return false
-      await sleep(500)
-    }
-    return false
-  })
 }
 
 app.whenReady().then(async () => {

@@ -35,6 +35,7 @@ const VAULT_FOLDERS = ['imports', 'statements', 'receipts', 'exports']
 
 function SafeStorageWarning() {
   const [available, setAvailable] = useState<boolean | null>(null)
+  const isLinux = typeof navigator !== 'undefined' && /Linux/.test(navigator.platform)
 
   useEffect(() => {
     window.electronAPI?.vault.safeStorageAvailable()
@@ -42,7 +43,8 @@ function SafeStorageWarning() {
       .catch(() => setAvailable(false))
   }, [])
 
-  if (available !== false) return null
+  // Only warn on Linux — macOS/Windows always have a working keychain
+  if (!isLinux || available !== false) return null
 
   return (
     <div className="bg-amber-950/50 border border-amber-700 rounded-lg px-5 py-4 flex gap-3">

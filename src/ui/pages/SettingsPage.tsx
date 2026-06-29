@@ -12,14 +12,13 @@ import FeaturesTab from './settings/FeaturesTab'
 import UsersTab from './settings/UsersTab'
 import DatabaseTab from './settings/DatabaseTab'
 import ReportsTab from './settings/ReportsTab'
-import AITab from './settings/AITab'
 import BankRulesTab from './settings/BankRulesTab'
 import PluginsTab from './settings/PluginsTab'
 import AuditTab from './settings/AuditTab'
 
 type Tab =
   | 'vault' | 'general' | 'navigation' | 'accounts' | 'payment-methods'
-  | 'accounting' | 'bank-rules' | 'shortcuts' | 'features' | 'ai' | 'plugins'
+  | 'accounting' | 'bank-rules' | 'shortcuts' | 'features' | 'plugins'
   | 'audit' | 'users' | 'database' | 'reports'
 
 interface Category {
@@ -38,7 +37,6 @@ const CATEGORIES: Category[] = [
   { id: 'bank-rules', label: 'Bank Rules' },
   { id: 'shortcuts', label: 'Shortcuts' },
   { id: 'features', label: 'Features' },
-  { id: 'ai', label: 'AI' },
   { id: 'plugins', label: 'Plugins' },
   { id: 'audit', label: 'Audit' },
   { id: 'users', label: 'Users', authRequired: true },
@@ -125,7 +123,6 @@ export default function SettingsPage() {
         {tab === 'bank-rules' && <BankRulesTab />}
         {tab === 'shortcuts' && <ShortcutsTab />}
         {tab === 'features' && <FeaturesTab />}
-        {tab === 'ai' && <AITab />}
         {tab === 'plugins' && <PluginsTab />}
         {tab === 'audit' && <AuditTab />}
         {tab === 'users' && <UsersTab />}

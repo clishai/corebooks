@@ -1,20 +1,17 @@
-import { useState, useRef, useLayoutEffect, useEffect, useCallback, useMemo } from 'react'
+import { useState, useRef, useLayoutEffect, useEffect, useMemo } from 'react'
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import NewEntryModal from './NewEntryModal'
 import Toast from './Toast'
 import ActionToast from './ActionToast'
-import AIButtonPopover from './AIButtonPopover'
-import AIPanel from './AIPanel'
 import OnboardingWizard, { shouldShowOnboarding, getCompanyName } from './OnboardingWizard'
 import CommandPalette from './CommandPalette'
 import SidebarSection from './SidebarSection'
 import SidebarWordmark from './SidebarWordmark'
 import SidebarCollapseToggle from './SidebarCollapseToggle'
 import { getPinnedReports, togglePinnedReport, expandSection } from '../lib/sidebarState'
-import { getSidebarWide, setSidebarWide, getNavSectionOrder, saveNavSectionOrder, type NavSectionId } from '../lib/sidebarLayout'
+import { getSidebarWide, setSidebarWide, getNavSectionOrder, type NavSectionId } from '../lib/sidebarLayout'
 import { ALL_REPORTS } from '../lib/reports'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
-import { getOllamaConfig, checkOllama, type OllamaConfig } from '../lib/ollama'
 import { formatBinding, getShortcuts } from '../lib/shortcuts'
 import ImportModal from './ImportModal'
 import { isFeatureActive } from '../lib/features'
@@ -82,11 +79,6 @@ export default function Layout() {
     () => formatBinding(getShortcuts()['global-search']),
   )
 
-  // AI state
-  const [aiConfig, setAiConfig] = useState<OllamaConfig>(getOllamaConfig)
-  const [ollamaConnected, setOllamaConnected] = useState<boolean | null>(null)
-  const [aiPanelOpen, setAiPanelOpen] = useState(() => localStorage.getItem('cb_ai_panel_open') === 'true')
-
   const [sidebarWide, setSidebarWideState] = useState(getSidebarWide)
   const [featureVersion, setFeatureVersion] = useState(0)
   void featureVersion
@@ -100,38 +92,6 @@ export default function Layout() {
   }
 
   const [navOrder, setNavOrder] = useState(getNavSectionOrder)
-  const [navEditMode, setNavEditMode] = useState(false)
-  const [dragOverId, setDragOverId] = useState<NavSectionId | null>(null)
-
-  function handleDragStart(e: React.DragEvent, id: NavSectionId) {
-    e.dataTransfer.setData('text/plain', id)
-    e.dataTransfer.effectAllowed = 'move'
-  }
-
-  function handleDragOver(e: React.DragEvent, id: NavSectionId) {
-    e.preventDefault()
-    e.dataTransfer.dropEffect = 'move'
-    setDragOverId(id)
-  }
-
-  function handleDrop(e: React.DragEvent, targetId: NavSectionId) {
-    e.preventDefault()
-    setDragOverId(null)
-    const draggedId = e.dataTransfer.getData('text/plain') as NavSectionId
-    if (draggedId === targetId) return
-    const next = [...navOrder]
-    const from = next.indexOf(draggedId)
-    const to = next.indexOf(targetId)
-    if (from === -1 || to === -1) return
-    next.splice(from, 1)
-    next.splice(to, 0, draggedId)
-    setNavOrder(next)
-    saveNavSectionOrder(next)
-  }
-
-  function handleDragEnd() {
-    setDragOverId(null)
-  }
 
   // Vault-triggered import (pre-loaded file)
   const [vaultImportFile, setVaultImportFile] = useState<{ name: string; path: string; text: string } | null>(null)
@@ -147,39 +107,6 @@ export default function Layout() {
   }
 
   useLayoutEffect(() => { prevRouteIndex.current = currRouteIndex })
-
-  // Ollama background ping
-  const pingOllama = useCallback(async () => {
-    if (!aiConfig.enabled) return
-    const result = await checkOllama(aiConfig.endpoint)
-    setOllamaConnected(result.connected)
-  }, [aiConfig.enabled, aiConfig.endpoint])
-
-  useEffect(() => {
-    if (!aiConfig.enabled) {
-      setOllamaConnected(null)
-      setAiPanelOpen(false)
-      localStorage.setItem('cb_ai_panel_open', 'false')
-      return
-    }
-    void pingOllama()
-    const interval = setInterval(() => void pingOllama(), 60_000)
-    return () => clearInterval(interval)
-  }, [aiConfig.enabled, pingOllama])
-
-  // Re-ping when window gains focus
-  useEffect(() => {
-    const handler = () => void pingOllama()
-    window.addEventListener('focus', handler)
-    return () => window.removeEventListener('focus', handler)
-  }, [pingOllama])
-
-  // Refresh AI config when settings change
-  useEffect(() => {
-    function handleAiConfigChanged() { setAiConfig(getOllamaConfig()) }
-    window.addEventListener('cb:ai-config-changed', handleAiConfigChanged)
-    return () => window.removeEventListener('cb:ai-config-changed', handleAiConfigChanged)
-  }, [])
 
   useEffect(() => {
     function handleShortcutsChanged() {
@@ -261,23 +188,6 @@ export default function Layout() {
     }
   }
 
-  function toggleAiPanel() {
-    setAiPanelOpen((prev) => {
-      const next = !prev
-      localStorage.setItem('cb_ai_panel_open', String(next))
-      return next
-    })
-  }
-
-  async function handleOllamaActivate(): Promise<boolean> {
-    const started = window.electronAPI ? await window.electronAPI.ollama.start() : true
-    if (!started) return false
-
-    const result = await checkOllama(aiConfig.endpoint)
-    setOllamaConnected(result.connected)
-    return result.connected
-  }
-
   useEffect(() => {
     function handleNameChange() { setCompanyName(getCompanyName()) }
     function handlePinsChange() { setPinnedReports(getPinnedReports()) }
@@ -289,10 +199,11 @@ export default function Layout() {
     }
   }, [])
 
+  // Listen for nav order changes made in Settings
   useEffect(() => {
-    function handleOpenNavEdit() { setNavEditMode(true) }
-    window.addEventListener('cb:open-nav-edit', handleOpenNavEdit)
-    return () => window.removeEventListener('cb:open-nav-edit', handleOpenNavEdit)
+    function handleNavOrderChanged() { setNavOrder(getNavSectionOrder()) }
+    window.addEventListener('cb:nav-order-changed', handleNavOrderChanged)
+    return () => window.removeEventListener('cb:nav-order-changed', handleNavOrderChanged)
   }, [])
 
   useEffect(() => {
@@ -342,10 +253,22 @@ export default function Layout() {
 
   const pinnedReportMetas = ALL_REPORTS.filter((r) => pinnedReports.includes(r.id))
 
+  // On macOS with titleBarStyle:'hiddenInset', traffic lights sit at (12,12)
+  // and overlay the top of the sidebar. A 28px draggable spacer pushes
+  // sidebar content below the buttons and gives a native window-drag region.
+  const isMacElectron = !!window.electronAPI && /Mac/.test(navigator.platform)
+
   return (
     <div className="flex h-screen bg-base overflow-hidden">
       {/* Sidebar */}
       <aside className={`sidebar-transition bg-void flex flex-col shrink-0 border-r border-rim overflow-hidden ${sidebarWide ? 'w-52' : 'w-[52px]'}`}>
+        {/* macOS title-bar spacer — keeps traffic lights from overlapping content */}
+        {isMacElectron && (
+          <div
+            className="h-7 shrink-0 select-none"
+            style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+          />
+        )}
         {/* Zone 1: Logo */}
         <SidebarWordmark wide={sidebarWide} onClick={() => navigate('/home')} />
 
@@ -353,82 +276,44 @@ export default function Layout() {
         <nav className="flex-1 py-4 px-2 overflow-y-auto min-h-0">
           {sidebarWide ? (
             <div className="space-y-1">
-              {navEditMode && (
-                <div className="flex items-center justify-between px-3 py-1 mb-2 bg-violet/10 border border-violet/30 rounded text-[10px] text-violet">
-                  <span className="uppercase tracking-wider">editing nav</span>
-                  <button
-                    onClick={() => setNavEditMode(false)}
-                    className="border border-violet/40 px-2 py-0.5 rounded hover:bg-violet/20 transition-colors cursor-pointer"
-                  >
-                    Done
-                  </button>
-                </div>
-              )}
-
               {/* Home — always first, pinned */}
               <NavLink to="/home" className={navLinkClass}>Home</NavLink>
 
-              {/* Reorderable sections */}
-              {(() => {
-                const sectionContent: Record<NavSectionId, React.ReactNode> = {
-                  ledger: (
-                    <SidebarSection id="ledger" label="Ledger">
-                      <NavLink to="/accounts" className={navLinkClass}>Chart of Accounts</NavLink>
-                      <NavLink to="/entries" className={navLinkClass}>Entries</NavLink>
-                      <NavLink to="/drafts" className={navLinkClass}>Drafts</NavLink>
-                    </SidebarSection>
-                  ),
-                  reports: (
-                    <SidebarSection id="reports" label="Reports">
-                      <NavLink to="/reports" end className={navLinkClass}>Reports Library</NavLink>
-                      {pinnedReportMetas.map((r) => (
-                        <NavLink key={r.id} to={r.path} className={navLinkClass}>{r.label}</NavLink>
+              {/* Ordered sections — order controlled from Settings → Navigation */}
+              {navOrder.map((sectionId) => {
+                if (sectionId === 'ledger') return (
+                  <SidebarSection key="ledger" id="ledger" label="Ledger">
+                    <NavLink to="/accounts" className={navLinkClass}>Chart of Accounts</NavLink>
+                    <NavLink to="/entries" className={navLinkClass}>Entries</NavLink>
+                    <NavLink to="/drafts" className={navLinkClass}>Drafts</NavLink>
+                  </SidebarSection>
+                )
+                if (sectionId === 'reports') return (
+                  <SidebarSection key="reports" id="reports" label="Reports">
+                    <NavLink to="/reports" end className={navLinkClass}>Reports Library</NavLink>
+                    {pinnedReportMetas.map((r) => (
+                      <NavLink key={r.id} to={r.path} className={navLinkClass}>{r.label}</NavLink>
+                    ))}
+                  </SidebarSection>
+                )
+                if (sectionId === 'extra-workflows') {
+                  const workflowLinks = [
+                    { id: 'bank-feed',      to: '/extra/bank-feed',      label: 'Bank Feed' },
+                    { id: 'reconciliation', to: '/extra/reconciliation', label: 'Reconciliation' },
+                    { id: 'recurring',      to: '/extra/recurring',      label: 'Recurring' },
+                    { id: 'close-period',   to: '/extra/close-period',   label: 'Close Period' },
+                  ].filter((w) => isFeatureActive(w.id))
+                  if (workflowLinks.length === 0) return null
+                  return (
+                    <SidebarSection key="extra-workflows" id="extra-workflows" label="Extra Workflows">
+                      {workflowLinks.map((w) => (
+                        <NavLink key={w.id} to={w.to} className={navLinkClass}>{w.label}</NavLink>
                       ))}
                     </SidebarSection>
-                  ),
-                  'extra-workflows': (() => {
-                    const workflowLinks = [
-                      { id: 'bank-feed',      to: '/extra/bank-feed',      label: 'Bank Feed' },
-                      { id: 'reconciliation', to: '/extra/reconciliation', label: 'Reconciliation' },
-                      { id: 'recurring',      to: '/extra/recurring',      label: 'Recurring' },
-                      { id: 'close-period',   to: '/extra/close-period',   label: 'Close Period' },
-                    ].filter((w) => isFeatureActive(w.id))
-                    if (workflowLinks.length === 0) return null
-                    return (
-                      <SidebarSection id="extra-workflows" label="Extra Workflows">
-                        {workflowLinks.map((w) => (
-                          <NavLink key={w.id} to={w.to} className={navLinkClass}>{w.label}</NavLink>
-                        ))}
-                      </SidebarSection>
-                    )
-                  })(),
+                  )
                 }
-                return navOrder.map((sectionId) => {
-                const isDragOver = dragOverId === sectionId
-                return (
-                  <div
-                    key={sectionId}
-                    draggable={navEditMode}
-                    onDragStart={navEditMode ? (e) => handleDragStart(e, sectionId) : undefined}
-                    onDragOver={navEditMode ? (e) => handleDragOver(e, sectionId) : undefined}
-                    onDrop={navEditMode ? (e) => handleDrop(e, sectionId) : undefined}
-                    onDragEnd={navEditMode ? handleDragEnd : undefined}
-                    className={`rounded transition-colors ${navEditMode ? 'cursor-grab border border-transparent' : ''} ${isDragOver && navEditMode ? 'border-violet/50 bg-violet/5' : ''}`}
-                  >
-                    {navEditMode && (
-                      <div className="flex items-center gap-1.5 px-3 py-1">
-                        <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" className="text-violet/50">
-                          <circle cx="9" cy="5" r="1.5"/><circle cx="15" cy="5" r="1.5"/>
-                          <circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/>
-                          <circle cx="9" cy="19" r="1.5"/><circle cx="15" cy="19" r="1.5"/>
-                        </svg>
-                      </div>
-                    )}
-                    {sectionContent[sectionId]}
-                  </div>
-                )
-              })
-              })()}
+                return null
+              })}
             </div>
           ) : (
             <div className="flex flex-col items-center gap-1 pt-1">
@@ -512,9 +397,12 @@ export default function Layout() {
 
       {/* Right column */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        {/* Top toolbar */}
-        <header className="h-12 border-b border-rim bg-void grid grid-cols-[1fr_auto_1fr] items-center px-4 shrink-0">
-          <div className="flex items-center min-w-0">
+        {/* Top toolbar — draggable on macOS so users can move the window */}
+        <header
+          className="h-12 border-b border-rim bg-void grid grid-cols-[1fr_auto_1fr] items-center px-4 shrink-0"
+          style={isMacElectron ? { WebkitAppRegion: 'drag' } as React.CSSProperties : undefined}
+        >
+          <div className="flex items-center min-w-0" style={isMacElectron ? { WebkitAppRegion: 'no-drag' } as React.CSSProperties : undefined}>
             <button
               onClick={() => navigate('/home')}
               className="text-sm font-medium text-chalk hover:text-neon transition-colors truncate max-w-[160px] cursor-pointer"
@@ -524,23 +412,16 @@ export default function Layout() {
             </button>
           </div>
 
-          <div className="w-72">
+          <div className="w-72" style={isMacElectron ? { WebkitAppRegion: 'no-drag' } as React.CSSProperties : undefined}>
             <button
               onClick={() => setShowSearch(true)}
               className="w-full bg-surface border border-rim rounded-sm px-3 py-1 text-xs text-ash/50 text-left hover:border-neon/50 transition-colors focus:outline-none cursor-pointer"
             >
-              Press / for global search
+              Press {searchShortcutLabel} for global search
             </button>
           </div>
 
-          <div className="flex items-center justify-end gap-2">
-            <AIButtonPopover
-              aiEnabled={aiConfig.enabled}
-              ollamaConnected={ollamaConnected}
-              panelOpen={aiPanelOpen}
-              onTogglePanel={toggleAiPanel}
-              onActivate={handleOllamaActivate}
-            />
+          <div className="flex items-center justify-end gap-2" style={isMacElectron ? { WebkitAppRegion: 'no-drag' } as React.CSSProperties : undefined}>
             <button
               onClick={() => setShowNewEntry(true)}
               className="bg-neon hover:bg-neon-dim text-void text-xs font-semibold px-3 py-1.5 rounded-sm transition-colors cursor-pointer"
@@ -550,19 +431,11 @@ export default function Layout() {
           </div>
         </header>
 
-        {/* Content row: page + optional AI panel */}
+        {/* Content row */}
         <div className="flex-1 flex overflow-hidden">
           <main key={location.key} className={`flex-1 overflow-auto p-6 min-w-0 ${slideClass}`}>
             <Outlet context={{ pendingImportCount }} />
           </main>
-
-          {aiConfig.enabled && aiPanelOpen && (
-            <AIPanel
-              config={aiConfig}
-              ollamaConnected={ollamaConnected}
-              onClose={toggleAiPanel}
-            />
-          )}
         </div>
       </div>
 
@@ -593,6 +466,7 @@ export default function Layout() {
         />
       )}
       {showWelcome && <OnboardingWizard onDismiss={() => { setShowWelcome(false); setCompanyName(getCompanyName()) }} />}
+      {showSearch && <CommandPalette onClose={() => setShowSearch(false)} />}
     </div>
   )
 }

@@ -52,9 +52,6 @@ declare global {
         regenerateRecovery: (password: string) => Promise<{ phraseWords: string[] }>
         resetPasswordAfterRecovery: (words: string[], newPassword: string) => Promise<void>
       }
-      ollama: {
-        start: () => Promise<boolean>
-      }
     }
   }
 }

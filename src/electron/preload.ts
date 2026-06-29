@@ -63,7 +63,4 @@ contextBridge.exposeInMainWorld('electronAPI', {
     resetPasswordAfterRecovery: (words: string[], newPassword: string) =>
       ipcRenderer.invoke('vault:resetPasswordAfterRecovery', words, newPassword),
   },
-  ollama: {
-    start: () => ipcRenderer.invoke('ollama:start'),
-  },
 })
