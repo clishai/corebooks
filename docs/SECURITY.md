@@ -24,9 +24,17 @@ These match the OWASP 2024 recommended minimum for Argon2id in interactive-login
 
 AES-256-GCM. The 16-byte authentication tag is appended to the ciphertext. Any tampering with the ciphertext or the tag causes decryption to fail before any data is returned.
 
-**What the password protects today**
+**What the password protects**
 
-The vault password protects the key slots stored in `.corebooks` and gates the encrypted export feature. Full SQLite database encryption (SQLCipher) is planned for a future release and is blocked on a custom Prisma adapter.
+The vault password protects:
+- The key slots stored in `.corebooks` (password slot and recovery slot)
+- The `corebooks.db` SQLite database, which is encrypted with SQLCipher using vault key K
+
+**Database encryption (SQLCipher)**
+
+`corebooks.db` is encrypted at rest using SQLCipher with AES-256 in CBC mode. The SQLCipher key is vault key K expressed as a 64-character hex string, applied via `PRAGMA key = "x'<hex>'"` (raw key mode — no SQLCipher internal KDF, K already has full 256-bit entropy from Argon2id).
+
+On first launch after upgrading, existing plaintext databases are migrated to SQLCipher automatically using `PRAGMA rekey`. No user action required. For password-protected vaults, migration happens immediately after the user enters their password for the first time.
 
 **Recovery phrase**
 
