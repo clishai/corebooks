@@ -53,6 +53,10 @@ export default function VaultPasswordSetup({ onComplete, onCancel }: Props) {
 
   function handleVerifySubmit() {
     setCheckError(null)
+    if (phrase.length !== 12) {
+      setCheckError('Phrase data is missing. Please restart vault setup.')
+      return
+    }
     for (const idx of checkIndices) {
       const typed = (checkInputs[idx] ?? '').trim().toLowerCase()
       if (typed !== phrase[idx]) {
@@ -60,6 +64,7 @@ export default function VaultPasswordSetup({ onComplete, onCancel }: Props) {
         return
       }
     }
+    setPhrase([])
     onComplete()
   }
 
@@ -70,7 +75,8 @@ export default function VaultPasswordSetup({ onComplete, onCancel }: Props) {
           <h2 className="text-base font-semibold text-chalk">Set vault password</h2>
           <button
             onClick={onCancel}
-            className="text-ash hover:text-chalk text-sm cursor-pointer"
+            disabled={submitting}
+            className="text-ash hover:text-chalk text-sm cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Cancel
           </button>
@@ -90,6 +96,7 @@ export default function VaultPasswordSetup({ onComplete, onCancel }: Props) {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 autoFocus
+                autoComplete="new-password"
                 className="w-full bg-raised border border-rim rounded px-3 py-2 text-sm text-chalk focus:outline-none focus:border-neon/50"
               />
             </div>
@@ -100,6 +107,7 @@ export default function VaultPasswordSetup({ onComplete, onCancel }: Props) {
                 value={confirm}
                 onChange={(e) => setConfirm(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter' && passwordValid) void handlePasswordSubmit() }}
+                autoComplete="new-password"
                 className="w-full bg-raised border border-rim rounded px-3 py-2 text-sm text-chalk focus:outline-none focus:border-neon/50"
               />
               {confirm.length > 0 && password !== confirm && (
