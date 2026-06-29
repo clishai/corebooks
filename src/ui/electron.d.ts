@@ -26,7 +26,8 @@ declare global {
         getState: () => VaultState
         list: () => Promise<VaultEntry[]>
         create: (name: string, dirPath: string) => Promise<VaultEntry>
-        select: (dirPath: string) => Promise<void>
+        select: (dirPath: string) => Promise<{ needsPassword: boolean }>
+        unlock: (password: string) => Promise<void>
         rename: (newName: string) => Promise<{ newPath: string }>
         showInExplorer: () => Promise<void>
         chooseDirectory: () => Promise<string | null>

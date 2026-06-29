@@ -92,6 +92,11 @@ async function isDefaultOllamaReady(): Promise<boolean> {
 // Until then, the key exists and is safely stored — but the database file
 // itself is not yet encrypted. See src/db/client.ts for the hook point.
 function getOrCreateEncryptionKey(userData: string): void {
+  // Guard: if vault:unlock or resetPasswordAfterRecovery already set the key
+  // from a password-derived vault key K, do not overwrite it with the OS
+  // keychain key (which would open the wrong database).
+  if (process.env['COREBOOKS_DB_KEY']) return
+
   if (!safeStorage.isEncryptionAvailable()) {
     // safeStorage is unavailable (e.g. headless CI). Skip key setup.
     return
@@ -194,7 +199,47 @@ function registerIpc(): void {
 
   ipcMain.handle('vault:select', async (_event, vaultPath: string) => {
     vaultManager.select(vaultPath)
+    // If the vault has a password, the renderer must collect the password and
+    // call vault:unlock before the API is started. Return a sentinel so the UI
+    // can show the UnlockVaultModal instead of waiting for vault:ready.
+    const enc = vaultManager.getEncryption()
+    if (enc !== null) {
+      return { needsPassword: true }
+    }
     currentApiPort = await startApiForVault(vaultPath)
+    mainWindow?.webContents.send('vault:ready')
+    return { needsPassword: false }
+  })
+
+  // Called by UnlockVaultModal after vault:select returns { needsPassword: true }.
+  // Derives the vault key K from the user's password, sets COREBOOKS_DB_KEY,
+  // then starts the API. On success the renderer receives vault:ready exactly
+  // as it would for an unencrypted vault.
+  ipcMain.handle('vault:unlock', async (_event, password: string) => {
+    const current = vaultManager.getCurrent()
+    if (!current) throw new Error('No vault selected')
+    const enc = vaultManager.getEncryption()
+    if (!enc) throw new Error('Vault has no encryption configured')
+    if (!password) throw new Error('Password must not be empty')
+
+    const { salt, iv, ct } = enc.slots.password
+    const derivedKey = Buffer.from(
+      argon2id(Buffer.from(password, 'utf-8'), Buffer.from(salt, 'hex'), { ...enc.argon2, dkLen: 32 }),
+    )
+    // decryptVaultKey throws on wrong password / bad auth tag.
+    let vaultKey: Buffer
+    try {
+      vaultKey = decryptVaultKey(Buffer.from(ct, 'hex'), derivedKey, Buffer.from(iv, 'hex'))
+    } catch {
+      throw new Error('Password is incorrect')
+    }
+
+    // Set env var before startApiForVault calls getOrCreateEncryptionKey.
+    // The guard added to getOrCreateEncryptionKey will see this and skip the
+    // OS-keychain lookup so K is not overwritten.
+    process.env['COREBOOKS_DB_KEY'] = vaultKey.toString('hex')
+
+    currentApiPort = await startApiForVault(current.path)
     mainWindow?.webContents.send('vault:ready')
   })
 
@@ -246,7 +291,13 @@ function registerIpc(): void {
       throw new Error('Vault is already encrypted')
     }
     if (!password) throw new Error('Password must not be empty')
-    const vaultKey = randomBytes(32)
+    // Plan E/F: COREBOOKS_DB_KEY IS the vault key K. Wrap the existing key
+    // rather than generating a new random one — generating a new key would
+    // require re-encrypting the database, because the database was already
+    // opened (and will be opened in future) with this same K.
+    const hexKey = process.env['COREBOOKS_DB_KEY']
+    if (!hexKey) throw new Error('Encryption key not initialized — open the vault first')
+    const vaultKey = Buffer.from(hexKey, 'hex')
     const phrase = generateRecoveryPhrase()
     const entropy = recoveryPhraseToEntropy(phrase)
 
@@ -397,6 +448,22 @@ function registerIpc(): void {
       ct: newSlot.toString('hex'),
     }
     vaultManager.setEncryption(enc)
+
+    // Re-save vault key K to the OS keychain so future transparent auto-opens
+    // (non-password path) continue to work. Without this, the keychain would
+    // still hold the OLD random key from first launch, which would not match
+    // the vault database that was re-encrypted with the recovered K.
+    const userData = app.getPath('userData')
+    if (safeStorage.isEncryptionAvailable()) {
+      try {
+        const keyPath = path.join(userData, '.db.key')
+        const encryptedKey = safeStorage.encryptString(vaultKey.toString('hex'))
+        fs.writeFileSync(keyPath, encryptedKey, { mode: 0o600 })
+      } catch {
+        // Non-fatal: keychain write failure — the vault can still be opened
+        // with the password next time.
+      }
+    }
   })
 
   // ── Vault file operations ────────────────────────────────────────────────────
@@ -493,13 +560,25 @@ app.whenReady().then(async () => {
   // If the user requested "skip picker for 30 days", auto-select the last vault
   // before creating the window. This means the preload's sendSync('vault:getState')
   // will see a non-null apiPort, so VaultGate renders the app directly.
+  //
+  // Password-protected vaults cannot be auto-opened because the password has not
+  // yet been entered. Skip auto-open for those vaults so the vault picker shows
+  // and the user can select the vault, triggering the UnlockVaultModal flow.
   const skipUntil = vaultManager.getSkipPickerUntil()
   if (skipUntil && new Date(skipUntil) > new Date()) {
     const knownVaults = vaultManager.list()
     if (knownVaults.length > 0) {
       try {
         vaultManager.select(knownVaults[0].path)
-        currentApiPort = await startApiForVault(knownVaults[0].path)
+        const enc = vaultManager.getEncryption()
+        if (enc !== null) {
+          // Password-protected vault — do not auto-open; show the vault picker
+          // so the user can enter their password via UnlockVaultModal.
+          vaultManager.select(knownVaults[0].path) // keep selection so picker knows which vault
+          currentApiPort = null
+        } else {
+          currentApiPort = await startApiForVault(knownVaults[0].path)
+        }
       } catch {
         // Vault unavailable (moved or deleted) — fall through to show picker
         currentApiPort = null
