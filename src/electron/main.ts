@@ -245,11 +245,14 @@ function registerIpc(): void {
     if (vaultManager.getEncryption() !== null) {
       throw new Error('Vault is already encrypted')
     }
+    if (!password) throw new Error('Password must not be empty')
     const vaultKey = randomBytes(32)
     const phrase = generateRecoveryPhrase()
     const entropy = recoveryPhraseToEntropy(phrase)
 
     const saltA = randomBytes(32); const ivA = randomBytes(12)
+    // Buffer.from creates an owned copy — argon2id returns a Uint8Array sharing
+    // an ArrayBuffer whose offset may be non-zero; copy is required for correctness.
     const derivedA = Buffer.from(
       argon2id(Buffer.from(password, 'utf-8'), saltA, { ...ARGON2_PARAMS, dkLen: 32 }),
     )
@@ -291,6 +294,7 @@ function registerIpc(): void {
   ipcMain.handle('vault:changePassword', (_event, oldPassword: string, newPassword: string) => {
     const enc = vaultManager.getEncryption()
     if (!enc) throw new Error('Vault is not encrypted')
+    if (!newPassword) throw new Error('Password must not be empty')
     const { salt, iv, ct } = enc.slots.password
     const derivedOld = Buffer.from(
       argon2id(Buffer.from(oldPassword, 'utf-8'), Buffer.from(salt, 'hex'), { ...ARGON2_PARAMS, dkLen: 32 }),
@@ -307,6 +311,8 @@ function registerIpc(): void {
       iv: ivA.toString('hex'),
       ct: newSlot.toString('hex'),
     }
+    // Only the password slot is re-wrapped. The recovery slot wraps the
+    // same vault key K and remains valid without modification.
     vaultManager.setEncryption(enc)
   })
 
@@ -351,6 +357,7 @@ function registerIpc(): void {
     const enc = vaultManager.getEncryption()
     if (!enc) throw new Error('Vault is not encrypted')
     if (!isValidPhrase(words)) throw new Error('Invalid recovery phrase')
+    if (!newPassword) throw new Error('Password must not be empty')
     const entropy = recoveryPhraseToEntropy(words)
     const { salt, iv, ct } = enc.slots.recovery
     const derivedB = Buffer.from(
