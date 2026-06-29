@@ -125,7 +125,7 @@ export default function DatabaseTab() {
     setEncryptError(null)
     try {
       const data = await api.settings.export()
-      const envelope = await encryptExport(data, passphrase)
+      const envelope = await encryptExport(JSON.stringify(data), passphrase)
       const blob = new Blob([JSON.stringify(envelope)], { type: 'application/json' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
