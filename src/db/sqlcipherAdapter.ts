@@ -180,6 +180,13 @@ function mapArg(arg: unknown, argType: { scalarType: ArgScalarType }): unknown {
   if (typeof arg === 'string' && argType.scalarType === 'decimal') return Number.parseFloat(arg)
   if (typeof arg === 'string' && argType.scalarType === 'bigint') return BigInt(arg)
   if (typeof arg === 'boolean') return arg ? 1 : 0
+  // Date objects must be serialized before SQLite binding — better-sqlite3
+  // cannot bind Date instances directly (only numbers, strings, bigints,
+  // buffers, and null). Prisma may pass either an ISO string (scalarType
+  // 'datetime') or an actual Date object depending on the query path.
+  if (arg instanceof Date) {
+    return arg.toISOString().replace('Z', '+00:00')
+  }
   if (typeof arg === 'string' && argType.scalarType === 'datetime') {
     // Prisma sends datetime as ISO string; SQLite stores as ISO with offset
     const d = new Date(arg)

@@ -1,5 +1,9 @@
 import { PrismaClient } from '../generated/prisma/client.js';
-import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
+import { SqlCipherAdapterFactory } from './sqlcipherAdapter.js';
+import { openDatabase } from './openDatabase.js';
+import type Database from 'better-sqlite3-multiple-ciphers';
+
+type Db = InstanceType<typeof Database>;
 
 // ── PostgreSQL URL helpers ────────────────────────────────────────────────────
 
@@ -28,29 +32,40 @@ function checkPostgresSSL(rawUrl: string): void {
   }
 }
 
-// ── SQLCipher hook (future) ───────────────────────────────────────────────────
-// When SQLCipher support is added, this is where the at-rest encryption key
-// gets applied. The key is already generated and stored via Electron safeStorage
-// (see src/electron/main.ts) and surfaced here as COREBOOKS_DB_KEY.
-//
-// Pending work: PrismaBetterSqlite3 creates the better-sqlite3 Database
-// internally and does not expose a PRAGMA hook. Full SQLCipher support requires
-// either a custom Prisma driver adapter or official support from Prisma.
-//
-// Once unblocked, the implementation is:
-//   import Database from 'better-sqlite3-sqlcipher';
-//   const db = new Database(filePath);
-//   const key = process.env['COREBOOKS_DB_KEY'];
-//   if (key) db.pragma(`key = '${key}'`);
-//   const adapter = new PrismaBetterSqlite3({ url: filePath }, db);
+// Module-level reference to the opened Database instance.
+// Set by createPrismaClient() for the SQLite path so that bootstrap.ts can
+// retrieve it via getOpenDb() and pass it to ensureSchema() — avoiding a
+// second open/close cycle on the same file.
+let _db: Db | undefined;
+
+/**
+ * Returns the Database instance that was opened by the most recent call to
+ * getPrismaClient() / createPrismaClient(). Returns undefined in PostgreSQL
+ * mode (where there is no better-sqlite3 Database).
+ *
+ * Callers (e.g. bootstrap.ts) should call getPrismaClient() before
+ * getOpenDb() to guarantee the instance exists.
+ */
+export function getOpenDb(): Db | undefined {
+  return _db;
+}
 
 function createPrismaClient(): PrismaClient {
   const rawUrl = process.env['DATABASE_URL'] ?? 'file:corebooks.db';
   checkPostgresSSL(rawUrl);
-  // PrismaBetterSqlite3 expects a file path, not a file: URI.
+
+  // SQLite path — open the database with SQLCipher, then hand the pre-opened
+  // instance to SqlCipherAdapterFactory so Prisma never sees a plaintext file.
+  // Note: the Prisma schema is SQLite-only (provider = "sqlite"), so PostgreSQL
+  // mode uses a separate Prisma setup at the infrastructure level. This client
+  // is always the SQLite path.
   const filePath = rawUrl.startsWith('file:') ? rawUrl.slice(5) : rawUrl;
-  const adapter = new PrismaBetterSqlite3({ url: filePath });
-  return new PrismaClient({ adapter });
+  const key = process.env['COREBOOKS_DB_KEY'] ?? '';
+  _db = openDatabase(filePath, key);
+  const factory = new SqlCipherAdapterFactory({ url: filePath }, _db);
+  // PrismaClient accepts a SqlDriverAdapterFactory directly; it calls
+  // factory.connect() internally the first time a connection is needed.
+  return new PrismaClient({ adapter: factory });
 }
 
 let _client: PrismaClient | undefined;
