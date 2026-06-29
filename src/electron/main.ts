@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, shell, dialog, safeStorage } from 'electron'
+import { app, BrowserWindow, ipcMain, shell, dialog, safeStorage, globalShortcut } from 'electron'
 import { createServer } from 'net'
 import { randomBytes } from 'crypto'
 import fs from 'fs'
@@ -175,6 +175,13 @@ async function createWindow(): Promise<void> {
   } else {
     await mainWindow.loadFile(path.join(__dirname, '../ui/index.html'))
   }
+
+  // Allow opening DevTools in packaged builds for debugging
+  mainWindow.webContents.on('before-input-event', (_event, input) => {
+    if ((input.meta || input.control) && input.alt && input.key === 'i') {
+      mainWindow?.webContents.openDevTools()
+    }
+  })
 }
 
 function registerIpc(): void {
@@ -565,13 +572,13 @@ app.whenReady().then(async () => {
 
   registerIpc()
 
-  // If the user requested "skip picker for 30 days", auto-select the last vault
-  // before creating the window. This means the preload's sendSync('vault:getState')
-  // will see a non-null apiPort, so VaultGate renders the app directly.
-  //
-  // Password-protected vaults cannot be auto-opened because the password has not
-  // yet been entered. Skip auto-open for those vaults so the vault picker shows
-  // and the user can select the vault, triggering the UnlockVaultModal flow.
+  // Create the window first so users see the vault picker immediately
+  // instead of a blank screen while the keychain / API starts up.
+  await createWindow()
+
+  // Auto-open the last vault if the user chose "skip for 30 days".
+  // This runs AFTER the window is created. The vault picker renders
+  // briefly, then vault:ready triggers a reload into the full app.
   const skipUntil = vaultManager.getSkipPickerUntil()
   if (skipUntil && new Date(skipUntil) > new Date()) {
     const knownVaults = vaultManager.list()
@@ -582,25 +589,21 @@ app.whenReady().then(async () => {
         if (enc !== null) {
           // Password-protected vault — do not auto-open; show the vault picker
           // so the user can enter their password via UnlockVaultModal.
-          vaultManager.select(knownVaults[0].path) // keep selection so picker knows which vault
           currentApiPort = null
         } else {
           currentApiPort = await startApiForVault(knownVaults[0].path)
+          // Vault is ready — tell the renderer to reload into the full app.
+          mainWindow?.webContents.send('vault:ready')
+          // Start file watcher now that mainWindow exists.
+          if (vaultManager.getCurrent() && mainWindow) {
+            vaultWatcher.start(vaultManager.getCurrent()!.path, mainWindow)
+          }
         }
       } catch {
         // Vault unavailable (moved or deleted) — fall through to show picker
         currentApiPort = null
       }
     }
-  }
-
-  await createWindow()
-
-  // If a vault was auto-selected above, mainWindow now exists but the file
-  // watcher was not started (mainWindow was null during startApiForVault).
-  // Start it now.
-  if (currentApiPort !== null && vaultManager.getCurrent() && mainWindow) {
-    vaultWatcher.start(vaultManager.getCurrent()!.path, mainWindow)
   }
 
   app.on('activate', () => {
