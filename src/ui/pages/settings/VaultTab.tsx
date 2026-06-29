@@ -233,9 +233,9 @@ export default function VaultTab() {
         {encrypted ? (
           <>
             <p className="text-sm text-ash mb-3">
-              Vault key is protected by your password. Full database encryption (SQLCipher) is
-              pending a future update — for now, the password gates exports and protects the
-              vault key inside <code className="text-xs bg-raised px-1.5 py-0.5 rounded">.corebooks</code>.
+              Your vault database is encrypted with SQLCipher (AES-256). The password is required
+              every time the vault is opened and protects the encryption key stored in{' '}
+              <code className="text-xs bg-raised px-1.5 py-0.5 rounded">.corebooks</code>.
             </p>
             <div className="flex flex-wrap gap-2">
               <button

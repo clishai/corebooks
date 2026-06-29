@@ -29,7 +29,7 @@ export const periodRoutes: FastifyPluginAsync<RouteOptions> = async (app, opts) 
 
   app.post<{ Body: Record<string, unknown> }>('/generate-closing', async (req, reply) => {
     const { year, month } = req.body as { year: number; month: number };
-    if (!year || !month) return reply.badRequest('year and month required');
+    if (year == null || month == null) return reply.badRequest('year and month required');
     try {
       return await generateClosingEntry(year, month, ledger);
     } catch (err: unknown) {
@@ -40,7 +40,7 @@ export const periodRoutes: FastifyPluginAsync<RouteOptions> = async (app, opts) 
 
   app.post<{ Body: Record<string, unknown> }>('/post-closing', async (req, reply) => {
     const { draftId, year, month } = req.body as { draftId: string; year: number; month: number };
-    if (!draftId || !year || !month) return reply.badRequest('draftId, year, month required');
+    if (!draftId || year == null || month == null) return reply.badRequest('draftId, year, month required');
     try {
       return await postClosingEntry(draftId, year, month, ledger);
     } catch (err: unknown) {

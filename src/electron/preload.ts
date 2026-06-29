@@ -51,6 +51,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
       return () => ipcRenderer.removeListener('vault:file-removed', listener)
     },
     safeStorageAvailable: () => ipcRenderer.invoke('vault:safeStorageAvailable'),
+    getDefaultBase: () => ipcRenderer.invoke('vault:getDefaultBase'),
     setSkipUntil: (until: string | null) => ipcRenderer.invoke('vault:setSkipUntil', until),
     getSkipUntil: () => ipcRenderer.invoke('vault:getSkipUntil'),
     getEncryptionStatus: () => ipcRenderer.invoke('vault:getEncryptionStatus'),

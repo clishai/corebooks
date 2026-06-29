@@ -27,6 +27,8 @@ export default function VaultPickerPage() {
       setVaults(list)
       if (list.length > 0) setSelectedPath(list[0].path)
     }).catch(() => setVaults([]))
+    // Pre-load the default base directory so it's ready when the form opens.
+    window.electronAPI?.vault.getDefaultBase().then(setNewDir).catch(() => {})
   }, [])
 
   useEffect(() => {

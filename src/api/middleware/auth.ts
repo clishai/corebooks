@@ -8,16 +8,29 @@ export interface Session {
   role: 'Viewer' | 'Bookkeeper' | 'Admin'
 }
 
-const sessions = new Map<string, Session>()
+const SESSION_TTL_MS = 24 * 60 * 60 * 1000
+
+interface SessionEntry {
+  session: Session
+  expiresAt: number
+}
+
+const sessions = new Map<string, SessionEntry>()
 
 export function createSession(session: Session): string {
   const token = randomBytes(32).toString('hex')
-  sessions.set(token, session)
+  sessions.set(token, { session, expiresAt: Date.now() + SESSION_TTL_MS })
   return token
 }
 
 export function getSession(token: string): Session | undefined {
-  return sessions.get(token)
+  const entry = sessions.get(token)
+  if (!entry) return undefined
+  if (Date.now() > entry.expiresAt) {
+    sessions.delete(token)
+    return undefined
+  }
+  return entry.session
 }
 
 export function destroySession(token: string): void {

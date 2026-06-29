@@ -35,7 +35,12 @@ export async function fireOverdueTemplates(ledger: Ledger): Promise<number> {
           ledger,
           grantPostingAuthority('recurring'),
         )
-        if (!result.posted) continue
+        // Advance the due date even on post failure — the draft already exists.
+        // Skipping advanceNextDue would re-fire this template on every scheduler
+        // tick and create unbounded duplicate drafts.
+        if (!result.posted) {
+          console.error(`[recurring] autoPost failed for template ${template.id}:`, result.errors)
+        }
       }
 
       await advanceNextDue(template.id, template.schedule, template.nextDue)

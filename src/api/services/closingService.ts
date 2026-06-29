@@ -79,19 +79,31 @@ export async function generateClosingEntry(
 
   const lines: JournalLine[] = [];
 
-  // Debit each revenue account to zero it out (revenue accounts normally
-  // carry a credit balance, so a debit reduces them to zero).
+  // Zero out each revenue account. Normal revenue accounts carry a credit
+  // balance (positive) → debit them. Contra-revenue accounts (e.g. Sales
+  // Returns) carry a debit balance and are represented here with a negative
+  // balance → credit them. Always pass a positive amount to validateEntry.
   for (const rev of statement.revenueLines) {
     if (rev.balance !== 0) {
-      lines.push({ accountId: rev.accountId, amount: rev.balance, type: 'debit' });
+      lines.push({
+        accountId: rev.accountId,
+        amount: Math.abs(rev.balance),
+        type: rev.balance > 0 ? 'debit' : 'credit',
+      });
     }
   }
 
-  // Credit each expense account to zero it out (expense accounts normally
-  // carry a debit balance, so a credit reduces them to zero).
+  // Zero out each expense account. Normal expense accounts carry a debit
+  // balance (positive) → credit them. Contra-expense accounts (e.g. Purchase
+  // Rebates) carry a credit balance and are represented here with a negative
+  // balance → debit them. Always pass a positive amount to validateEntry.
   for (const exp of statement.expenseLines) {
     if (exp.balance !== 0) {
-      lines.push({ accountId: exp.accountId, amount: exp.balance, type: 'credit' });
+      lines.push({
+        accountId: exp.accountId,
+        amount: Math.abs(exp.balance),
+        type: exp.balance > 0 ? 'credit' : 'debit',
+      });
     }
   }
 

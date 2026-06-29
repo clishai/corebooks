@@ -524,6 +524,14 @@ function registerIpc(): void {
 
   ipcMain.handle('vault:safeStorageAvailable', () => safeStorage.isEncryptionAvailable())
 
+  // Returns (and creates if needed) the default base directory for new vaults,
+  // mirroring Obsidian's convention of a dedicated app folder inside Documents.
+  ipcMain.handle('vault:getDefaultBase', () => {
+    const base = path.join(app.getPath('documents'), 'corebooks')
+    fs.mkdirSync(base, { recursive: true })
+    return base
+  })
+
   // ── Ollama process management ────────────────────────────────────────────────
 
   ipcMain.handle('ollama:start', async () => {
