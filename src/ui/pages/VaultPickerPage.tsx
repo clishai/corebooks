@@ -114,7 +114,13 @@ export default function VaultPickerPage() {
           new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
         )
       }
-      await window.electronAPI?.vault.select(dir)
+      const result = await window.electronAPI?.vault.select(dir)
+      if (result?.needsPassword) {
+        const vault = vaults.find((v) => v.path === dir)
+        setUnlockVault({ name: vault?.name ?? dir, path: dir })
+        setOpening(false)
+        return
+      }
       // vault:ready fires → onReady callback → window.location.reload()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to open vault')
