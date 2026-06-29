@@ -295,11 +295,17 @@ function registerIpc(): void {
     const enc = vaultManager.getEncryption()
     if (!enc) throw new Error('Vault is not encrypted')
     if (!newPassword) throw new Error('Password must not be empty')
+    if (newPassword.length < 8) throw new Error('New password must be at least 8 characters')
     const { salt, iv, ct } = enc.slots.password
     const derivedOld = Buffer.from(
       argon2id(Buffer.from(oldPassword, 'utf-8'), Buffer.from(salt, 'hex'), { ...ARGON2_PARAMS, dkLen: 32 }),
     )
-    const vaultKey = decryptVaultKey(Buffer.from(ct, 'hex'), derivedOld, Buffer.from(iv, 'hex'))
+    let vaultKey: Buffer
+    try {
+      vaultKey = decryptVaultKey(Buffer.from(ct, 'hex'), derivedOld, Buffer.from(iv, 'hex'))
+    } catch {
+      throw new Error('Password is incorrect')
+    }
 
     const saltA = randomBytes(32); const ivA = randomBytes(12)
     const derivedNew = Buffer.from(
@@ -324,7 +330,11 @@ function registerIpc(): void {
       argon2id(Buffer.from(password, 'utf-8'), Buffer.from(salt, 'hex'), { ...ARGON2_PARAMS, dkLen: 32 }),
     )
     // Throws on wrong password — guards against unauthorized removal.
-    decryptVaultKey(Buffer.from(ct, 'hex'), derivedKey, Buffer.from(iv, 'hex'))
+    try {
+      decryptVaultKey(Buffer.from(ct, 'hex'), derivedKey, Buffer.from(iv, 'hex'))
+    } catch {
+      throw new Error('Password is incorrect')
+    }
     vaultManager.removeEncryption()
   })
 
@@ -335,7 +345,12 @@ function registerIpc(): void {
     const derivedKey = Buffer.from(
       argon2id(Buffer.from(password, 'utf-8'), Buffer.from(salt, 'hex'), { ...ARGON2_PARAMS, dkLen: 32 }),
     )
-    const vaultKey = decryptVaultKey(Buffer.from(ct, 'hex'), derivedKey, Buffer.from(iv, 'hex'))
+    let vaultKey: Buffer
+    try {
+      vaultKey = decryptVaultKey(Buffer.from(ct, 'hex'), derivedKey, Buffer.from(iv, 'hex'))
+    } catch {
+      throw new Error('Password is incorrect')
+    }
 
     const phrase = generateRecoveryPhrase()
     const entropy = recoveryPhraseToEntropy(phrase)
@@ -363,7 +378,12 @@ function registerIpc(): void {
     const derivedB = Buffer.from(
       argon2id(entropy, Buffer.from(salt, 'hex'), { ...ARGON2_PARAMS, dkLen: 32 }),
     )
-    const vaultKey = decryptVaultKey(Buffer.from(ct, 'hex'), derivedB, Buffer.from(iv, 'hex'))
+    let vaultKey: Buffer
+    try {
+      vaultKey = decryptVaultKey(Buffer.from(ct, 'hex'), derivedB, Buffer.from(iv, 'hex'))
+    } catch {
+      throw new Error('Invalid recovery phrase')
+    }
 
     const saltA = randomBytes(32); const ivA = randomBytes(12)
     const derivedA = Buffer.from(

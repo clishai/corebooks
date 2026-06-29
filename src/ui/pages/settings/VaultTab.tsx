@@ -475,7 +475,7 @@ function ChangePasswordModal({ onComplete, onCancel }: SimpleModalProps) {
       <div className="bg-surface border border-rim rounded-lg w-full max-w-md">
         <div className="px-6 py-4 border-b border-rim flex items-center justify-between">
           <h2 className="text-base font-semibold text-chalk">Change password</h2>
-          <button onClick={onCancel} className="text-ash hover:text-chalk text-sm cursor-pointer">Cancel</button>
+          <button onClick={onCancel} disabled={submitting} className="text-ash hover:text-chalk text-sm cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">Cancel</button>
         </div>
         <div className="px-6 py-6 space-y-4">
           <div>
@@ -537,7 +537,7 @@ function RegenerateRecoveryModal({ onComplete, onCancel }: RegenerateRecoveryMod
       <div className="bg-surface border border-rim rounded-lg w-full max-w-md">
         <div className="px-6 py-4 border-b border-rim flex items-center justify-between">
           <h2 className="text-base font-semibold text-chalk">Regenerate recovery phrase</h2>
-          <button onClick={onCancel} className="text-ash hover:text-chalk text-sm cursor-pointer">Cancel</button>
+          <button onClick={onCancel} disabled={submitting} className="text-ash hover:text-chalk text-sm cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">Cancel</button>
         </div>
         <div className="px-6 py-6 space-y-4">
           <div className="bg-amber-950/40 border border-amber-700 rounded-lg px-4 py-3">
@@ -581,6 +581,7 @@ function DisplayPhraseModal({ phrase, onClose }: { phrase: string[]; onClose: ()
             className="grid grid-cols-3 gap-2"
             onCopy={(e) => e.preventDefault()}
             onCut={(e) => e.preventDefault()}
+            onDragStart={(e) => e.preventDefault()}
             style={{ userSelect: 'none' }}
           >
             {phrase.map((word, i) => (
@@ -626,7 +627,7 @@ function RemoveEncryptionModal({ onComplete, onCancel }: SimpleModalProps) {
       <div className="bg-surface border border-rim rounded-lg w-full max-w-md">
         <div className="px-6 py-4 border-b border-rim flex items-center justify-between">
           <h2 className="text-base font-semibold text-chalk">Remove encryption</h2>
-          <button onClick={onCancel} className="text-ash hover:text-chalk text-sm cursor-pointer">Cancel</button>
+          <button onClick={onCancel} disabled={submitting} className="text-ash hover:text-chalk text-sm cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">Cancel</button>
         </div>
         <div className="px-6 py-6 space-y-4">
           <div className="bg-red-950/40 border border-red-700 rounded-lg px-4 py-3">
