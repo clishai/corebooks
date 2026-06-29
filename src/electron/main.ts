@@ -282,7 +282,7 @@ function registerIpc(): void {
     try {
       const { salt, iv, ct } = enc.slots.password
       const derivedKey = Buffer.from(
-        argon2id(Buffer.from(password, 'utf-8'), Buffer.from(salt, 'hex'), { ...ARGON2_PARAMS, dkLen: 32 }),
+        argon2id(Buffer.from(password, 'utf-8'), Buffer.from(salt, 'hex'), { ...enc.argon2, dkLen: 32 }),
       )
       decryptVaultKey(Buffer.from(ct, 'hex'), derivedKey, Buffer.from(iv, 'hex'))
       return true
@@ -298,7 +298,7 @@ function registerIpc(): void {
     if (newPassword.length < 8) throw new Error('New password must be at least 8 characters')
     const { salt, iv, ct } = enc.slots.password
     const derivedOld = Buffer.from(
-      argon2id(Buffer.from(oldPassword, 'utf-8'), Buffer.from(salt, 'hex'), { ...ARGON2_PARAMS, dkLen: 32 }),
+      argon2id(Buffer.from(oldPassword, 'utf-8'), Buffer.from(salt, 'hex'), { ...enc.argon2, dkLen: 32 }),
     )
     let vaultKey: Buffer
     try {
@@ -327,7 +327,7 @@ function registerIpc(): void {
     if (!enc) throw new Error('Vault is not encrypted')
     const { salt, iv, ct } = enc.slots.password
     const derivedKey = Buffer.from(
-      argon2id(Buffer.from(password, 'utf-8'), Buffer.from(salt, 'hex'), { ...ARGON2_PARAMS, dkLen: 32 }),
+      argon2id(Buffer.from(password, 'utf-8'), Buffer.from(salt, 'hex'), { ...enc.argon2, dkLen: 32 }),
     )
     // Throws on wrong password — guards against unauthorized removal.
     try {
@@ -343,7 +343,7 @@ function registerIpc(): void {
     if (!enc) throw new Error('Vault is not encrypted')
     const { salt, iv, ct } = enc.slots.password
     const derivedKey = Buffer.from(
-      argon2id(Buffer.from(password, 'utf-8'), Buffer.from(salt, 'hex'), { ...ARGON2_PARAMS, dkLen: 32 }),
+      argon2id(Buffer.from(password, 'utf-8'), Buffer.from(salt, 'hex'), { ...enc.argon2, dkLen: 32 }),
     )
     let vaultKey: Buffer
     try {
@@ -373,10 +373,11 @@ function registerIpc(): void {
     if (!enc) throw new Error('Vault is not encrypted')
     if (!isValidPhrase(words)) throw new Error('Invalid recovery phrase')
     if (!newPassword) throw new Error('Password must not be empty')
+    if (newPassword.length < 8) throw new Error('New password must be at least 8 characters')
     const entropy = recoveryPhraseToEntropy(words)
     const { salt, iv, ct } = enc.slots.recovery
     const derivedB = Buffer.from(
-      argon2id(entropy, Buffer.from(salt, 'hex'), { ...ARGON2_PARAMS, dkLen: 32 }),
+      argon2id(entropy, Buffer.from(salt, 'hex'), { ...enc.argon2, dkLen: 32 }),
     )
     let vaultKey: Buffer
     try {

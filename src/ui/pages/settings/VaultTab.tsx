@@ -459,8 +459,6 @@ function ChangePasswordModal({ onComplete, onCancel }: SimpleModalProps) {
     if (!vault || !valid) return
     setSubmitting(true); setError(null)
     try {
-      const ok = await vault.verifyPassword(oldPassword)
-      if (!ok) throw new Error('Current password is incorrect')
       await vault.changePassword(oldPassword, newPassword)
       onComplete()
     } catch (e) {
@@ -521,8 +519,6 @@ function RegenerateRecoveryModal({ onComplete, onCancel }: RegenerateRecoveryMod
     if (!vault) return
     setSubmitting(true); setError(null)
     try {
-      const ok = await vault.verifyPassword(password)
-      if (!ok) throw new Error('Password is incorrect')
       const result = await vault.regenerateRecovery(password)
       onComplete(result.phraseWords)
     } catch (e) {

@@ -140,6 +140,7 @@ export default function VaultPasswordSetup({ onComplete, onCancel }: Props) {
               className="grid grid-cols-3 gap-2"
               onCopy={(e) => e.preventDefault()}
               onCut={(e) => e.preventDefault()}
+              onDragStart={(e) => e.preventDefault()}
               style={{ userSelect: 'none' }}
             >
               {phrase.map((word, i) => (
