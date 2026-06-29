@@ -41,7 +41,7 @@ Vault registry lives at `userData/vaults.json` (the only file outside any vault)
 ## Stack
 
 - TypeScript strict mode, Node.js runtime
-- Database: SQLite via Prisma 7 + `@prisma/adapter-better-sqlite3` (default); PostgreSQL opt-in
+- Database: SQLite via Prisma 7 + custom `SqlCipherAdapterFactory` backed by `better-sqlite3-multiple-ciphers` (SQLCipher); PostgreSQL opt-in
 - Frontend: React 19 + Vite 8 + Tailwind v4 (`src/ui/`)
 - API: Fastify 5 + @fastify/sensible (`src/api/`)
 - Testing: Vitest, Package manager: npm
@@ -72,7 +72,7 @@ Key decisions to carry forward:
 - **Onboarding**: `src/ui/components/OnboardingWizard.tsx` (3-step modal: company name, business type, template suggestions). Replaces deleted `FirstLaunchModal.tsx`. `shouldShowOnboarding` and `getCompanyName` exported from `OnboardingWizard`.
 - **Feature flags**: `src/ui/lib/featureFlags.ts` — `cb_flags` in localStorage, `ar_ap` and `inventory` booleans. Gate new module sidebar items behind `isFeatureEnabled('ar_ap')` / `isFeatureEnabled('inventory')`.
 - **Payment methods**: `src/ui/lib/paymentMethods.ts` — `cb_payment_methods` in localStorage, default list. `NewEntryModal` uses a `<select>` from this list (not free text). Settings → Payment Methods tab manages the list.
-- **Security**: API loopback-only; PostgreSQL SSL warning; encrypted export (AES-256-GCM + PBKDF2 600k iterations) via `src/ui/lib/crypto.ts`; `safeStorage` key infrastructure in `src/electron/main.ts` ready for SQLCipher.
+- **Security**: API loopback-only; PostgreSQL SSL warning; encrypted export (AES-256-GCM + PBKDF2 600k iterations) via `src/ui/lib/crypto.ts`; `safeStorage` key infrastructure in `src/electron/main.ts`; SQLCipher full database encryption complete (Plan F).
 
 ### Phase 6 — Keyboard Shortcuts (complete)
 
@@ -175,6 +175,30 @@ Key decisions to carry forward:
 
 ---
 
+### Plan F — SQLCipher Full Database Encryption (complete)
+
+Every vault's `corebooks.db` is encrypted at rest with SQLCipher (AES-256-CBC). The vault key K is a 32-byte value stored in `userData/.db.key` via `safeStorage`. For password-protected vaults K is also wrapped in `.corebooks` (password slot + BIP-39 recovery slot), so the database can be unlocked without touching the OS keychain.
+
+**Key files added/changed:**
+- `src/db/sqlcipherAdapter.ts` — Full TypeScript reimplementation of `@prisma/adapter-better-sqlite3` (based on v7.8.0), backed by `better-sqlite3-multiple-ciphers`. Constructor accepts an optional pre-opened `Database` instance so `PRAGMA key` can be applied before Prisma touches the file. Implements `SqlDriverAdapterFactory` from `@prisma/driver-adapter-utils`. Transaction serialized via `async-mutex`.
+- `src/db/openDatabase.ts` — Opens a database file, applies `PRAGMA key = "x'<64-char-hex>'"` (raw key mode), and migrates plaintext databases to SQLCipher on first launch using `PRAGMA rekey`. Returns the keyed `Database` instance.
+- `src/db/ensureSchema.ts` — Signature changed from `(dbPath: string)` to `(db: Db)`. Caller owns the connection lifecycle; no internal open/close.
+- `src/db/client.ts` — `PrismaBetterSqlite3` removed. Now uses `SqlCipherAdapterFactory` + `openDatabase`. Exports `getOpenDb()` so `bootstrap.ts` can pass the already-opened instance to `ensureSchema`.
+- `src/api/bootstrap.ts` — Calls `getPrismaClient()` (which opens and keys the DB), then `getOpenDb()`, then `ensureSchema(db)`. Single connection, no double-open.
+- `src/electron/main.ts` — `getOrCreateEncryptionKey` guards against overwriting a key already set by `vault:unlock`; `vault:setupEncryption` wraps the OS-keychain key (not fresh random bytes, avoiding any re-encryption); `vault:select` returns `{ needsPassword: true }` for encrypted vaults without starting the API; new `vault:unlock` IPC derives K (Argon2id → AES-256-GCM unwrap) and then calls `startApiForVault`; auto-open skips password-protected vaults; `resetPasswordAfterRecovery` re-saves K to the OS keychain.
+- `src/electron/preload.ts` / `src/ui/electron.d.ts` — `vault.unlock(password)` added to IPC surface; `vault.select` return type updated to include `{ needsPassword?: boolean }`.
+- `src/ui/components/UnlockVaultModal.tsx` — Password prompt modal overlaid on VaultPickerPage. Single password input, inline error on wrong password, loading state, Escape to cancel.
+- `src/ui/pages/VaultPickerPage.tsx` — Both the vault-card click path and "Open existing…" path check `result?.needsPassword` after `vault.select`; shows `UnlockVaultModal` when true.
+
+**Key decisions:**
+- `better-sqlite3-multiple-ciphers` (not `better-sqlite3-sqlcipher`) — actively maintained, based on better-sqlite3 12.x (API-compatible with the project). `sqlcipher_export` is unavailable in this build; `PRAGMA rekey` on a plaintext-opened connection is used for migration.
+- K_os = K_vault — the OS-keychain key IS the vault key. No separate key per-slot avoids re-encryption when password is set or removed.
+- Custom Prisma adapter rather than patching — the official adapter is CJS and cannot be patched in ESM TypeScript. Full reimplementation (~420 lines) is maintainable and pinned to v7.8.0.
+
+**Tests:** `tests/db/sqlcipherAdapter.test.ts`, `tests/db/openDatabase.test.ts`, `tests/db/sqlcipherIntegration.test.ts` — 244 total tests passing. Security audit confirmed no key material in logs, error messages, or IPC responses.
+
+---
+
 ## The Single Most Important Rule
 
 **Never modify the core to accommodate an outer layer.**
@@ -263,18 +287,19 @@ Tokens defined in `src/ui/index.css` via Tailwind v4 `@theme`. Neon blue: primar
 |---|---|
 | API loopback-only | `src/api/bootstrap.ts` |
 | PostgreSQL SSL validation | `src/db/client.ts`, settings route, Settings UI |
-| safeStorage encryption key | `src/electron/main.ts` (`COREBOOKS_DB_KEY`) — lives in `userData`, NOT in vault |
+| SQLCipher database encryption | `src/db/openDatabase.ts`, `src/db/sqlcipherAdapter.ts`, `src/db/client.ts` |
+| safeStorage encryption key (`COREBOOKS_DB_KEY`) | `src/electron/main.ts` — lives in `userData`, NOT in vault |
+| Password-protected vault unlock | `src/electron/main.ts` (`vault:unlock` IPC), `src/ui/components/UnlockVaultModal.tsx` |
+| Vault password + BIP-39 recovery slots | `src/electron/main.ts` (`vault:setupEncryption`, `vault:unlock`, etc.), `<vault>/.corebooks` |
 | Encrypted export (AES-256-GCM + PBKDF2) | `src/ui/lib/crypto.ts`, `ExportPasswordModal.tsx` |
 | Session auth (PostgreSQL mode only) | `src/api/middleware/auth.ts`, `src/api/routes/auth.ts` |
 | Vault registry | `userData/vaults.json` — list of known vault paths + last-opened timestamps |
-| Vault metadata | `<vault>/.corebooks` — name, version, created date (no secrets) |
+| Vault metadata | `<vault>/.corebooks` — name, version, created date, encrypted key slots (no raw secrets) |
 | AI posting boundary | `src/api/posting/authority.ts`, `src/api/services/postingService.ts`, `tests/api/aiPostingBoundary.test.ts` |
 
-**Vault and key separation:** The vault folder (`<vault>/corebooks.db`, `<vault>/.corebooks`) contains no key material. The OS-keychain key (`userData/.db.key`) is intentionally outside any vault so vaults can be moved, copied, or backed up independently without compromising the encryption key.
+**Vault and key separation:** The vault folder (`<vault>/corebooks.db`, `<vault>/.corebooks`) contains no raw key material. The OS-keychain key (`userData/.db.key`) is intentionally outside any vault so vaults can be moved, copied, or backed up independently without compromising the encryption key. The `.corebooks` metadata file stores encrypted key slots (AES-256-GCM wrapped), never the raw key.
 
 **AI data boundary:** Local AI is opt-in and currently limited to localhost Ollama. AI features may observe, explain, classify, and suggest drafts; they must not post official entries or receive a posting authority. Keep this policy outside `src/core`.
-
-**SQLCipher gap:** Key is in the OS keychain. Blocker: `PrismaBetterSqlite3` creates the `better-sqlite3` instance internally — no way to pass a pre-opened database or run `PRAGMA key` before Prisma opens the file. Fix: swap to `better-sqlite3-sqlcipher` and write a custom Prisma adapter that accepts a pre-opened encrypted instance.
 
 ## Self-Review Checklist
 

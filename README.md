@@ -24,12 +24,15 @@ The accounting engine, database, REST API, browser-based UI, and Electron deskto
 - Chart of accounts with current/non-current classification, live balances, inline editing, configurable column visibility, and an account template library (42 common accounts)
 - Journal entry creation with draft saving, auto-save, and payment method tracking
 - Recurring transaction templates (weekly / monthly / quarterly / annually) with auto-post option
-- Period close workflow that generates closing entries and transfers net income to retained earnings
+- **Period close workflow** — generates closing entries that zero out Revenue and Expense accounts into Retained Earnings; user reviews the draft before posting; closed periods are locked
 - Trial Balance, Balance Sheet (Current/Non-current sections), and Income Statement with per-account breakdowns
+- **Reconciliation** — clear posted entries against bank statement line items to verify books match
+- **Bank feed import** — drag CSV/OFX files into `imports/` or use the Bank Feed page to create draft-only categorisation rules; imports always produce drafts for review before posting
 - Global search command palette (press `/`) searching across accounts, entries, and reports
 - Configurable keyboard shortcuts with live rebinding and conflict detection
 - Bulk operations on entries and accounts (reverse, delete, set classification)
 - Multi-user roles (Viewer / Bookkeeper / Admin) in PostgreSQL mode — SQLite stays single-user with no login required
+- **Vault encryption** — every vault database is encrypted at rest with SQLCipher (AES-256). Optional vault password adds a second layer: the database key is wrapped with Argon2id + AES-256-GCM and stored in the vault metadata. A 12-word BIP-39 recovery phrase is generated as a fallback. Non-password vaults unlock transparently via your OS keychain (macOS Keychain, Windows DPAPI, Linux libsecret).
 - Encrypted data export (AES-256-GCM + PBKDF2)
 - Settings covering general reminders, account columns, payment methods, keyboard shortcuts, AI configuration, user management (PostgreSQL), database stats, JSON export, and data wipe
 - Feature flag system gating optional modules (AR/AP, Inventory) as they ship
@@ -97,10 +100,10 @@ corebooks is designed like an onion. Each layer wraps the one before it without 
 | Layer | What It Does |
 |---|---|
 | **Core (Layer 1)** | Pure double-entry accounting engine. Chart of accounts, journal entries, general ledger, trial balance, financial statements. Zero external dependencies. |
-| **Database & API (Layer 2)** | Persistence with SQLite (default) or PostgreSQL (business). REST API. |
-| **UI (Layer 3)** | React + Tailwind browser-based interface. Dark mode. |
-| **Desktop App (Layer 4)** | Electron wrapper — vault picker on launch, named vault folders, `safeStorage` key management. Builds to .dmg / .exe / .AppImage. |
-| **Integrations** | Vault file sync (chokidar, real-time import notifications), Ollama AI panel (optional, local LLM). Bank feed import (OFX/QFX/CSV), plugin API, webhooks coming next. |
+| **Database (Layer 2)** | Persistence with SQLite (default) or PostgreSQL (business) via Prisma. Amounts stored as integer cents — the mapper layer is the only cent↔dollar boundary. |
+| **API (Layer 3)** | Fastify REST API. Routes delegate to repositories; no accounting logic lives in routes. |
+| **UI (Layer 4)** | React 19 + Tailwind v4 browser-based interface. Cypherpunk dark theme, JetBrains Mono, spring-animated page transitions. |
+| **Desktop App (Layer 5)** | Electron wrapper — vault picker on launch, named vault folders, SQLCipher database encryption, `safeStorage` key management, optional vault password with BIP-39 recovery, cross-platform file watcher. Builds to .dmg / .exe / .AppImage. |
 
 ## Who This Is For
 
@@ -131,12 +134,17 @@ Neither the folder nor the database is reachable from the network — the Fastif
 binds to `127.0.0.1` only (loopback). The vault can be backed up by any tool that copies
 folders (Time Machine, iCloud Drive, Dropbox, rsync). No special export step required.
 
-**At-rest encryption (in progress):** When running as a desktop app, corebooks generates
-a 256-bit random key on first launch and stores it in your OS credential vault —
-macOS Keychain, Windows DPAPI, or Linux libsecret — via Electron's `safeStorage` API.
-The key is tied to your OS login, so stealing the database file without also compromising
-your account gains nothing. Full SQLite file encryption (SQLCipher) is the planned next
-step once a compatible Prisma driver adapter is available.
+**At-rest encryption:** Every vault database (`corebooks.db`) is encrypted with SQLCipher
+(AES-256-CBC). On first launch, corebooks generates a 256-bit key and stores it in your
+OS credential vault — macOS Keychain, Windows DPAPI, or Linux libsecret — via Electron's
+`safeStorage` API. The key is tied to your OS login, so stealing the database file without
+also compromising your account gains nothing.
+
+**Vault password (optional):** You can add a password to any vault in Settings → Vault. The
+database key is then wrapped with Argon2id (64 MiB, 3 iterations, 4 lanes) and
+AES-256-GCM, and stored alongside a 12-word BIP-39 recovery phrase in the vault's
+`.corebooks` metadata file. The recovery phrase lets you reset a forgotten password without
+losing your data. Write it on paper and keep it separate from your computer.
 
 **Encrypted backups:** The Settings → Database page has an **Encrypted Export** option.
 It encrypts your full data backup with AES-256-GCM using a passphrase you choose.
@@ -182,10 +190,9 @@ These are areas where community contributions would be most valuable. None are s
 | **Inventory Management** | Item catalog, quantities on hand, receive-goods and sell-goods flows, COGS accounting. Gated to product businesses via the feature flag system. |
 | **Import from other accounting software** | Parse and import data from QuickBooks, Wave, FreshBooks, or CSV exports. Map external account structures to corebooks chart of accounts. |
 | **PostgreSQL migration wizard** | Guided in-app flow to switch from SQLite to a shared PostgreSQL server: validate connection, migrate schema, copy data, confirm, restart. Plain-language UI — no technical jargon. |
-| **Bank feed / transaction import** | OFX/QFX/CSV bank statements dropped into `imports/` trigger an import modal. Auto-match or create draft entries for review. Imports always create drafts — never auto-post. (Vault file sync is complete; OFX/QFX parsing is next.) |
+| **Bank feed OFX/QFX parsing** | The bank feed page and import modal exist; CSV import works today. OFX/QFX format parsing is the next step to support direct bank statement downloads. |
 | **AI-assisted categorisation** | Ollama AI infrastructure is in place (toolbar button, side panel, Settings → AI tab). Next: use the connected model to suggest account mappings during import. No API keys required — local inference only. |
-| **Plugin API** | Webhook and plugin interface so third-party tools (Stripe, Shopify, payroll providers) can post transactions directly into corebooks. |
-| **Closing entries** | Period-end close that zeroes out Revenue and Expense accounts into Retained Earnings, producing a clean opening balance for the next fiscal year. |
+| **Plugin API** | Webhook and plugin interface so third-party tools (Stripe, Shopify, payroll providers) can push source documents and drafts into corebooks. |
 | **Multi-currency** | Record transactions in foreign currencies with exchange rate tracking and unrealised gain/loss accounts. |
 
 ---
