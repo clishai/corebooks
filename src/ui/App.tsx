@@ -21,6 +21,8 @@ import ReportsLibraryPage from './pages/ReportsLibraryPage'
 import LoginPage from './pages/LoginPage'
 import VaultPickerPage from './pages/VaultPickerPage'
 import { checkAuthStatus, getAuthToken } from './lib/auth'
+import { readLocalLegacySettings, markLegacyMigrationComplete } from './lib/migrateLocalStorage'
+import { api } from './api/client'
 
 // ── Error boundary ────────────────────────────────────────────────────────────
 
@@ -57,6 +59,45 @@ class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryStat
   }
 }
 
+// ── Migration flag (in-memory, one session only) ──────────────────────────────
+
+// Exported so GeneralTab can read it without going through localStorage.
+// Set to true after a successful legacy-settings migration in this session.
+export let migrationRanThisSession = false
+
+// ── Post-vault migration runner ───────────────────────────────────────────────
+
+// Renders nothing. On first mount (which only happens after apiBaseUrl is set)
+// checks for legacy localStorage keys and, if found, posts them to the vault DB
+// via the existing /settings/app-settings endpoint, then clears them.
+function MigrationRunner() {
+  useEffect(() => {
+    const legacy = readLocalLegacySettings()
+    if (!legacy) return
+
+    const payload: Record<string, unknown> = {}
+    if (legacy.companyName !== undefined) payload['companyName'] = legacy.companyName
+    if (legacy.featureFlags !== undefined) payload['featureFlags'] = JSON.stringify(legacy.featureFlags)
+    if (legacy.paymentMethods !== undefined) payload['paymentMethods'] = JSON.stringify(legacy.paymentMethods)
+
+    if (Object.keys(payload).length === 0) {
+      markLegacyMigrationComplete()
+      return
+    }
+
+    api.settings.saveAppSettings(payload)
+      .then(() => {
+        markLegacyMigrationComplete()
+        migrationRanThisSession = true
+      })
+      .catch(() => {
+        // Non-fatal: leave legacy keys in place so we can retry next launch.
+      })
+  }, [])
+
+  return null
+}
+
 // ── Vault gate ────────────────────────────────────────────────────────────────
 
 function VaultGate({ children }: { children: ReactNode }) {
@@ -66,7 +107,12 @@ function VaultGate({ children }: { children: ReactNode }) {
   if (isElectron && !hasVault) {
     return <VaultPickerPage />
   }
-  return <>{children}</>
+  return (
+    <>
+      <MigrationRunner />
+      {children}
+    </>
+  )
 }
 
 // ── Auth gate ─────────────────────────────────────────────────────────────────

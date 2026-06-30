@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react'
 import { ALL_METRICS, MetricId, getSelectedMetrics, saveSelectedMetrics, HomeLayout, getHomeLayout, saveHomeLayout } from '../../lib/metrics'
 import { SNOOZE_OPTIONS, getSnoozeDuration, saveSnoozeDuration } from '../../lib/alerts'
 import { api } from '../../api/client'
+import { migrationRanThisSession } from '../../App'
 
 export default function GeneralTab() {
+  const [showMigrationBanner, setShowMigrationBanner] = useState(migrationRanThisSession)
   const [companyName, setCompanyName] = useState(() => localStorage.getItem('cb_company_name') ?? '')
   const [companySaved, setCompanySaved] = useState(false)
   const [selected, setSelected] = useState<MetricId[]>(getSelectedMetrics)
@@ -53,6 +55,28 @@ export default function GeneralTab() {
 
   return (
     <div className="space-y-8">
+
+      {/* Migration notice — shown once per session when legacy localStorage settings were moved into the vault */}
+      {showMigrationBanner && (
+        <div className="flex items-start gap-3 bg-neon/10 border border-neon/30 rounded-lg px-4 py-3">
+          <svg className="shrink-0 mt-0.5 text-neon" width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5" />
+            <path d="M8 5v3.5M8 10.5v.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
+          <p className="text-sm text-chalk flex-1 leading-relaxed">
+            Your per-vault preferences (company name, feature flags, payment methods) have been moved from browser storage into this vault.
+          </p>
+          <button
+            onClick={() => setShowMigrationBanner(false)}
+            aria-label="Dismiss"
+            className="shrink-0 text-ash hover:text-chalk transition-colors mt-0.5 cursor-pointer"
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+          </button>
+        </div>
+      )}
 
       {/* Business name */}
       <div className="space-y-3">
