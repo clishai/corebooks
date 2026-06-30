@@ -1,13 +1,13 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { randomBytes } from 'node:crypto'
-import { generateMnemonic, mnemonicToEntropy } from '@scure/bip39'
+import { generateMnemonic, mnemonicToEntropy, validateMnemonic } from '@scure/bip39'
 import { wordlist } from '@scure/bip39/wordlists/english.js'
 import type {
   ActiveVault, OpenResult, PickerEntry, PickerRegistry, VaultId,
 } from './types.js'
 import { generateVaultId, readIdentity, writeIdentity } from './identity.js'
-import { createLockFile, unlockWithPassword, verifyHmac } from './lockFile.js'
+import { createLockFile, unlockWithPassword, unlockWithRecovery as unwrapWithRecovery, verifyHmac } from './lockFile.js'
 import { readSettings, writeSettings } from './settings.js'
 import { writeWorkspace } from './workspace.js'
 import { appendAuditEvent } from './audit.js'
@@ -56,38 +56,43 @@ export class VaultLifecycle {
     if (fs.existsSync(vaultPath)) throw new Error('VaultPathExists')
 
     fs.mkdirSync(vaultPath, { recursive: true })
-    fs.mkdirSync(path.join(vaultPath, '.corebooks'))
-    for (const sub of SUBDIRS) fs.mkdirSync(path.join(vaultPath, sub))
+    try {
+      fs.mkdirSync(path.join(vaultPath, '.corebooks'))
+      for (const sub of SUBDIRS) fs.mkdirSync(path.join(vaultPath, sub))
 
-    const id: VaultId = generateVaultId()
-    writeIdentity(vaultPath, {
-      schemaVersion: 1,
-      id,
-      displayName: sanitized,
-      created: new Date().toISOString(),
-    })
+      const id: VaultId = generateVaultId()
+      writeIdentity(vaultPath, {
+        schemaVersion: 1,
+        id,
+        displayName: sanitized,
+        created: new Date().toISOString(),
+      })
 
-    const K = randomBytes(32)
-    const phrase = generateMnemonic(wordlist, 128) // 12 words
-    const entropy = Buffer.from(mnemonicToEntropy(phrase, wordlist))
-    const lock = createLockFile(id, K, args.password, entropy)
-    fs.writeFileSync(path.join(vaultPath, '.corebooks', 'lock.json'), JSON.stringify(lock, null, 2), { mode: 0o600 })
+      const K = randomBytes(32)
+      const phrase = generateMnemonic(wordlist, 128) // 12 words
+      const entropy = Buffer.from(mnemonicToEntropy(phrase, wordlist))
+      const lock = createLockFile(id, K, args.password, entropy)
+      fs.writeFileSync(path.join(vaultPath, '.corebooks', 'lock.json'), JSON.stringify(lock, null, 2), { mode: 0o600 })
 
-    writeSettings(vaultPath, { ...structuredClone(DEFAULT_VAULT_SETTINGS), companyName: sanitized })
-    writeWorkspace(vaultPath, structuredClone(DEFAULT_VAULT_WORKSPACE))
+      writeSettings(vaultPath, { ...structuredClone(DEFAULT_VAULT_SETTINGS), companyName: sanitized })
+      writeWorkspace(vaultPath, structuredClone(DEFAULT_VAULT_WORKSPACE))
 
-    appendAuditEvent(vaultPath, { actor: 'system', event: 'vault.created', data: { id, displayName: sanitized } })
+      appendAuditEvent(vaultPath, { actor: 'system', event: 'vault.created', data: { id, displayName: sanitized } })
 
-    const lockResult = acquireLock(vaultPath)
-    if (lockResult.status === 'busy') throw new Error('VaultBusy: just-created vault is already locked?')
+      const lockResult = acquireLock(vaultPath)
+      if (lockResult.status === 'busy') throw new Error('VaultBusy: just-created vault is already locked?')
 
-    const db = await this.cfg.dbFactory.open({ filePath: path.join(vaultPath, 'corebooks.db'), key: K })
+      const db = await this.cfg.dbFactory.open({ filePath: path.join(vaultPath, 'corebooks.db'), key: K })
 
-    const vault: ActiveVault = { id, path: vaultPath, displayName: sanitized, apiPort: 0 }
-    this.state = { vault, key: K, db }
-    appendAuditEvent(vaultPath, { actor: 'system', event: 'vault.opened', data: {} })
-    this.updatePicker(vault)
-    return { vault, recoveryPhrase: phrase }
+      const vault: ActiveVault = { id, path: vaultPath, displayName: sanitized, apiPort: 0 }
+      this.state = { vault, key: K, db }
+      appendAuditEvent(vaultPath, { actor: 'system', event: 'vault.opened', data: {} })
+      this.updatePicker(vault)
+      return { vault, recoveryPhrase: phrase }
+    } catch (err) {
+      fs.rmSync(vaultPath, { recursive: true, force: true })
+      throw err
+    }
   }
 
   async open(args: { path: string; password?: string }): Promise<OpenResult> {
@@ -106,7 +111,13 @@ export class VaultLifecycle {
 
     const lockFilePath = path.join(vaultPath, '.corebooks', 'lock.json')
     if (!fs.existsSync(lockFilePath)) return { status: 'identity-mismatch' }
-    const lock = JSON.parse(fs.readFileSync(lockFilePath, 'utf-8'))
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let lock: any
+    try {
+      lock = JSON.parse(fs.readFileSync(lockFilePath, 'utf-8'))
+    } catch {
+      return { status: 'lock-tampered' }
+    }
     if (!verifyHmac(lock, identity.id)) return { status: 'lock-tampered' }
 
     if (!args.password) return { status: 'needs-password' }
@@ -143,7 +154,14 @@ export class VaultLifecycle {
       throw err
     }
 
-    const db = await this.cfg.dbFactory.open({ filePath: path.join(vaultPath, 'corebooks.db'), key: K })
+    let db: DbHandle
+    try {
+      db = await this.cfg.dbFactory.open({ filePath: path.join(vaultPath, 'corebooks.db'), key: K })
+    } catch (err) {
+      K.fill(0)
+      releaseLock(vaultPath)
+      throw err
+    }
     const vault: ActiveVault = { id: identity.id, path: vaultPath, displayName: identity.displayName, apiPort: 0 }
     this.state = { vault, key: K, db }
     appendAuditEvent(vaultPath, { actor: 'system', event: 'vault.opened', data: {} })
@@ -161,11 +179,95 @@ export class VaultLifecycle {
     this.state = null
   }
 
+  /**
+   * Close the current vault (if any) and open a different one atomically.
+   * Pass `target.directory + displayName + password` to create a new vault,
+   * or `target.path + password` to open an existing one.
+   *
+   * No Electron relaunch needed — the Prisma/DB client lives on this lifecycle
+   * instance, not as a module-level singleton.
+   */
+  async switch(args: {
+    target:
+      | { directory: string; displayName: string; password: string }
+      | { path: string; password: string }
+  }): Promise<OpenResult | { status: 'opened'; vault: ActiveVault }> {
+    await this.close()
+    if ('directory' in args.target) {
+      const { vault } = await this.create(args.target)
+      return { status: 'opened', vault }
+    }
+    return this.open(args.target)
+  }
+
+  /**
+   * Unlock a vault using its BIP-39 recovery phrase, then immediately rotate
+   * the password slot to `newPassword` (same K and recovery slot retained).
+   * This is the "forgot password" recovery path.
+   */
+  async unlockWithRecovery(args: { path: string; phrase: string; newPassword: string }): Promise<OpenResult> {
+    if (args.newPassword.length < 12) throw new Error('VaultPasswordTooShort')
+    if (!validateMnemonic(args.phrase, wordlist)) throw new Error('VaultRecoveryPhraseInvalid')
+
+    const identity = readIdentity(args.path)
+    const lockFilePath = path.join(args.path, '.corebooks', 'lock.json')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let lock: any
+    try {
+      lock = JSON.parse(fs.readFileSync(lockFilePath, 'utf-8'))
+    } catch {
+      return { status: 'lock-tampered' }
+    }
+    if (!verifyHmac(lock, identity.id)) return { status: 'lock-tampered' }
+
+    const entropy = Buffer.from(mnemonicToEntropy(args.phrase, wordlist))
+    const K = unwrapWithRecovery(lock, identity.id, entropy)
+
+    // Rewrite lock.json with new password slot; same K and recovery slot remain.
+    const newLock = createLockFile(identity.id, K, args.newPassword, entropy)
+    fs.writeFileSync(lockFilePath, JSON.stringify(newLock, null, 2), { mode: 0o600 })
+    appendAuditEvent(args.path, { actor: 'human', event: 'password.rotated-via-recovery', data: {} })
+
+    const lockResult = acquireLock(args.path)
+    if (lockResult.status === 'busy') { K.fill(0); return { status: 'busy', lockedByPid: lockResult.lockedByPid } }
+
+    let db: DbHandle
+    try {
+      db = await this.cfg.dbFactory.open({ filePath: path.join(args.path, 'corebooks.db'), key: K })
+    } catch (err) {
+      K.fill(0)
+      releaseLock(args.path)
+      throw err
+    }
+
+    const vault: ActiveVault = { id: identity.id, path: args.path, displayName: identity.displayName, apiPort: 0 }
+    this.state = { vault, key: K, db }
+    appendAuditEvent(args.path, { actor: 'system', event: 'vault.opened', data: {} })
+    this.updatePicker(vault)
+    return { status: 'opened', vault }
+  }
+
+  /**
+   * Append a non-system audit event to the currently-open vault.
+   * The actor is always 'human' — use this for user-initiated events
+   * (password changes, biometric toggles, etc.).
+   */
+  async appendAuditEvent(event: string, data: unknown): Promise<void> {
+    if (!this.state) throw new Error('NoActiveVault')
+    appendAuditEvent(this.state.vault.path, { actor: 'human', event, data })
+  }
+
   private updatePicker(vault: ActiveVault): void {
     const file = this.cfg.pickerRegistryPath
-    const reg: PickerRegistry = fs.existsSync(file)
-      ? JSON.parse(fs.readFileSync(file, 'utf-8'))
-      : { vaults: [] }
+    let reg: PickerRegistry = { vaults: [] }
+    if (fs.existsSync(file)) {
+      try {
+        reg = JSON.parse(fs.readFileSync(file, 'utf-8')) as PickerRegistry
+      } catch {
+        // Corrupt picker.json — reset to empty rather than blocking vault open
+        reg = { vaults: [] }
+      }
+    }
     const now = new Date().toISOString()
     const existing = reg.vaults.find(v => v.id === vault.id)
     const entry: PickerEntry = { id: vault.id, path: vault.path, displayName: vault.displayName, lastOpened: now }

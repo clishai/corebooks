@@ -108,3 +108,54 @@ describe('VaultLifecycle.open', () => {
     expect(fs.existsSync(path.join(vault.path, '.corebooks', 'settings.json'))).toBe(false)
   }, 30_000)
 })
+
+describe('VaultLifecycle.switch', () => {
+  // Spec T19
+  it('switch tears down A cleanly then opens B; A key zeroed, lock released', async () => {
+    const lc = newLifecycle()
+    const a = await lc.create({ directory: parentDir, displayName: 'A', password: 'password 12 chars' })
+    const aKey = lc.__test_getActiveKey()!
+    const bParent = path.join(tmp, 'parent-b')
+    fs.mkdirSync(bParent)
+    const result = await lc.switch({
+      target: { directory: bParent, displayName: 'B', password: 'password 12 chars more' },
+    })
+    expect(result.status).toBe('opened')
+    expect(aKey.every(b => b === 0)).toBe(true)
+    expect(fs.existsSync(path.join(a.vault.path, '.corebooks', 'process.lock'))).toBe(false)
+    expect(lc.current?.displayName).toBe('B')
+  }, 60_000)
+})
+
+describe('VaultLifecycle.unlockWithRecovery', () => {
+  // Spec T11
+  it('unlocks with recovery phrase and rotates the password', async () => {
+    const lc = newLifecycle()
+    const { vault, recoveryPhrase } = await lc.create({
+      directory: parentDir, displayName: 'A', password: 'original pass 12',
+    })
+    await lc.close()
+    const lc2 = newLifecycle()
+    const result = await lc2.unlockWithRecovery({
+      path: vault.path, phrase: recoveryPhrase, newPassword: 'new pass 12 chars',
+    })
+    expect(result.status).toBe('opened')
+    await lc2.close()
+    // Verify new password works
+    const lc3 = newLifecycle()
+    const r = await lc3.open({ path: vault.path, password: 'new pass 12 chars' })
+    expect(r.status).toBe('opened')
+  }, 90_000)
+})
+
+describe('VaultLifecycle.appendAuditEvent', () => {
+  it('appends events to the active vault via the public API', async () => {
+    const lc = newLifecycle()
+    await lc.create({ directory: parentDir, displayName: 'A', password: 'password 12 chars' })
+    await lc.appendAuditEvent('password.changed', { by: 'user' })
+    const lines = fs.readFileSync(path.join(lc.current!.path, '.corebooks', 'audit.jsonl'), 'utf-8').trim().split('\n')
+    const audit = JSON.parse(lines[lines.length - 1])
+    expect(audit.event).toBe('password.changed')
+    expect(audit.actor).toBe('human')
+  }, 30_000)
+})
