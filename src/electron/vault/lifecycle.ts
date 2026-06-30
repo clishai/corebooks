@@ -71,7 +71,12 @@ export class VaultLifecycle {
       const K = randomBytes(32)
       const phrase = generateMnemonic(wordlist, 128) // 12 words
       const entropy = Buffer.from(mnemonicToEntropy(phrase, wordlist))
-      const lock = createLockFile(id, K, args.password, entropy)
+      let lock: ReturnType<typeof createLockFile>
+      try {
+        lock = createLockFile(id, K, args.password, entropy)
+      } finally {
+        entropy.fill(0)
+      }
       fs.writeFileSync(path.join(vaultPath, '.corebooks', 'lock.json'), JSON.stringify(lock, null, 2), { mode: 0o600 })
 
       writeSettings(vaultPath, { ...structuredClone(DEFAULT_VAULT_SETTINGS), companyName: sanitized })
@@ -112,7 +117,7 @@ export class VaultLifecycle {
     const lockFilePath = path.join(vaultPath, '.corebooks', 'lock.json')
     if (!fs.existsSync(lockFilePath)) return { status: 'identity-mismatch' }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let lock: any
+    let lock: any // untrusted JSON; validated by verifyHmac before use
     try {
       lock = JSON.parse(fs.readFileSync(lockFilePath, 'utf-8'))
     } catch {
@@ -191,7 +196,7 @@ export class VaultLifecycle {
     target:
       | { directory: string; displayName: string; password: string }
       | { path: string; password: string }
-  }): Promise<OpenResult | { status: 'opened'; vault: ActiveVault }> {
+  }): Promise<OpenResult> {
     await this.close()
     if ('directory' in args.target) {
       const { vault } = await this.create(args.target)
@@ -212,7 +217,7 @@ export class VaultLifecycle {
     const identity = readIdentity(args.path)
     const lockFilePath = path.join(args.path, '.corebooks', 'lock.json')
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let lock: any
+    let lock: any // untrusted JSON; validated by verifyHmac before use
     try {
       lock = JSON.parse(fs.readFileSync(lockFilePath, 'utf-8'))
     } catch {
@@ -221,15 +226,32 @@ export class VaultLifecycle {
     if (!verifyHmac(lock, identity.id)) return { status: 'lock-tampered' }
 
     const entropy = Buffer.from(mnemonicToEntropy(args.phrase, wordlist))
-    const K = unwrapWithRecovery(lock, identity.id, entropy)
+    let K: Buffer
+    try {
+      K = unwrapWithRecovery(lock, identity.id, entropy)
+    } catch (err) {
+      entropy.fill(0)
+      throw err
+    }
+
+    // Acquire process lock BEFORE rewriting lock.json so that if another process
+    // holds the vault the password slot is not rotated on disk without a successful open.
+    const lockResult = acquireLock(args.path)
+    if (lockResult.status === 'busy') {
+      K.fill(0)
+      entropy.fill(0)
+      return { status: 'busy', lockedByPid: lockResult.lockedByPid }
+    }
 
     // Rewrite lock.json with new password slot; same K and recovery slot remain.
-    const newLock = createLockFile(identity.id, K, args.newPassword, entropy)
+    let newLock: ReturnType<typeof createLockFile>
+    try {
+      newLock = createLockFile(identity.id, K, args.newPassword, entropy)
+    } finally {
+      entropy.fill(0)
+    }
     fs.writeFileSync(lockFilePath, JSON.stringify(newLock, null, 2), { mode: 0o600 })
     appendAuditEvent(args.path, { actor: 'human', event: 'password.rotated-via-recovery', data: {} })
-
-    const lockResult = acquireLock(args.path)
-    if (lockResult.status === 'busy') { K.fill(0); return { status: 'busy', lockedByPid: lockResult.lockedByPid } }
 
     let db: DbHandle
     try {

@@ -125,6 +125,18 @@ describe('VaultLifecycle.switch', () => {
     expect(fs.existsSync(path.join(a.vault.path, '.corebooks', 'process.lock'))).toBe(false)
     expect(lc.current?.displayName).toBe('B')
   }, 60_000)
+
+  it('switch works when no vault is currently open', async () => {
+    const lc = newLifecycle()
+    // No create/open first — state is null
+    const bParent = path.join(tmp, 'parent-b')
+    fs.mkdirSync(bParent)
+    const result = await lc.switch({
+      target: { directory: bParent, displayName: 'B', password: 'password 12 chars' },
+    })
+    expect(result.status).toBe('opened')
+    expect(lc.current?.displayName).toBe('B')
+  }, 30_000)
 })
 
 describe('VaultLifecycle.unlockWithRecovery', () => {
@@ -158,4 +170,9 @@ describe('VaultLifecycle.appendAuditEvent', () => {
     expect(audit.event).toBe('password.changed')
     expect(audit.actor).toBe('human')
   }, 30_000)
+
+  it('throws NoActiveVault when no vault is open', async () => {
+    const lc = newLifecycle()
+    await expect(lc.appendAuditEvent('test', {})).rejects.toThrow('NoActiveVault')
+  })
 })
