@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import type { OpenResult } from '../electron'
 
 interface Props {
   vaultName: string
@@ -20,12 +21,17 @@ export function UnlockVaultModal({ vaultName, vaultPath, onSuccess, onCancel, al
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
-    inputRef.current?.focus()
+    if (mode === 'password') {
+      inputRef.current?.focus()
+    } else {
+      textareaRef.current?.focus()
+    }
   }, [mode])
 
-  function handleOpenResult(result: { status: string } | undefined) {
+  function handleOpenResult(result: OpenResult | undefined) {
     if (!result) {
       setError('No response from vault service. Please try again.')
       return false
@@ -52,9 +58,6 @@ export function UnlockVaultModal({ vaultName, vaultPath, onSuccess, onCancel, al
         return false
       case 'needs-settings-confirmation':
         setError('This vault has pending settings to confirm. Please open it from the picker.')
-        return false
-      default:
-        setError(`Unexpected vault status: ${result.status}`)
         return false
     }
   }
@@ -199,7 +202,7 @@ export function UnlockVaultModal({ vaultName, vaultPath, onSuccess, onCancel, al
               <div>
                 <label className="block text-xs font-semibold text-chalk mb-1">12-word recovery phrase</label>
                 <textarea
-                  ref={inputRef as unknown as React.RefObject<HTMLTextAreaElement>}
+                  ref={textareaRef}
                   value={phrase}
                   onChange={(e) => setPhrase(e.target.value)}
                   placeholder="word1 word2 word3 …"

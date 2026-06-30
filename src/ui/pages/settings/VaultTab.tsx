@@ -78,7 +78,7 @@ export default function VaultTab() {
     setLoadingFiles(true)
     vault.listVaultFiles()
       .then(setFiles)
-      .catch(() => {})
+      .catch((e) => setFileError(e instanceof Error ? e.message : 'Failed to load vault files'))
       .finally(() => setLoadingFiles(false))
   }, [filesOpen])
 

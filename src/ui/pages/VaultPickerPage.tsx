@@ -35,6 +35,9 @@ export default function VaultPickerPage() {
   // After the recovery phrase is acknowledged, this triggers the reload that
   // the vault:ready listener has been suppressing.
   const suppressReload = useRef(false)
+  // Tracks whether vault:ready fired while suppressReload was active so that
+  // handlePhraseAcknowledged knows whether to reload immediately or wait.
+  const vaultReadySuppressed = useRef(false)
 
   useEffect(() => {
     window.electronAPI?.vault.list().then((list) => {
@@ -49,7 +52,9 @@ export default function VaultPickerPage() {
     const unsubscribe = window.electronAPI?.vault.onReady(() => {
       if (suppressReload.current) {
         // A create flow is showing the recovery phrase — defer reload until
-        // the user acknowledges it.
+        // the user acknowledges it. Mark that we received the event so
+        // handlePhraseAcknowledged can reload immediately.
+        vaultReadySuppressed.current = true
         return
       }
       window.location.reload()
@@ -166,8 +171,16 @@ export default function VaultPickerPage() {
   function handlePhraseAcknowledged(): void {
     setCreatedPhrase(null)
     suppressReload.current = false
-    // vault:ready already fired and was suppressed — trigger the reload now.
-    window.location.reload()
+    if (vaultReadySuppressed.current) {
+      // vault:ready already fired while the phrase modal was showing — safe to reload now.
+      window.location.reload()
+    } else {
+      // vault:ready hasn't arrived yet; wait for it then reload.
+      const cleanup = window.electronAPI!.vault.onReady(() => {
+        cleanup()
+        window.location.reload()
+      })
+    }
   }
 
   async function handleChooseDir(): Promise<void> {
