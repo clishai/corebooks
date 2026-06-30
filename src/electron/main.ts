@@ -104,7 +104,7 @@ app.whenReady().then(async () => {
     dbFactory: {
       async open({ filePath, key }) {
         const { client, db } = createPrismaClient({ filePath, key })
-        const port = await startApi({ prisma: client, db })
+        const port = await startApi({ db })
         currentApiPort = port
 
         // Start recurring template check
@@ -118,6 +118,7 @@ app.whenReady().then(async () => {
               clearInterval(recurringIntervalId)
               recurringIntervalId = null
             }
+            currentApiPort = null
             await client.$disconnect()
             // db is closed by the Prisma adapter
           },

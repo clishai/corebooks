@@ -6,7 +6,6 @@ import { listAccounts } from '../db/repositories/accountRepository.js';
 import { disconnectPrisma } from '../db/client.js';
 import { buildApp } from './server.js';
 import { ensureSchema } from '../db/ensureSchema.js';
-import type { PrismaClient } from '../generated/prisma/client.js';
 import type Database from 'better-sqlite3-multiple-ciphers';
 
 type Db = InstanceType<typeof Database>;
@@ -32,19 +31,15 @@ function findFreePort(): Promise<number> {
 }
 
 /**
- * Start the Fastify API bound to a Prisma client + Database opened by the
- * caller (typically VaultLifecycle via main.ts's DbFactory). The API uses
- * the Prisma singleton in src/db/client.ts, which must already have been
- * set via createPrismaClient({filePath, key}) before this is called.
+ * Start the Fastify API using the already-keyed Database opened by the caller
+ * (typically VaultLifecycle via main.ts's DbFactory). The Prisma singleton in
+ * src/db/client.ts must already have been set via createPrismaClient() before
+ * this is called.
  *
  * Returns the chosen 127.0.0.1 port the API is listening on.
- *
- * The caller owns the prisma + db lifecycle. We do not close them here on
- * error from .listen() — only $disconnect to release the adapter; the caller
- * still needs to close db separately if appropriate.
  */
-export async function startApi(_args: { prisma: PrismaClient; db: Db }): Promise<number> {
-  ensureSchema(_args.db);
+export async function startApi(args: { db: Db }): Promise<number> {
+  ensureSchema(args.db);
 
   const [loadedLedger, chartOfAccounts] = await Promise.all([
     loadLedger(),
