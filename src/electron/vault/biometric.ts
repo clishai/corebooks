@@ -4,7 +4,6 @@ export interface BiometricBackend {
   isEncryptionAvailable(): boolean
   encryptString(plain: string): Buffer
   decryptString(encrypted: Buffer): string
-  // In-memory item store keyed by label. Real backend uses OS keychain.
   put(label: string, value: Buffer): void
   get(label: string): Buffer | null
   remove(label: string): void
@@ -13,6 +12,11 @@ export interface BiometricBackend {
 export interface BiometricStore {
   isBiometricAvailable(): boolean
   storeBiometricKey(vaultId: VaultId, K: Buffer): void
+  /**
+   * Returns null if biometric encryption is unavailable OR if no key has been
+   * stored for this vault. Call isBiometricAvailable() first to distinguish
+   * the two cases before falling back to password unlock.
+   */
   loadBiometricKey(vaultId: VaultId): Buffer | null
   removeBiometricKey(vaultId: VaultId): void
 }
@@ -49,6 +53,7 @@ export class FakeBackend implements BiometricBackend {
   encryptionAvailable = true
   items = new Map<string, Buffer>()
   isEncryptionAvailable() { return this.encryptionAvailable }
+  // 'FAKE:' prefix cannot appear in hex-encoded key material ([0-9a-f] only).
   encryptString(plain: string) { return Buffer.from('FAKE:' + plain, 'utf-8') }
   decryptString(encrypted: Buffer) {
     const s = encrypted.toString('utf-8')
