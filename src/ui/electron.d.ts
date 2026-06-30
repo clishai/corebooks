@@ -1,6 +1,27 @@
-import type { VaultEntry, VaultState } from '../electron/vaultTypes'
-
 export {}
+
+export interface ActiveVault {
+  id: string
+  path: string
+  displayName: string
+  apiPort: number
+}
+
+export interface PickerEntry {
+  id: string
+  path: string
+  displayName: string
+  lastOpened: string
+}
+
+export type OpenResult =
+  | { status: 'opened'; vault: ActiveVault }
+  | { status: 'needs-password' }
+  | { status: 'needs-settings-confirmation'; defaults: Record<string, unknown> }
+  | { status: 'busy'; lockedByPid: number }
+  | { status: 'identity-mismatch' }
+  | { status: 'lock-tampered' }
+  | { status: 'legacy-needs-migration' }
 
 interface VaultFileEntry {
   folder: string
@@ -23,34 +44,28 @@ declare global {
     electronAPI?: {
       apiBaseUrl: string | null
       vault: {
-        getState: () => VaultState
-        list: () => Promise<VaultEntry[]>
-        create: (name: string, dirPath: string) => Promise<VaultEntry>
-        select: (dirPath: string) => Promise<{ needsPassword: boolean }>
-        unlock: (password: string) => Promise<void>
-        rename: (newName: string) => Promise<{ newPath: string }>
-        showInExplorer: () => Promise<void>
-        chooseDirectory: () => Promise<string | null>
-        onReady: (cb: () => void) => () => void
-        relaunch: () => Promise<void>
-        listImports: () => Promise<VaultFileEntry[]>
-        listVaultFiles: () => Promise<VaultFileEntry[]>
-        moveFile: (srcPath: string, targetFolder: string) => Promise<string>
-        deleteFile: (filePath: string) => Promise<void>
-        readFile: (filePath: string) => Promise<string>
-        onFileAdded: (cb: (event: FileAddedEvent) => void) => () => void
-        onFileRemoved: (cb: (event: { path: string }) => void) => () => void
-        safeStorageAvailable: () => Promise<boolean>
-        getDefaultBase: () => Promise<string>
-        setSkipUntil: (until: string | null) => Promise<void>
-        getSkipUntil: () => Promise<string | null>
-        getEncryptionStatus: () => Promise<{ encrypted: boolean }>
-        setupEncryption: (password: string) => Promise<{ phraseWords: string[] }>
-        verifyPassword: (password: string) => Promise<boolean>
-        changePassword: (oldPassword: string, newPassword: string) => Promise<void>
-        removeEncryption: (password: string) => Promise<void>
-        regenerateRecovery: (password: string) => Promise<{ phraseWords: string[] }>
-        resetPasswordAfterRecovery: (words: string[], newPassword: string) => Promise<void>
+        list(): Promise<PickerEntry[]>
+        create(args: { directory: string; displayName: string; password: string }): Promise<{ vault: ActiveVault; recoveryPhrase: string }>
+        open(args: { path: string; password?: string }): Promise<OpenResult>
+        close(): Promise<void>
+        switchTo(args: { path: string; password: string }): Promise<OpenResult>
+        unlockWithRecovery(args: { path: string; phrase: string; newPassword: string }): Promise<OpenResult>
+        confirmDefaultSettings(): Promise<void>
+        chooseDirectory(): Promise<string | null>
+        showInExplorer(vaultPath: string): Promise<void>
+        migrateLegacy(args: { path: string; password: string }): Promise<{ recoveryPhrase: string }>
+        enableBiometric(): Promise<void>
+        disableBiometric(): Promise<void>
+        isBiometricAvailable(): Promise<boolean>
+        listImports(): Promise<Array<{ name: string; path: string; size: number; mtime: number }>>
+        listVaultFiles(): Promise<VaultFileEntry[]>
+        moveFile(srcPath: string, targetFolder: string): Promise<string>
+        deleteFile(filePath: string): Promise<void>
+        readFile(filePath: string): Promise<string>
+        onFileAdded(cb: (event: FileAddedEvent) => void): () => void
+        onFileRemoved(cb: (event: { path: string }) => void): () => void
+        getDefaultBase(): Promise<string>
+        onReady(cb: () => void): () => void
       }
     }
   }

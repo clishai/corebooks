@@ -279,6 +279,27 @@ export class VaultLifecycle {
     appendAuditEvent(this.state.vault.path, { actor: 'human', event, data })
   }
 
+  /**
+   * Store the currently-open vault's K in the BiometricStore (OS keychain via
+   * Electron safeStorage). Throws NoActiveVault if no vault is open, or
+   * BiometricUnavailable if the OS keychain is not accessible.
+   */
+  async enableBiometricForActiveVault(): Promise<void> {
+    if (!this.state) throw new Error('NoActiveVault')
+    this.cfg.biometric.storeBiometricKey(this.state.vault.id, Buffer.from(this.state.key))
+    appendAuditEvent(this.state.vault.path, { actor: 'human', event: 'biometric.enabled', data: {} })
+  }
+
+  /**
+   * Remove the currently-open vault's K from the BiometricStore. Idempotent —
+   * does not throw if no key was stored. Throws NoActiveVault if no vault is open.
+   */
+  async disableBiometricForActiveVault(): Promise<void> {
+    if (!this.state) throw new Error('NoActiveVault')
+    this.cfg.biometric.removeBiometricKey(this.state.vault.id)
+    appendAuditEvent(this.state.vault.path, { actor: 'human', event: 'biometric.disabled', data: {} })
+  }
+
   private updatePicker(vault: ActiveVault): void {
     const file = this.cfg.pickerRegistryPath
     let reg: PickerRegistry = { vaults: [] }
