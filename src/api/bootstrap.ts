@@ -36,9 +36,11 @@ function findFreePort(): Promise<number> {
  * src/db/client.ts must already have been set via createPrismaClient() before
  * this is called.
  *
- * Returns the chosen 127.0.0.1 port the API is listening on.
+ * Returns the chosen 127.0.0.1 port the API is listening on plus a `stop`
+ * function that shuts the Fastify instance down (so the lifecycle owner can
+ * close it without leaking a listener when a vault is closed or switched).
  */
-export async function startApi(args: { db: Db }): Promise<number> {
+export async function startApi(args: { db: Db }): Promise<{ port: number; stop: () => Promise<void> }> {
   ensureSchema(args.db);
 
   const [loadedLedger, chartOfAccounts] = await Promise.all([
@@ -57,5 +59,5 @@ export async function startApi(args: { db: Db }): Promise<number> {
     await disconnectPrisma();
     throw err;
   }
-  return port;
+  return { port, stop: () => app.close() };
 }

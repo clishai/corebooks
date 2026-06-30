@@ -56,6 +56,8 @@ export class VaultLifecycle {
     if (fs.existsSync(vaultPath)) throw new Error('VaultPathExists')
 
     fs.mkdirSync(vaultPath, { recursive: true })
+    const K = randomBytes(32)
+    let committed = false
     try {
       fs.mkdirSync(path.join(vaultPath, '.corebooks'))
       for (const sub of SUBDIRS) fs.mkdirSync(path.join(vaultPath, sub))
@@ -68,7 +70,6 @@ export class VaultLifecycle {
         created: new Date().toISOString(),
       })
 
-      const K = randomBytes(32)
       const phrase = generateMnemonic(wordlist, 128) // 12 words
       const entropy = Buffer.from(mnemonicToEntropy(phrase, wordlist))
       let lock: ReturnType<typeof createLockFile>
@@ -91,10 +92,12 @@ export class VaultLifecycle {
 
       const vault: ActiveVault = { id, path: vaultPath, displayName: sanitized, apiPort: 0 }
       this.state = { vault, key: K, db }
+      committed = true
       appendAuditEvent(vaultPath, { actor: 'system', event: 'vault.opened', data: {} })
       this.updatePicker(vault)
       return { vault, recoveryPhrase: phrase }
     } catch (err) {
+      if (!committed) K.fill(0)
       fs.rmSync(vaultPath, { recursive: true, force: true })
       throw err
     }

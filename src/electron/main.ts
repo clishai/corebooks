@@ -104,7 +104,7 @@ app.whenReady().then(async () => {
     dbFactory: {
       async open({ filePath, key }) {
         const { client, db } = createPrismaClient({ filePath, key })
-        const port = await startApi({ db })
+        const { port, stop } = await startApi({ db })
         currentApiPort = port
 
         // Start recurring template check
@@ -119,6 +119,7 @@ app.whenReady().then(async () => {
               recurringIntervalId = null
             }
             currentApiPort = null
+            await stop()
             await client.$disconnect()
             // db is closed by the Prisma adapter
           },
@@ -195,8 +196,10 @@ app.whenReady().then(async () => {
     if (!pendingSettingsPath) throw new Error('NoPendingSettingsConfirmation')
     const { writeSettings } = await import('./vault/settings.js')
     const { DEFAULT_VAULT_SETTINGS } = await import('./vault/defaults.js')
+    const { appendAuditEvent } = await import('./vault/audit.js')
     const displayName = path.basename(pendingSettingsPath)
     writeSettings(pendingSettingsPath, { ...DEFAULT_VAULT_SETTINGS, companyName: displayName })
+    appendAuditEvent(pendingSettingsPath, { actor: 'human', event: 'settings.restored-defaults', data: {} })
     pendingSettingsPath = null
   })
 
@@ -220,7 +223,11 @@ app.whenReady().then(async () => {
       const result = await migrateLegacyVault({
         vaultPath: args.path, oldGlobalKey: oldKey, password: args.password, displayName,
       })
-      return { recoveryPhrase: result.recoveryPhrase }
+      try {
+        return { recoveryPhrase: result.recoveryPhrase }
+      } finally {
+        result.newKey.fill(0)
+      }
     } finally {
       oldKey.fill(0)
     }

@@ -91,8 +91,8 @@ export function UnlockVaultModal({ vaultName, vaultPath, onSuccess, onCancel, al
       setError('Recovery phrase must be exactly 12 words.')
       return
     }
-    if (newPassword.length < 8) {
-      setError('New password must be at least 8 characters.')
+    if (newPassword.length < 12) {
+      setError('New password must be at least 12 characters.')
       return
     }
     if (newPassword !== confirmPassword) {
@@ -216,7 +216,7 @@ export function UnlockVaultModal({ vaultName, vaultPath, onSuccess, onCancel, al
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-chalk mb-1">New password (min. 8 characters)</label>
+                <label className="block text-xs font-semibold text-chalk mb-1">New password (min. 12 characters)</label>
                 <input
                   type="password"
                   value={newPassword}

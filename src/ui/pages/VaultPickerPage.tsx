@@ -139,7 +139,7 @@ export default function VaultPickerPage() {
   const createValid =
     newName.trim().length > 0 &&
     newDir.trim().length > 0 &&
-    newPassword.length >= 8 &&
+    newPassword.length >= 12 &&
     newPassword === newPasswordConfirm
 
   async function handleCreate(): Promise<void> {
@@ -336,7 +336,7 @@ export default function VaultPickerPage() {
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-medium text-chalk mb-1.5">Vault password (min. 8 characters)</label>
+                <label className="block text-xs font-medium text-chalk mb-1.5">Vault password (min. 12 characters)</label>
                 <input
                   type="password"
                   value={newPassword}

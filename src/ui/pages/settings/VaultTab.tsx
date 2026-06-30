@@ -47,6 +47,9 @@ export default function VaultTab() {
   const [biometricAvailable, setBiometricAvailable] = useState<boolean>(false)
   const [biometricBusy, setBiometricBusy] = useState<boolean>(false)
   const [biometricError, setBiometricError] = useState<string | null>(null)
+  // Tracks whether biometric was enabled in this app session. Persistence
+  // across restarts is a follow-up — see note rendered below the buttons.
+  const [biometricEnabled, setBiometricEnabled] = useState<boolean>(false)
 
   // Close vault state
   const [closing, setClosing] = useState(false)
@@ -166,6 +169,7 @@ export default function VaultTab() {
     setBiometricError(null)
     try {
       await vault!.enableBiometric()
+      setBiometricEnabled(true)
     } catch (e) {
       setBiometricError(e instanceof Error ? e.message : 'Failed to enable biometric unlock')
     } finally {
@@ -178,6 +182,7 @@ export default function VaultTab() {
     setBiometricError(null)
     try {
       await vault!.disableBiometric()
+      setBiometricEnabled(false)
     } catch (e) {
       setBiometricError(e instanceof Error ? e.message : 'Failed to disable biometric unlock')
     } finally {
@@ -251,6 +256,9 @@ export default function VaultTab() {
                 Disable
               </button>
             </div>
+            {biometricEnabled && (
+              <p className="text-xs text-ash mt-1">Biometric unlock is active until the app is restarted.</p>
+            )}
             {biometricError && (
               <p className="text-xs text-red-400 mt-2">{biometricError}</p>
             )}
