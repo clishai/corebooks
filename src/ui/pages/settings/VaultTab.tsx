@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
+import type { PickerEntry } from '../../electron'
 import { getLifecycleLog, type LifecycleEvent } from '../../lib/features'
-import VaultPasswordSetup from '../../components/VaultPasswordSetup'
-import VaultRecoverModal from '../../components/VaultRecoverModal'
 
 interface VaultFile {
   folder: string
@@ -33,39 +32,9 @@ function formatBytes(bytes: number) {
 
 const VAULT_FOLDERS = ['imports', 'statements', 'receipts', 'exports']
 
-function SafeStorageWarning() {
-  const [available, setAvailable] = useState<boolean | null>(null)
-  const isLinux = typeof navigator !== 'undefined' && /Linux/.test(navigator.platform)
-
-  useEffect(() => {
-    window.electronAPI?.vault.safeStorageAvailable()
-      .then(setAvailable)
-      .catch(() => setAvailable(false))
-  }, [])
-
-  // Only warn on Linux — macOS/Windows always have a working keychain
-  if (!isLinux || available !== false) return null
-
-  return (
-    <div className="bg-amber-950/50 border border-amber-700 rounded-lg px-5 py-4 flex gap-3">
-      <span className="text-amber-400 shrink-0 mt-0.5">⚠</span>
-      <div>
-        <p className="text-sm text-amber-300 font-medium">OS keychain unavailable</p>
-        <p className="text-sm text-ash mt-1 leading-relaxed">
-          The encryption key for your vault database is stored unprotected on this system.
-          Install <code className="text-chalk bg-raised px-1 py-0.5 rounded text-xs">libsecret</code> and
-          a keyring daemon (GNOME Keyring or KWallet) to enable OS-level encryption.
-        </p>
-      </div>
-    </div>
-  )
-}
-
 export default function VaultTab() {
   const vault = window.electronAPI?.vault
-  const state = vault?.getState()
-  const [name, setName] = useState(state?.vaultName ?? '')
-  const [renaming, setRenaming] = useState(false)
+  const [currentVault, setCurrentVault] = useState<PickerEntry | null>(null)
   const [filesOpen, setFilesOpen] = useState(false)
   const [files, setFiles] = useState<VaultFile[]>([])
   const [loadingFiles, setLoadingFiles] = useState(false)
@@ -73,22 +42,36 @@ export default function VaultTab() {
   const [fileError, setFileError] = useState<string | null>(null)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [log, setLog] = useState<LifecycleEvent[]>([])
-  const [encrypted, setEncrypted] = useState<boolean>(false)
-  const [setupOpen, setSetupOpen] = useState(false)
-  const [recoverOpen, setRecoverOpen] = useState(false)
-  const [changeOpen, setChangeOpen] = useState(false)
-  const [regenOpen, setRegenOpen] = useState(false)
-  const [removeOpen, setRemoveOpen] = useState(false)
-  const [regeneratedPhrase, setRegeneratedPhrase] = useState<string[] | null>(null)
+
+  // Biometric state
+  const [biometricAvailable, setBiometricAvailable] = useState<boolean>(false)
+  const [biometricBusy, setBiometricBusy] = useState<boolean>(false)
+  const [biometricError, setBiometricError] = useState<string | null>(null)
+
+  // Close vault state
+  const [closing, setClosing] = useState(false)
+
+  // Identify the active vault by looking at the picker list and taking the most
+  // recently opened entry. The active vault is always the one we have an API
+  // connection to in this window, and the lifecycle code touches lastOpened on
+  // open, so this is a safe proxy.
+  useEffect(() => {
+    if (!vault) return
+    vault.list()
+      .then((list) => {
+        if (list.length === 0) { setCurrentVault(null); return }
+        const sorted = [...list].sort((a, b) =>
+          new Date(b.lastOpened).getTime() - new Date(a.lastOpened).getTime(),
+        )
+        setCurrentVault(sorted[0] ?? null)
+      })
+      .catch(() => setCurrentVault(null))
+  }, [])
 
   useEffect(() => {
     if (!vault) return
-    vault.getEncryptionStatus().then((s) => setEncrypted(s.encrypted)).catch(() => {})
+    vault.isBiometricAvailable().then(setBiometricAvailable).catch(() => setBiometricAvailable(false))
   }, [])
-
-  function refreshStatus(): void {
-    vault?.getEncryptionStatus().then((s) => setEncrypted(s.encrypted)).catch(() => {})
-  }
 
   useEffect(() => {
     if (!filesOpen || !vault) return
@@ -112,14 +95,13 @@ export default function VaultTab() {
     if (historyOpen) setLog(getLifecycleLog())
   }, [historyOpen])
 
-  if (!vault || !state) {
+  if (!vault) {
     return (
       <div className="bg-surface border border-rim rounded-lg px-5 py-5 space-y-3">
         <h3 className="text-sm font-semibold text-chalk">Vaults are a desktop-only feature</h3>
         <p className="text-sm text-ash leading-relaxed">
           In the desktop app, every set of books lives in a <strong className="text-chalk">vault</strong> — a plain
-          folder on your machine that you own and control. You pick which vault to open on every
-          launch, and you can rename a vault directly from Settings (the folder renames on disk).
+          folder on your machine that you own and control. You pick which vault to open on every launch.
         </p>
         <p className="text-sm text-ash leading-relaxed">
           In web mode, corebooks connects to whichever database is configured via{' '}
@@ -133,17 +115,6 @@ export default function VaultTab() {
         </p>
       </div>
     )
-  }
-
-  async function handleRename() {
-    if (!name.trim()) return
-    setRenaming(true)
-    try {
-      await vault!.rename(name.trim())
-    } catch (e) {
-      console.error(e)
-      setRenaming(false)
-    }
   }
 
   async function handleMove(file: VaultFile) {
@@ -175,151 +146,131 @@ export default function VaultTab() {
     window.dispatchEvent(new CustomEvent('cb:vault-open-import', { detail: { path: file.path, name: file.name } }))
   }
 
+  async function handleCloseVault() {
+    if (!confirm('Close this vault and return to the vault picker? Unsaved changes are auto-saved as drafts.')) return
+    setClosing(true)
+    try {
+      await vault!.close()
+      // Main process unloads the vault and the renderer becomes effectively
+      // detached from the API. A reload re-runs preload, which will see a null
+      // apiBaseUrl and the VaultGate will show the picker.
+      window.location.reload()
+    } catch (e) {
+      setClosing(false)
+      alert(e instanceof Error ? e.message : 'Failed to close vault')
+    }
+  }
+
+  async function handleEnableBiometric() {
+    setBiometricBusy(true)
+    setBiometricError(null)
+    try {
+      await vault!.enableBiometric()
+    } catch (e) {
+      setBiometricError(e instanceof Error ? e.message : 'Failed to enable biometric unlock')
+    } finally {
+      setBiometricBusy(false)
+    }
+  }
+
+  async function handleDisableBiometric() {
+    setBiometricBusy(true)
+    setBiometricError(null)
+    try {
+      await vault!.disableBiometric()
+    } catch (e) {
+      setBiometricError(e instanceof Error ? e.message : 'Failed to disable biometric unlock')
+    } finally {
+      setBiometricBusy(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
-      {/* Vault name */}
+      {/* Vault identity */}
       <div>
-        <h3 className="text-sm font-semibold text-chalk mb-3">Vault name</h3>
-        <div className="flex gap-3">
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') void handleRename() }}
-            className="flex-1 bg-raised border border-rim rounded px-3 py-2 text-sm text-chalk focus:outline-none focus:border-neon/50"
-          />
-          <button
-            onClick={() => void handleRename()}
-            disabled={renaming || !name.trim() || name.trim() === state.vaultName}
-            className="px-4 py-2 bg-neon hover:bg-neon-dim text-void text-sm font-semibold rounded transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            {renaming ? 'Renaming…' : 'Rename'}
-          </button>
-        </div>
-        {renaming ? (
-          <p className="text-xs text-neon mt-2">Renaming folder on disk and restarting — the app will reopen in a moment.</p>
-        ) : (
-          <p className="text-xs text-ash mt-2">Renaming the vault renames the folder on disk and restarts the app.</p>
-        )}
-      </div>
-
-      {/* Vault location */}
-      <div>
-        <h3 className="text-sm font-semibold text-chalk mb-2">Vault location</h3>
-        <div className="flex items-center gap-3">
-          <span className="flex-1 text-sm text-ash truncate font-mono">{state.vaultPath}</span>
-          <button
-            onClick={() => void vault.showInExplorer()}
-            className="px-3 py-1.5 bg-raised border border-rim rounded text-xs text-ash hover:text-chalk hover:border-neon/50 transition-colors cursor-pointer whitespace-nowrap"
-          >
-            Show in Finder
-          </button>
+        <h3 className="text-sm font-semibold text-chalk mb-3">Vault</h3>
+        <div className="bg-surface border border-rim rounded-lg px-5 py-4 space-y-2">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-sm text-chalk font-semibold">
+              {currentVault?.displayName ?? 'Unknown vault'}
+            </span>
+            {currentVault && (
+              <button
+                onClick={() => void vault.showInExplorer(currentVault.path)}
+                className="px-3 py-1.5 bg-raised border border-rim rounded text-xs text-ash hover:text-chalk hover:border-neon/50 transition-colors cursor-pointer whitespace-nowrap"
+              >
+                Show in Finder
+              </button>
+            )}
+          </div>
+          {currentVault && (
+            <div className="text-xs text-ash truncate font-mono">{currentVault.path}</div>
+          )}
         </div>
       </div>
 
-      {/* Switch vault */}
+      {/* Close vault */}
       <div>
-        <h3 className="text-sm font-semibold text-chalk mb-2">Switch vault</h3>
-        <p className="text-sm text-ash mb-3">Close the current vault and return to the vault picker.</p>
+        <h3 className="text-sm font-semibold text-chalk mb-2">Close vault</h3>
+        <p className="text-sm text-ash mb-3">
+          Disconnect from this vault and return to the picker. Use this when you&apos;re done working,
+          or to open a different vault.
+        </p>
         <button
-          onClick={() => void vault.relaunch()}
-          className="px-4 py-2 bg-raised border border-rim rounded text-sm text-ash hover:text-chalk hover:border-neon/50 transition-colors cursor-pointer"
+          onClick={() => void handleCloseVault()}
+          disabled={closing}
+          className="px-4 py-2 bg-raised border border-rim rounded text-sm text-ash hover:text-chalk hover:border-neon/50 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
         >
-          Switch vault…
+          {closing ? 'Closing…' : 'Close vault…'}
         </button>
       </div>
 
-      {/* Vault password */}
+      {/* Biometric unlock */}
       <div>
-        <h3 className="text-sm font-semibold text-chalk mb-2">Vault password</h3>
-        {encrypted ? (
+        <h3 className="text-sm font-semibold text-chalk mb-2">Biometric unlock</h3>
+        {biometricAvailable ? (
           <>
             <p className="text-sm text-ash mb-3">
-              Your vault database is encrypted with SQLCipher (AES-256). The password is required
-              every time the vault is opened and protects the encryption key stored in{' '}
-              <code className="text-xs bg-raised px-1.5 py-0.5 rounded">.corebooks</code>.
+              Allow your OS biometric (Touch ID, Windows Hello, etc.) to unlock this vault without
+              typing your password. Your password is wrapped using OS-protected key material.
             </p>
             <div className="flex flex-wrap gap-2">
               <button
-                onClick={() => setChangeOpen(true)}
-                className="px-3 py-1.5 bg-raised border border-rim rounded text-xs text-ash hover:text-chalk hover:border-neon/50 transition-colors cursor-pointer"
+                onClick={() => void handleEnableBiometric()}
+                disabled={biometricBusy}
+                className="px-3 py-1.5 bg-neon hover:bg-neon-dim text-void text-xs font-semibold rounded transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                Change password
+                {biometricBusy ? 'Working…' : 'Enable biometric unlock'}
               </button>
               <button
-                onClick={() => setRegenOpen(true)}
-                className="px-3 py-1.5 bg-raised border border-rim rounded text-xs text-ash hover:text-chalk hover:border-neon/50 transition-colors cursor-pointer"
+                onClick={() => void handleDisableBiometric()}
+                disabled={biometricBusy}
+                className="px-3 py-1.5 bg-raised border border-rim rounded text-xs text-ash hover:text-chalk hover:border-neon/50 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                Regenerate recovery phrase
-              </button>
-              <button
-                onClick={() => setRemoveOpen(true)}
-                className="px-3 py-1.5 bg-raised border border-rim rounded text-xs text-ash hover:text-red-400 hover:border-red-500/50 transition-colors cursor-pointer"
-              >
-                Remove encryption
+                Disable
               </button>
             </div>
+            {biometricError && (
+              <p className="text-xs text-red-400 mt-2">{biometricError}</p>
+            )}
           </>
         ) : (
-          <>
-            <p className="text-sm text-ash mb-3">
-              This vault is unencrypted — data is protected by your OS file permissions only.
-              Set a password to enable strong encryption and require it on every open and export.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <button
-                onClick={() => setSetupOpen(true)}
-                className="px-3 py-1.5 bg-neon hover:bg-neon-dim text-void text-xs font-semibold rounded transition-colors cursor-pointer"
-              >
-                Set vault password
-              </button>
-              <button
-                onClick={() => setRecoverOpen(true)}
-                className="px-3 py-1.5 bg-raised border border-rim rounded text-xs text-ash hover:text-chalk hover:border-neon/50 transition-colors cursor-pointer"
-              >
-                Recover with 12-word phrase
-              </button>
-            </div>
-          </>
+          <p className="text-sm text-ash">
+            Biometric unlock is not available on this device or OS configuration.
+          </p>
         )}
       </div>
 
-      {setupOpen && (
-        <VaultPasswordSetup
-          onComplete={() => { setSetupOpen(false); refreshStatus() }}
-          onCancel={() => setSetupOpen(false)}
-        />
-      )}
-      {recoverOpen && (
-        <VaultRecoverModal
-          onComplete={() => { setRecoverOpen(false); refreshStatus() }}
-          onCancel={() => setRecoverOpen(false)}
-        />
-      )}
-      {changeOpen && (
-        <ChangePasswordModal
-          onComplete={() => setChangeOpen(false)}
-          onCancel={() => setChangeOpen(false)}
-        />
-      )}
-      {regenOpen && (
-        <RegenerateRecoveryModal
-          onComplete={(phrase) => { setRegenOpen(false); setRegeneratedPhrase(phrase) }}
-          onCancel={() => setRegenOpen(false)}
-        />
-      )}
-      {regeneratedPhrase && (
-        <DisplayPhraseModal phrase={regeneratedPhrase} onClose={() => setRegeneratedPhrase(null)} />
-      )}
-      {removeOpen && (
-        <RemoveEncryptionModal
-          onComplete={() => { setRemoveOpen(false); refreshStatus() }}
-          onCancel={() => setRemoveOpen(false)}
-        />
-      )}
-
-      {/* safeStorage warning */}
-      <SafeStorageWarning />
+      {/* Vault password — placeholder for a future task */}
+      <div>
+        <h3 className="text-sm font-semibold text-chalk mb-2">Vault password</h3>
+        <p className="text-sm text-ash">
+          Your vault is encrypted with the password you chose when you created it. Changing the
+          password and regenerating the recovery phrase from inside the app will return in a future
+          release.
+        </p>
+      </div>
 
       {/* Vault contents */}
       <div>
@@ -438,217 +389,6 @@ export default function VaultTab() {
             )}
           </div>
         )}
-      </div>
-    </div>
-  )
-}
-
-interface SimpleModalProps {
-  onComplete: () => void
-  onCancel: () => void
-}
-
-function ChangePasswordModal({ onComplete, onCancel }: SimpleModalProps) {
-  const vault = window.electronAPI?.vault
-  const [oldPassword, setOldPassword] = useState('')
-  const [newPassword, setNewPassword] = useState('')
-  const [confirm, setConfirm] = useState('')
-  const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const valid = newPassword.length >= 8 && newPassword === confirm && oldPassword.length > 0
-
-  async function handleSubmit() {
-    if (!vault || !valid) return
-    setSubmitting(true); setError(null)
-    try {
-      await vault.changePassword(oldPassword, newPassword)
-      onComplete()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to change password')
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 bg-void/80 backdrop-blur-sm flex items-center justify-center z-50 p-6">
-      <div className="bg-surface border border-rim rounded-lg w-full max-w-md">
-        <div className="px-6 py-4 border-b border-rim flex items-center justify-between">
-          <h2 className="text-base font-semibold text-chalk">Change password</h2>
-          <button onClick={onCancel} disabled={submitting} className="text-ash hover:text-chalk text-sm cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">Cancel</button>
-        </div>
-        <div className="px-6 py-6 space-y-4">
-          <div>
-            <label className="block text-xs font-semibold text-chalk mb-1">Current password</label>
-            <input type="password" value={oldPassword} onChange={(e) => setOldPassword(e.target.value)} autoFocus autoComplete="current-password"
-              className="w-full bg-raised border border-rim rounded px-3 py-2 text-sm text-chalk focus:outline-none focus:border-neon/50" />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-chalk mb-1">New password (min. 8 characters)</label>
-            <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} autoComplete="new-password"
-              className="w-full bg-raised border border-rim rounded px-3 py-2 text-sm text-chalk focus:outline-none focus:border-neon/50" />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-chalk mb-1">Confirm new password</label>
-            <input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} autoComplete="new-password"
-              className="w-full bg-raised border border-rim rounded px-3 py-2 text-sm text-chalk focus:outline-none focus:border-neon/50" />
-          </div>
-          {error && <p className="text-xs text-red-400">{error}</p>}
-          <div className="flex justify-end">
-            <button onClick={() => void handleSubmit()} disabled={!valid || submitting}
-              className="px-4 py-2 bg-neon hover:bg-neon-dim text-void text-sm font-semibold rounded transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
-              {submitting ? 'Changing…' : 'Change password'}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-interface RegenerateRecoveryModalProps {
-  onComplete: (phrase: string[]) => void
-  onCancel: () => void
-}
-
-function RegenerateRecoveryModal({ onComplete, onCancel }: RegenerateRecoveryModalProps) {
-  const vault = window.electronAPI?.vault
-  const [password, setPassword] = useState('')
-  const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  async function handleSubmit() {
-    if (!vault) return
-    setSubmitting(true); setError(null)
-    try {
-      const result = await vault.regenerateRecovery(password)
-      onComplete(result.phraseWords)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to regenerate phrase')
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 bg-void/80 backdrop-blur-sm flex items-center justify-center z-50 p-6">
-      <div className="bg-surface border border-rim rounded-lg w-full max-w-md">
-        <div className="px-6 py-4 border-b border-rim flex items-center justify-between">
-          <h2 className="text-base font-semibold text-chalk">Regenerate recovery phrase</h2>
-          <button onClick={onCancel} disabled={submitting} className="text-ash hover:text-chalk text-sm cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">Cancel</button>
-        </div>
-        <div className="px-6 py-6 space-y-4">
-          <div className="bg-amber-950/40 border border-amber-700 rounded-lg px-4 py-3">
-            <p className="text-sm text-amber-300 font-medium">Warning</p>
-            <p className="text-xs text-amber-200/80 mt-1">
-              Your old 12-word phrase will stop working immediately. Make sure to write down the new
-              phrase and destroy the old one.
-            </p>
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-chalk mb-1">Current password</label>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoFocus autoComplete="current-password"
-              className="w-full bg-raised border border-rim rounded px-3 py-2 text-sm text-chalk focus:outline-none focus:border-neon/50" />
-          </div>
-          {error && <p className="text-xs text-red-400">{error}</p>}
-          <div className="flex justify-end">
-            <button onClick={() => void handleSubmit()} disabled={!password || submitting}
-              className="px-4 py-2 bg-neon hover:bg-neon-dim text-void text-sm font-semibold rounded transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
-              {submitting ? 'Generating…' : 'Generate new phrase'}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function DisplayPhraseModal({ phrase, onClose }: { phrase: string[]; onClose: () => void }) {
-  return (
-    <div className="fixed inset-0 bg-void/80 backdrop-blur-sm flex items-center justify-center z-50 p-6">
-      <div className="bg-surface border border-rim rounded-lg w-full max-w-2xl">
-        <div className="px-6 py-4 border-b border-rim">
-          <h2 className="text-base font-semibold text-chalk">New recovery phrase</h2>
-        </div>
-        <div className="px-6 py-6 space-y-4">
-          <div className="bg-emerald-950/40 border border-emerald-700 rounded-lg px-4 py-3">
-            <p className="text-sm text-emerald-300 font-medium">Write this on paper right now.</p>
-            <p className="text-xs text-emerald-200/80 mt-1">Do not screenshot. Your old phrase no longer works.</p>
-          </div>
-          <div
-            className="grid grid-cols-3 gap-2"
-            onCopy={(e) => e.preventDefault()}
-            onCut={(e) => e.preventDefault()}
-            onDragStart={(e) => e.preventDefault()}
-            style={{ userSelect: 'none' }}
-          >
-            {phrase.map((word, i) => (
-              <div key={i} className="flex items-center gap-2 bg-raised border border-rim rounded px-3 py-2">
-                <span className="text-xs text-ash font-mono w-5 text-right">{i + 1}.</span>
-                <span className="text-sm text-chalk font-mono">{word}</span>
-              </div>
-            ))}
-          </div>
-          <div className="flex justify-end">
-            <button onClick={onClose}
-              className="px-4 py-2 bg-neon hover:bg-neon-dim text-void text-sm font-semibold rounded transition-colors cursor-pointer">
-              I've written it down
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function RemoveEncryptionModal({ onComplete, onCancel }: SimpleModalProps) {
-  const vault = window.electronAPI?.vault
-  const [password, setPassword] = useState('')
-  const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  async function handleSubmit() {
-    if (!vault || !password) return
-    setSubmitting(true); setError(null)
-    try {
-      await vault.removeEncryption(password)
-      onComplete()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to remove encryption')
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 bg-void/80 backdrop-blur-sm flex items-center justify-center z-50 p-6">
-      <div className="bg-surface border border-rim rounded-lg w-full max-w-md">
-        <div className="px-6 py-4 border-b border-rim flex items-center justify-between">
-          <h2 className="text-base font-semibold text-chalk">Remove encryption</h2>
-          <button onClick={onCancel} disabled={submitting} className="text-ash hover:text-chalk text-sm cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">Cancel</button>
-        </div>
-        <div className="px-6 py-6 space-y-4">
-          <div className="bg-red-950/40 border border-red-700 rounded-lg px-4 py-3">
-            <p className="text-sm text-red-300 font-medium">This removes password protection.</p>
-            <p className="text-xs text-red-200/80 mt-1">
-              The vault key wrap and recovery phrase are deleted from
-              <code className="text-xs bg-raised px-1 py-0.5 rounded ml-1">.corebooks</code>.
-              The vault is again protected only by OS file permissions.
-            </p>
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-chalk mb-1">Current password</label>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoFocus autoComplete="current-password"
-              className="w-full bg-raised border border-rim rounded px-3 py-2 text-sm text-chalk focus:outline-none focus:border-neon/50" />
-          </div>
-          {error && <p className="text-xs text-red-400">{error}</p>}
-          <div className="flex justify-end">
-            <button onClick={() => void handleSubmit()} disabled={!password || submitting}
-              className="px-4 py-2 bg-red-600 hover:bg-red-500 text-chalk text-sm font-semibold rounded transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
-              {submitting ? 'Removing…' : 'Remove encryption'}
-            </button>
-          </div>
-        </div>
       </div>
     </div>
   )
