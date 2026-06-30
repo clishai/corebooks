@@ -131,8 +131,6 @@ Key decisions to carry forward:
 
 **Web/Vite dev mode:** `window.electronAPI` is undefined — vault picker never renders, app works as before.
 
-**Known limitation:** Company name (`cb_company_name` in `localStorage`) is currently shared across vaults. Future work: store per-vault settings in the database or in `.corebooks` metadata.
-
 ---
 
 ### Phase 11 — Vault File Sync + Ollama AI Infrastructure (complete)
@@ -166,8 +164,6 @@ Key decisions to carry forward:
 - `@fontsource/jetbrains-mono` added; imported in `index.css` (weights 300/400/600). Font is now bundled in the Electron binary — no system font or CDN dependency.
 - `vault:safeStorageAvailable` IPC added; `VaultTab` shows amber warning when OS keyring is unavailable (Linux without libsecret/GNOME Keyring/KWallet).
 - `chokidar` added for cross-platform file watching (FSEvents/macOS, ReadDirectoryChangesW/Windows, inotify/Linux).
-
-**Known limitation (carried forward):** Company name (`cb_company_name` in localStorage) is still shared across vaults.
 
 **Reference docs:**
 - `docs/AI_BOUNDARIES.md` — detailed AI capability and posting-boundary design.
@@ -206,6 +202,20 @@ Every vault's `corebooks.db` is encrypted at rest with SQLCipher (AES-256-CBC). 
 The core is the accounting engine. It knows nothing about databases, screens, or external services. Everything else adapts to it — never the reverse.
 
 **Acceptable precedent — `Ledger.reset()`:** Added for the data-wipe settings endpoint. It is a pure in-memory operation with no knowledge of why it is called. Test: could this method exist in a world with no database and no UI? If yes, it belongs in the core.
+
+## Vault Isolation Principle
+
+**Every vault is a fully self-contained unit. No vault-scoped data is ever shared across vaults.**
+
+A vault represents one company's books. Anything that describes that company — name, fiscal year, currency, payment methods, feature flags, UI state for this vault, encryption material, audit log — lives **inside** the vault folder. Two vaults open on the same machine must look to the application as if they had never met. Users (e.g. fractional bookkeepers) may operate multiple vaults in a single day for different businesses; no setting, preference, or piece of state from vault A may ever leak into vault B.
+
+**The only data the application may hold app-globally:**
+- The launch picker's navigation hint list (paths + last-opened timestamps; no contents)
+- User/device-personal preferences explicitly unrelated to any business's books (e.g. keyboard shortcuts)
+
+Everything else is per-vault. localStorage, sessionStorage, and any file in `userData/` are NOT acceptable homes for vault-scoped data — that data must live in the vault's own `.corebooks/` metadata or in its database.
+
+The current code still uses some localStorage keys (`cb_company_name`, `cb_flags`, `cb_payment_methods`) for vault-scoped data; these are slated to migrate into per-vault storage as part of the vault isolation overhaul. Do not add new app-global storage for vault-scoped data, and prefer per-vault homes for any new settings.
 
 ## Permanent Core Constraints
 
@@ -317,6 +327,7 @@ Tokens defined in `src/ui/index.css` via Tailwind v4 `@theme`. Neon blue: primar
 - Do not use `console.log` for error handling — use TypeScript error types.
 - Do not skip tests for core functions.
 - Do not make silent changes — always explain what changed and why.
+- Do not store vault-scoped data (company name, fiscal year, currency, payment methods, feature flags, etc.) in localStorage, sessionStorage, or any file in `userData/`. It belongs in the vault's `.corebooks/` metadata or in its database. See the Vault Isolation Principle above.
 
 ## Potential Features
 
