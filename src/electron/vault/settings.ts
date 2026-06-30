@@ -59,10 +59,18 @@ export function writeSettings(vaultPath: string, settings: VaultSettings): void 
 function isValidSettings(v: unknown, targetVersion: number): v is VaultSettings {
   if (!v || typeof v !== 'object') return false
   const o = v as Record<string, unknown>
+  const fy = o['fiscalYearStart']
+  const ff = o['featureFlags']
   return (
     o['schemaVersion'] === targetVersion &&
     typeof o['companyName'] === 'string' &&
     typeof o['currency'] === 'string' &&
-    Array.isArray(o['paymentMethods'])
+    Array.isArray(o['paymentMethods']) &&
+    fy !== null && typeof fy === 'object' &&
+    typeof (fy as Record<string, unknown>)['month'] === 'number' &&
+    typeof (fy as Record<string, unknown>)['day'] === 'number' &&
+    ff !== null && typeof ff === 'object' &&
+    typeof (ff as Record<string, unknown>)['ar_ap'] === 'boolean' &&
+    typeof (ff as Record<string, unknown>)['inventory'] === 'boolean'
   )
 }

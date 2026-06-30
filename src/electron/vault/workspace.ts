@@ -3,6 +3,8 @@ import path from 'node:path'
 import type { VaultWorkspace } from './types.js'
 import { DEFAULT_VAULT_WORKSPACE } from './defaults.js'
 
+export const CURRENT_WORKSPACE_VERSION = 1
+
 const WORKSPACE_FILE = path.join('.corebooks', 'workspace.json')
 
 export function readWorkspace(vaultPath: string): VaultWorkspace {
@@ -30,7 +32,7 @@ function isValidWorkspace(v: unknown): v is VaultWorkspace {
   if (!v || typeof v !== 'object') return false
   const o = v as Record<string, unknown>
   return (
-    o['schemaVersion'] === 1 &&
+    o['schemaVersion'] === CURRENT_WORKSPACE_VERSION &&
     typeof o['lastTab'] === 'string' &&
     typeof o['sidebarCollapsed'] === 'boolean' &&
     Array.isArray(o['recentEntries'])

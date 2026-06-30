@@ -68,4 +68,26 @@ describe('settings', () => {
     )
     expect(() => readSettings(tmp, { targetVersion: 2 })).toThrow(/VaultSettingsMigratorMissing/)
   })
+
+  it('readSettings throws VaultSettingsInvalid when fiscalYearStart is missing', () => {
+    fs.writeFileSync(
+      path.join(tmp, '.corebooks', 'settings.json'),
+      JSON.stringify({ schemaVersion: 1, companyName: 'X', currency: 'USD', paymentMethods: [] }),
+    )
+    expect(() => readSettings(tmp)).toThrow(/VaultSettingsInvalid/)
+  })
+
+  it('readSettings throws VaultSettingsInvalid when featureFlags is missing', () => {
+    fs.writeFileSync(
+      path.join(tmp, '.corebooks', 'settings.json'),
+      JSON.stringify({
+        schemaVersion: 1,
+        companyName: 'X',
+        currency: 'USD',
+        paymentMethods: [],
+        fiscalYearStart: { month: 1, day: 1 },
+      }),
+    )
+    expect(() => readSettings(tmp)).toThrow(/VaultSettingsInvalid/)
+  })
 })
