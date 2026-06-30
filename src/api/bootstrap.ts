@@ -11,6 +11,8 @@ import { ensureSchema } from '../db/ensureSchema.js';
 // without needing to reconstruct it.
 export let ledger: Ledger = new Ledger();
 
+// args.key is owned by the caller (VaultLifecycle / main.ts). bootstrap.ts does
+// not zero it — the caller is responsible for zeroing after vault close.
 export async function startServer(args: { filePath: string; key: Buffer; port: number }): Promise<void> {
   // Open the database with the explicit key, run schema migrations on the
   // already-open keyed instance, then hand the Prisma client to the repos.

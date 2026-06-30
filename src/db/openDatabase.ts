@@ -23,7 +23,7 @@ export function openDatabase({ filePath, key }: OpenDatabaseArgs): Db {
     return db
   }
 
-  const hex = key.toString('hex')
+  const hex = key.toString('hex') // JS strings are immutable; hex cannot be zeroed — keep lifetime minimal
   const db = new Database(filePath)
   db.pragma(`key = "x'${hex}'"`)
   db.defaultSafeIntegers(true)
@@ -34,7 +34,11 @@ export function openDatabase({ filePath, key }: OpenDatabaseArgs): Db {
   } catch {
     db.close()
     // Plaintext database that needs encrypting in place.
-    migrateToSqlCipher(filePath, hex)
+    try {
+      migrateToSqlCipher(filePath, hex)
+    } catch (migErr) {
+      throw new Error(`Database migration to SQLCipher failed: ${(migErr as Error).message}`)
+    }
     return openEncrypted(filePath, hex)
   }
 }

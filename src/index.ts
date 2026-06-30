@@ -17,8 +17,19 @@ async function main() {
     // CLI / non-Electron mode: no Electron safeStorage, so no encryption key.
     // Open as plaintext (key: null). To use encryption in CLI mode, derive a
     // key externally and pass it via createPrismaClient before this function.
-    const { db } = createPrismaClient({ filePath: dbPath, key: null });
-    ensureSchema(db);
+    try {
+      const { db } = createPrismaClient({ filePath: dbPath, key: null });
+      ensureSchema(db);
+    } catch (err) {
+      if (String(err).includes('encrypted')) {
+        process.stderr.write(
+          `[corebooks] ERROR: The database at "${dbPath}" appears to be encrypted.\n` +
+          `  Use the Electron app to open encrypted vaults.\n`
+        );
+        process.exit(1);
+      }
+      throw err;
+    }
   }
 
   const [ledger, chartOfAccounts] = await Promise.all([loadLedger(), listAccounts()]);

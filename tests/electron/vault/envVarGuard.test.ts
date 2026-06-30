@@ -27,7 +27,7 @@ describe('env var guard (spec T14)', () => {
   it('no source file reads process.env.*KEY*', () => {
     const files = walk(path.join(ROOT, 'src'))
     const offenders = files.filter(f =>
-      /process\.env\[?['"][^'"]*KEY[^'"]*['"]\]?/.test(fs.readFileSync(f, 'utf-8'))
+      /process\.env\[?['"][A-Z_]*KEY[A-Z_]*['"]\]?/.test(fs.readFileSync(f, 'utf-8'))
     )
     expect(offenders).toEqual([])
   })

@@ -119,8 +119,9 @@ async function startApiForVault(vaultPath: string): Promise<number> {
   getOrCreateEncryptionKey(userData)
 
   // Pass the key explicitly — it never travels via process.env.
+  if (!_vaultKey) throw new Error('VaultKeyUnavailable: cannot start API without an encryption key')
   const { startServer } = await import('../api/bootstrap.js')
-  await startServer({ filePath: dbPath, key: _vaultKey ?? Buffer.alloc(0), port })
+  await startServer({ filePath: dbPath, key: _vaultKey, port })
 
   // Start file watcher for the newly selected vault
   if (mainWindow) vaultWatcher.start(vaultPath, mainWindow)
