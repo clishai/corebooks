@@ -8,6 +8,18 @@ const AUDIT_FILE = path.join('.corebooks', 'audit.jsonl')
 
 export const GENESIS_PREV_HASH = '0'.repeat(64)
 
+/**
+ * Deterministic JSON serialization for hashing/HMAC inputs.
+ *
+ * Sorts object keys recursively so the same logical value always produces
+ * the same string (and therefore the same hash). Shared with lockFile HMAC
+ * — keep stable across versions.
+ *
+ * Caller must guarantee the value is JSON-stringifiable: no `undefined`,
+ * no functions, no `BigInt`, no `NaN`/`Infinity`. Passing any of those
+ * produces a result that cannot be verified later — the chain breaks
+ * silently at the next read.
+ */
 export function canonicalJson(value: unknown): string {
   if (value === null || typeof value !== 'object') return JSON.stringify(value)
   if (Array.isArray(value)) return '[' + value.map(canonicalJson).join(',') + ']'
@@ -59,10 +71,17 @@ export function readAuditLog(vaultPath: string): AuditEvent[] {
 export type VerifyResult = { ok: true } | { ok: false; brokenAt: number }
 
 export function verifyAuditChain(vaultPath: string): VerifyResult {
-  const log = readAuditLog(vaultPath)
+  const file = path.join(vaultPath, AUDIT_FILE)
+  if (!fs.existsSync(file)) return { ok: true }
+  const lines = fs.readFileSync(file, 'utf-8').split('\n').filter(Boolean)
   let prev = GENESIS_PREV_HASH
-  for (let i = 0; i < log.length; i++) {
-    const e = log[i]
+  for (let i = 0; i < lines.length; i++) {
+    let e: AuditEvent
+    try {
+      e = JSON.parse(lines[i]) as AuditEvent
+    } catch {
+      return { ok: false, brokenAt: i }
+    }
     if (e.seq !== i) return { ok: false, brokenAt: i }
     if (e.prevHash !== prev) return { ok: false, brokenAt: i }
     const { hash, ...rest } = e

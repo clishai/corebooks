@@ -71,4 +71,14 @@ describe('audit', () => {
     appendAuditEvent(tmp, { actor: 'system', event: 'post-tamper', data: {} })
     expect(verifyAuditChain(tmp)).toEqual({ ok: false, brokenAt: 1 })
   })
+
+  it('verifyAuditChain reports brokenAt for a torn (unparseable) line', () => {
+    for (let i = 0; i < 3; i++) appendAuditEvent(tmp, { actor: 'system', event: `e${i}`, data: {} })
+    const file = path.join(tmp, '.corebooks', 'audit.jsonl')
+    const lines = fs.readFileSync(file, 'utf-8').split('\n').filter(Boolean)
+    // Simulate a power-loss torn write on the second line.
+    lines[1] = '{"seq":1,"at":"2026-06-29T00:00:00.000Z","actor":"system","event":"x","data":{},"prevHash":"' + '0'.repeat(64) + '",'
+    fs.writeFileSync(file, lines.join('\n') + '\n')
+    expect(verifyAuditChain(tmp)).toEqual({ ok: false, brokenAt: 1 })
+  })
 })
