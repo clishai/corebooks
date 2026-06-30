@@ -2,8 +2,13 @@ import Database from 'better-sqlite3-multiple-ciphers'
 
 type Db = InstanceType<typeof Database>
 
-export function openDatabase(filePath: string, key: string): Db {
-  if (!key) {
+export interface OpenDatabaseArgs {
+  filePath: string
+  key: Buffer | null // null = open as plaintext (migration paths only)
+}
+
+export function openDatabase({ filePath, key }: OpenDatabaseArgs): Db {
+  if (!key || key.length === 0) {
     const db = new Database(filePath)
     db.defaultSafeIntegers(true)
     try {
@@ -18,8 +23,9 @@ export function openDatabase(filePath: string, key: string): Db {
     return db
   }
 
+  const hex = key.toString('hex')
   const db = new Database(filePath)
-  db.pragma(`key = "x'${key}'"`)
+  db.pragma(`key = "x'${hex}'"`)
   db.defaultSafeIntegers(true)
 
   try {
@@ -27,14 +33,15 @@ export function openDatabase(filePath: string, key: string): Db {
     return db
   } catch {
     db.close()
-    migrateToSqlCipher(filePath, key)
-    return openEncrypted(filePath, key)
+    // Plaintext database that needs encrypting in place.
+    migrateToSqlCipher(filePath, hex)
+    return openEncrypted(filePath, hex)
   }
 }
 
-function openEncrypted(filePath: string, key: string): Db {
+function openEncrypted(filePath: string, hex: string): Db {
   const db = new Database(filePath)
-  db.pragma(`key = "x'${key}'"`)
+  db.pragma(`key = "x'${hex}'"`)
   db.defaultSafeIntegers(true)
   try {
     db.prepare('SELECT count(*) FROM sqlite_master').get()
@@ -65,10 +72,10 @@ function openEncrypted(filePath: string, key: string): Db {
  * connection that had already been opened with `PRAGMA key`, which only
  * works for already-encrypted files.
  */
-function migrateToSqlCipher(filePath: string, key: string): void {
+function migrateToSqlCipher(filePath: string, hex: string): void {
   const plain = new Database(filePath)
   try {
-    plain.pragma(`rekey = "x'${key}'"`)
+    plain.pragma(`rekey = "x'${hex}'"`)
   } finally {
     plain.close()
   }

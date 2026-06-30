@@ -32,52 +32,63 @@ function checkPostgresSSL(rawUrl: string): void {
   }
 }
 
-// Module-level reference to the opened Database instance.
-// Set by createPrismaClient() for the SQLite path so that bootstrap.ts can
-// retrieve it via getOpenDb() and pass it to ensureSchema() — avoiding a
-// second open/close cycle on the same file.
+export interface PrismaBundle {
+  client: PrismaClient;
+  db: Db;
+}
+
+// Module-level singletons set by createPrismaClient().
+let _client: PrismaClient | undefined;
 let _db: Db | undefined;
 
 /**
- * Returns the Database instance that was opened by the most recent call to
- * getPrismaClient() / createPrismaClient(). Returns undefined in PostgreSQL
- * mode (where there is no better-sqlite3 Database).
+ * Creates a new PrismaClient backed by an SQLCipher-keyed Database, stores
+ * both as the module singletons, and returns the bundle. Callers (e.g.
+ * bootstrap.ts) should call this before any repository functions.
  *
- * Callers (e.g. bootstrap.ts) should call getPrismaClient() before
- * getOpenDb() to guarantee the instance exists.
+ * key: Buffer with the 32-byte SQLCipher key, or null to open as plaintext
+ * (used in tests and non-Electron CLI mode).
+ */
+export function createPrismaClient(args: { filePath: string; key: Buffer | null }): PrismaBundle {
+  const db = openDatabase({ filePath: args.filePath, key: args.key });
+  const factory = new SqlCipherAdapterFactory({ url: args.filePath }, db);
+  const client = new PrismaClient({ adapter: factory });
+  _client = client;
+  _db = db;
+  return { client, db };
+}
+
+/**
+ * Returns the PrismaClient singleton, creating it from DATABASE_URL if it has
+ * not been initialised yet (used by tests and the non-Electron CLI entry point).
+ * In tests the DB is always plaintext, so key is null.
+ */
+export function getPrismaClient(): PrismaClient {
+  if (!_client) {
+    const rawUrl = process.env['DATABASE_URL'] ?? 'file:corebooks.db';
+    checkPostgresSSL(rawUrl);
+    const filePath = rawUrl.startsWith('file:') ? rawUrl.slice(5) : rawUrl;
+    // No key: open as plaintext. This path is used by tests and by the
+    // non-Electron CLI (src/index.ts). Electron always calls createPrismaClient
+    // with an explicit Buffer key before any repo functions run.
+    createPrismaClient({ filePath, key: null });
+  }
+  return _client!;
+}
+
+/**
+ * Returns the Database instance that was opened by the most recent call to
+ * createPrismaClient() / getPrismaClient(). Returns undefined if neither has
+ * been called yet.
  */
 export function getOpenDb(): Db | undefined {
   return _db;
-}
-
-function createPrismaClient(): PrismaClient {
-  const rawUrl = process.env['DATABASE_URL'] ?? 'file:corebooks.db';
-  checkPostgresSSL(rawUrl);
-
-  // SQLite path — open the database with SQLCipher, then hand the pre-opened
-  // instance to SqlCipherAdapterFactory so Prisma never sees a plaintext file.
-  // Note: the Prisma schema is SQLite-only (provider = "sqlite"), so PostgreSQL
-  // mode uses a separate Prisma setup at the infrastructure level. This client
-  // is always the SQLite path.
-  const filePath = rawUrl.startsWith('file:') ? rawUrl.slice(5) : rawUrl;
-  const key = process.env['COREBOOKS_DB_KEY'] ?? '';
-  _db = openDatabase(filePath, key);
-  const factory = new SqlCipherAdapterFactory({ url: filePath }, _db);
-  // PrismaClient accepts a SqlDriverAdapterFactory directly; it calls
-  // factory.connect() internally the first time a connection is needed.
-  return new PrismaClient({ adapter: factory });
-}
-
-let _client: PrismaClient | undefined;
-
-export function getPrismaClient(): PrismaClient {
-  if (!_client) _client = createPrismaClient();
-  return _client;
 }
 
 export async function disconnectPrisma(): Promise<void> {
   if (_client) {
     await _client.$disconnect();
     _client = undefined;
+    _db = undefined;
   }
 }

@@ -29,6 +29,11 @@ let vaultManager: VaultManager
 const vaultWatcher = new VaultWatcher()
 let recurringIntervalId: ReturnType<typeof setInterval> | null = null
 
+// The 32-byte SQLCipher key for the currently-open vault. Derived from the OS
+// keychain (getOrCreateEncryptionKey) or from a password (vault:unlock). Never
+// stored in process.env — passed explicitly to startServer via startApiForVault.
+let _vaultKey: Buffer | null = null
+
 function findFreePort(): Promise<number> {
   return new Promise((resolve, reject) => {
     const server = createServer()
@@ -72,15 +77,13 @@ function targetFolderPath(vaultPath: string, targetFolder: string): string {
 // credential store (macOS Keychain / Windows DPAPI / Linux libsecret) via
 // Electron's safeStorage API, and persists the encrypted blob to userData.
 //
-// The key is surfaced as COREBOOKS_DB_KEY so src/db/client.ts can apply it
-// as a SQLCipher PRAGMA once a compatible Prisma adapter is available.
-// Until then, the key exists and is safely stored — but the database file
-// itself is not yet encrypted. See src/db/client.ts for the hook point.
+// The key is stored in the module-level _vaultKey Buffer so it can be passed
+// explicitly to startServer — it never lives in process.env.
 function getOrCreateEncryptionKey(userData: string): void {
   // Guard: if vault:unlock or resetPasswordAfterRecovery already set the key
   // from a password-derived vault key K, do not overwrite it with the OS
   // keychain key (which would open the wrong database).
-  if (process.env['COREBOOKS_DB_KEY']) return
+  if (_vaultKey !== null) return
 
   if (!safeStorage.isEncryptionAvailable()) {
     // safeStorage is unavailable (e.g. headless CI). Skip key setup.
@@ -92,14 +95,14 @@ function getOrCreateEncryptionKey(userData: string): void {
   try {
     if (fs.existsSync(keyFile)) {
       const encrypted = fs.readFileSync(keyFile)
-      process.env['COREBOOKS_DB_KEY'] = safeStorage.decryptString(encrypted)
+      _vaultKey = Buffer.from(safeStorage.decryptString(encrypted), 'hex')
     } else {
       // First launch: generate a fresh 256-bit (32-byte) key as a hex string.
-      const key = randomBytes(32).toString('hex')
-      const encrypted = safeStorage.encryptString(key)
+      const keyHex = randomBytes(32).toString('hex')
+      const encrypted = safeStorage.encryptString(keyHex)
       // 0o600 = owner read/write only — no other OS user can read the file.
       fs.writeFileSync(keyFile, encrypted, { mode: 0o600 })
-      process.env['COREBOOKS_DB_KEY'] = key
+      _vaultKey = Buffer.from(keyHex, 'hex')
     }
   } catch {
     // If the OS keychain call fails (e.g. locked keychain at login),
@@ -115,9 +118,9 @@ async function startApiForVault(vaultPath: string): Promise<number> {
   const userData = app.getPath('userData')
   getOrCreateEncryptionKey(userData)
 
-  // Dynamic import ensures all env vars are set before Prisma initialises.
+  // Pass the key explicitly — it never travels via process.env.
   const { startServer } = await import('../api/bootstrap.js')
-  await startServer(port)
+  await startServer({ filePath: dbPath, key: _vaultKey ?? Buffer.alloc(0), port })
 
   // Start file watcher for the newly selected vault
   if (mainWindow) vaultWatcher.start(vaultPath, mainWindow)
@@ -204,7 +207,7 @@ function registerIpc(): void {
   })
 
   // Called by UnlockVaultModal after vault:select returns { needsPassword: true }.
-  // Derives the vault key K from the user's password, sets COREBOOKS_DB_KEY,
+  // Derives the vault key K from the user's password, stores it in _vaultKey,
   // then starts the API. On success the renderer receives vault:ready exactly
   // as it would for an unencrypted vault.
   ipcMain.handle('vault:unlock', async (_event, password: string) => {
@@ -226,10 +229,10 @@ function registerIpc(): void {
       throw new Error('Password is incorrect')
     }
 
-    // Set env var before startApiForVault calls getOrCreateEncryptionKey.
-    // The guard added to getOrCreateEncryptionKey will see this and skip the
-    // OS-keychain lookup so K is not overwritten.
-    process.env['COREBOOKS_DB_KEY'] = vaultKey.toString('hex')
+    // Set _vaultKey before startApiForVault calls getOrCreateEncryptionKey.
+    // The guard in getOrCreateEncryptionKey will see _vaultKey !== null and
+    // skip the OS-keychain lookup so K is not overwritten.
+    _vaultKey = vaultKey
 
     currentApiPort = await startApiForVault(current.path)
     mainWindow?.webContents.send('vault:ready')
@@ -283,13 +286,12 @@ function registerIpc(): void {
       throw new Error('Vault is already encrypted')
     }
     if (!password) throw new Error('Password must not be empty')
-    // Plan E/F: COREBOOKS_DB_KEY IS the vault key K. Wrap the existing key
-    // rather than generating a new random one — generating a new key would
-    // require re-encrypting the database, because the database was already
-    // opened (and will be opened in future) with this same K.
-    const hexKey = process.env['COREBOOKS_DB_KEY']
-    if (!hexKey) throw new Error('Encryption key not initialized — open the vault first')
-    const vaultKey = Buffer.from(hexKey, 'hex')
+    // Plan E/F: _vaultKey IS the vault key K. Wrap the existing key rather than
+    // generating a new random one — generating a new key would require
+    // re-encrypting the database, because the database was already opened (and
+    // will be opened in future) with this same K.
+    if (!_vaultKey) throw new Error('Encryption key not initialized — open the vault first')
+    const vaultKey = _vaultKey
     const phrase = generateRecoveryPhrase()
     const entropy = recoveryPhraseToEntropy(phrase)
 

@@ -2,7 +2,7 @@ import 'dotenv/config';
 import { Ledger } from '../core/engine/ledger.js';
 import { loadLedger } from '../db/repositories/entryRepository.js';
 import { listAccounts } from '../db/repositories/accountRepository.js';
-import { getPrismaClient, getOpenDb, disconnectPrisma } from '../db/client.js';
+import { createPrismaClient, disconnectPrisma } from '../db/client.js';
 import { buildApp } from './server.js';
 import { ensureSchema } from '../db/ensureSchema.js';
 
@@ -11,17 +11,11 @@ import { ensureSchema } from '../db/ensureSchema.js';
 // without needing to reconstruct it.
 export let ledger: Ledger = new Ledger();
 
-export async function startServer(port: number): Promise<void> {
-  // Calling getPrismaClient() first ensures the Database instance is opened
-  // (with the SQLCipher key applied) and stored in client.ts before we ask
-  // for it via getOpenDb(). In SQLite mode, getOpenDb() returns the same
-  // pre-opened, already-keyed instance — no second open/close cycle needed.
-  getPrismaClient();
-  const db = getOpenDb();
-  if (db !== undefined) {
-    // SQLite mode — run schema migrations on the already-open keyed instance.
-    ensureSchema(db);
-  }
+export async function startServer(args: { filePath: string; key: Buffer; port: number }): Promise<void> {
+  // Open the database with the explicit key, run schema migrations on the
+  // already-open keyed instance, then hand the Prisma client to the repos.
+  const { db } = createPrismaClient({ filePath: args.filePath, key: args.key });
+  ensureSchema(db);
 
   const [loadedLedger, chartOfAccounts] = await Promise.all([
     loadLedger(),
@@ -34,7 +28,7 @@ export async function startServer(port: number): Promise<void> {
   const app = buildApp({ ledger, chartOfAccounts }, { logger: false });
 
   try {
-    await app.listen({ port, host: '127.0.0.1' });
+    await app.listen({ port: args.port, host: '127.0.0.1' });
   } catch (err) {
     await disconnectPrisma();
     throw err;

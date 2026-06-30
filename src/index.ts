@@ -1,11 +1,10 @@
 import 'dotenv/config';
 import path from 'path';
-import { loadLedger } from './db/repositories/entryRepository.js';
-import { listAccounts } from './db/repositories/accountRepository.js';
-import { disconnectPrisma } from './db/client.js';
+import { disconnectPrisma, createPrismaClient } from './db/client.js';
 import { buildApp } from './api/server.js';
 import { ensureSchema } from './db/ensureSchema.js';
-import { openDatabase } from './db/openDatabase.js';
+import { loadLedger } from './db/repositories/entryRepository.js';
+import { listAccounts } from './db/repositories/accountRepository.js';
 
 const PORT = parseInt(process.env['PORT'] ?? '3000', 10);
 const HOST = process.env['HOST'] ?? '127.0.0.1';
@@ -15,12 +14,11 @@ async function main() {
   if (!rawUrl.startsWith('postgresql://') && !rawUrl.startsWith('postgres://')) {
     const filePath = rawUrl.startsWith('file:') ? rawUrl.slice(5) : rawUrl;
     const dbPath = path.isAbsolute(filePath) ? filePath : path.resolve(process.cwd(), filePath);
-    const schemaDb = openDatabase(dbPath, process.env['COREBOOKS_DB_KEY'] ?? '');
-    try {
-      ensureSchema(schemaDb);
-    } finally {
-      schemaDb.close();
-    }
+    // CLI / non-Electron mode: no Electron safeStorage, so no encryption key.
+    // Open as plaintext (key: null). To use encryption in CLI mode, derive a
+    // key externally and pass it via createPrismaClient before this function.
+    const { db } = createPrismaClient({ filePath: dbPath, key: null });
+    ensureSchema(db);
   }
 
   const [ledger, chartOfAccounts] = await Promise.all([loadLedger(), listAccounts()]);

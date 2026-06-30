@@ -6,7 +6,8 @@ import Database from 'better-sqlite3-multiple-ciphers'
 import { openDatabase } from '../../src/db/openDatabase'
 import { SqlCipherAdapterFactory } from '../../src/db/sqlcipherAdapter'
 
-const KEY = 'a'.repeat(64) // 32-byte key as 64-char hex
+const KEY_HEX = 'a'.repeat(64) // 32-byte key as 64-char hex
+const KEY = Buffer.from(KEY_HEX, 'hex')
 
 function tempDbPath(): string {
   return path.join(
@@ -37,12 +38,12 @@ describe('SQLCipher integration', () => {
   describe('openDatabase + SqlCipherAdapterFactory round-trip', () => {
     it('creates encrypted DB, writes via adapter, reads back', async () => {
       const p = newPath()
-      const db = openDatabase(p, KEY)
+      const db = openDatabase({ filePath: p, key: KEY })
       db.exec('CREATE TABLE accounts (id INTEGER PRIMARY KEY, name TEXT NOT NULL, amount REAL)')
       db.close()
 
       // Re-open via adapter — adapter.dispose() will close this db instance
-      const db2 = openDatabase(p, KEY)
+      const db2 = openDatabase({ filePath: p, key: KEY })
       db2.exec("INSERT INTO accounts VALUES (1, 'Cash', 1000.50)")
 
       const factory = new SqlCipherAdapterFactory({ url: p }, db2)
@@ -65,23 +66,23 @@ describe('SQLCipher integration', () => {
     it('rejects wrong key — cannot read data', () => {
       const p = newPath()
       // Write data with correct key
-      const db = openDatabase(p, KEY)
+      const db = openDatabase({ filePath: p, key: KEY })
       db.exec('CREATE TABLE t (val TEXT)')
       db.exec("INSERT INTO t VALUES ('secret')")
       db.close()
 
       // Try to open with wrong key — openDatabase attempts migration which fails
-      const wrongKey = 'b'.repeat(64)
-      expect(() => openDatabase(p, wrongKey)).toThrow()
+      const wrongKey = Buffer.from('b'.repeat(64), 'hex')
+      expect(() => openDatabase({ filePath: p, key: wrongKey })).toThrow()
     })
 
     it('empty key on encrypted database throws descriptive error', () => {
       const p = newPath()
-      const db = openDatabase(p, KEY)
+      const db = openDatabase({ filePath: p, key: KEY })
       db.exec('CREATE TABLE t (val TEXT)')
       db.close()
 
-      expect(() => openDatabase(p, '')).toThrow('Database appears to be encrypted')
+      expect(() => openDatabase({ filePath: p, key: null })).toThrow('Database appears to be encrypted')
     })
   })
 
@@ -101,7 +102,7 @@ describe('SQLCipher integration', () => {
       plain.close()
 
       // Open with key — triggers migration via PRAGMA rekey
-      const db = openDatabase(p, KEY)
+      const db = openDatabase({ filePath: p, key: KEY })
 
       const rows = db.prepare('SELECT * FROM entries ORDER BY id').all() as Array<{
         id: number | bigint
@@ -134,14 +135,14 @@ describe('SQLCipher integration', () => {
       plain.exec("INSERT INTO t VALUES ('important data')")
       plain.close()
 
-      const db = openDatabase(p, KEY)
+      const db = openDatabase({ filePath: p, key: KEY })
       db.close()
 
       // File exists at original path (in-place migration)
       expect(fs.existsSync(p)).toBe(true)
 
       // Can re-open with correct key
-      const db2 = openDatabase(p, KEY)
+      const db2 = openDatabase({ filePath: p, key: KEY })
       const row = db2.prepare("SELECT val FROM t").get() as { val: string }
       expect(row.val).toBe('important data')
       db2.close()
@@ -151,7 +152,7 @@ describe('SQLCipher integration', () => {
   describe('security properties', () => {
     it('encrypted file contains no plaintext strings from inserted data', () => {
       const p = newPath()
-      const db = openDatabase(p, KEY)
+      const db = openDatabase({ filePath: p, key: KEY })
       db.exec('CREATE TABLE t (secret TEXT)')
       db.exec("INSERT INTO t VALUES ('COREBOOKS_SENTINEL_SECRET_VALUE')")
       db.close()
@@ -166,7 +167,7 @@ describe('SQLCipher integration', () => {
       const p2 = newPath()
 
       for (const p of [p1, p2]) {
-        const db = openDatabase(p, KEY)
+        const db = openDatabase({ filePath: p, key: KEY })
         db.exec('CREATE TABLE t (val TEXT)')
         db.exec("INSERT INTO t VALUES ('identical data')")
         db.close()
@@ -181,21 +182,21 @@ describe('SQLCipher integration', () => {
 
     it('key material does not appear in file contents', () => {
       const p = newPath()
-      const db = openDatabase(p, KEY)
+      const db = openDatabase({ filePath: p, key: KEY })
       db.exec('CREATE TABLE t (val TEXT)')
       db.close()
 
       const fileContents = fs.readFileSync(p)
       const hexInFile = fileContents.toString('hex')
       // The 64-char hex key should not appear literally in the file
-      expect(hexInFile).not.toContain(KEY)
+      expect(hexInFile).not.toContain(KEY_HEX)
     })
   })
 
   describe('adapter transaction integrity', () => {
     it('rolled-back transaction does not persist data', async () => {
       const p = newPath()
-      const db = openDatabase(p, KEY)
+      const db = openDatabase({ filePath: p, key: KEY })
       db.exec('CREATE TABLE t (val TEXT)')
 
       const factory = new SqlCipherAdapterFactory({ url: p }, db)
@@ -218,7 +219,7 @@ describe('SQLCipher integration', () => {
 
     it('committed transaction persists after close and reopen', async () => {
       const p = newPath()
-      const db = openDatabase(p, KEY)
+      const db = openDatabase({ filePath: p, key: KEY })
       db.exec('CREATE TABLE t (val TEXT)')
 
       const factory = new SqlCipherAdapterFactory({ url: p }, db)
@@ -234,7 +235,7 @@ describe('SQLCipher integration', () => {
       await adapter.dispose()
 
       // Reopen and verify data survived
-      const db2 = openDatabase(p, KEY)
+      const db2 = openDatabase({ filePath: p, key: KEY })
       const row = db2.prepare('SELECT val FROM t').get() as { val: string }
       expect(row.val).toBe('persisted')
       db2.close()
