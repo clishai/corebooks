@@ -15,6 +15,8 @@ export type FailPoint = 'after-backup' | 'after-rekey' | 'after-identity'
 
 export interface MigrationArgs {
   vaultPath: string
+  /** The old shared global key (from userData/.db.key). Caller owns this buffer's
+   *  lifecycle; may zero it after `migrateLegacyVault` returns. */
   oldGlobalKey: Buffer
   password: string
   displayName: string
@@ -23,6 +25,8 @@ export interface MigrationArgs {
 
 export interface MigrationResult {
   recoveryPhrase: string
+  /** The new per-vault encryption key. Caller must persist this to the OS keychain
+   *  (via safeStorage / BiometricStore) and then zero it with `.fill(0)` once stored. */
   newKey: Buffer
 }
 
@@ -57,7 +61,11 @@ export async function migrateLegacyVault(args: MigrationArgs): Promise<Migration
   }
 
   // Step 1: rename legacy .corebooks file → backup (frees slot for directory)
-  fs.renameSync(legacyFile, backupFile)
+  try {
+    fs.renameSync(legacyFile, backupFile)
+  } catch (err) {
+    throw new Error(`MigrationFailed: could not rename .corebooks to backup — ${(err as Error).message}`)
+  }
 
   try {
     // Step 2: back up DB before rekeying (preserves ability to roll back)
@@ -98,6 +106,10 @@ export async function migrateLegacyVault(args: MigrationArgs): Promise<Migration
     writeSettings(v, { ...structuredClone(DEFAULT_VAULT_SETTINGS), companyName: args.displayName })
     writeWorkspace(v, structuredClone(DEFAULT_VAULT_WORKSPACE))
 
+    // Backup files (.corebooks.legacy-backup and corebooks.db.pre-migration) are
+    // intentionally retained after successful migration as a recovery safety net.
+    // The Electron IPC layer can surface a "clean up migration backups" action to
+    // the user once they have verified the vault opens correctly.
     appendAuditEvent(v, {
       actor: 'system',
       event: 'vault.created',
@@ -134,6 +146,8 @@ export async function migrateLegacyVault(args: MigrationArgs): Promise<Migration
  * Using `sqlcipher_export` is not available in
  * `better-sqlite3-multiple-ciphers` — `PRAGMA rekey` on an already-opened
  * (and keyed) connection is the supported in-place migration path.
+ *
+ * Mutates dbFile in place: re-encrypts it with newKey using PRAGMA rekey. On failure the file may be in an indeterminate state (the backup copy in dbBackup is authoritative).
  */
 function rekeyDb(dbFile: string, oldKey: Buffer, newKey: Buffer): void {
   const db = new Database(dbFile)
