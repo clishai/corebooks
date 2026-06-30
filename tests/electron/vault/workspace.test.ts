@@ -4,6 +4,7 @@ import path from 'node:path'
 import os from 'node:os'
 import { readWorkspace, writeWorkspace } from '../../../src/electron/vault/workspace.js'
 import { DEFAULT_VAULT_WORKSPACE } from '../../../src/electron/vault/defaults.js'
+import { readAuditLog } from '../../../src/electron/vault/audit.js'
 
 let tmp: string
 beforeEach(() => {
@@ -18,6 +19,15 @@ describe('workspace', () => {
     expect(ws).toEqual(DEFAULT_VAULT_WORKSPACE)
   })
 
+  it('readWorkspace writes a workspace.reset-from-defaults audit event when file is absent', () => {
+    readWorkspace(tmp)
+    const log = readAuditLog(tmp)
+    expect(log).toHaveLength(1)
+    expect(log[0].event).toBe('workspace.reset-from-defaults')
+    expect(log[0].actor).toBe('system')
+    expect((log[0].data as { reason: string }).reason).toBe('corrupt-or-missing')
+  })
+
   // Spec T21
   it('readWorkspace returns defaults and rewrites file when JSON is corrupt', () => {
     const file = path.join(tmp, '.corebooks', 'workspace.json')
@@ -25,6 +35,17 @@ describe('workspace', () => {
     const ws = readWorkspace(tmp)
     expect(ws).toEqual(DEFAULT_VAULT_WORKSPACE)
     expect(JSON.parse(fs.readFileSync(file, 'utf-8'))).toEqual(DEFAULT_VAULT_WORKSPACE)
+  })
+
+  it('readWorkspace writes a workspace.reset-from-defaults audit event when JSON is corrupt', () => {
+    const file = path.join(tmp, '.corebooks', 'workspace.json')
+    fs.writeFileSync(file, '{not json')
+    readWorkspace(tmp)
+    const log = readAuditLog(tmp)
+    expect(log).toHaveLength(1)
+    expect(log[0].event).toBe('workspace.reset-from-defaults')
+    expect(log[0].actor).toBe('system')
+    expect((log[0].data as { reason: string }).reason).toBe('corrupt-or-missing')
   })
 
   it('writeWorkspace round-trips', () => {

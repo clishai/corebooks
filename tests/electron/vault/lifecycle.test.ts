@@ -160,6 +160,48 @@ describe('VaultLifecycle.unlockWithRecovery', () => {
   }, 90_000)
 })
 
+describe('VaultLifecycle picker safety', () => {
+  // Spec T8
+  it('T8: picker.json entries contain only safe fields (no key material)', async () => {
+    const lc = newLifecycle()
+    const pickerPath = path.join(tmp, 'picker.json')
+    await lc.create({ directory: parentDir, displayName: 'SafePickerTest', password: 'test-password-12' })
+    const reg = JSON.parse(fs.readFileSync(pickerPath, 'utf-8'))
+    const entry = reg.vaults[0]
+    const keys = Object.keys(entry).sort()
+    expect(keys).toEqual(['displayName', 'id', 'lastOpened', 'path'])
+    // Verify none of the sensitive words appear anywhere in the stringified entry
+    const raw = JSON.stringify(entry)
+    for (const forbidden of ['password', 'key', 'salt', 'iv', 'hash', 'secret']) {
+      expect(raw.toLowerCase()).not.toContain(forbidden)
+    }
+    await lc.close()
+  }, 30_000)
+
+  // Spec T9
+  it('T9: tampering picker.json displayName does not affect vault auth', async () => {
+    const lc = newLifecycle()
+    const pickerPath = path.join(tmp, 'picker.json')
+    const created = await lc.create({ directory: parentDir, displayName: 'AuthTestVault', password: 'test-password-12' })
+    const vaultPath = created.vault.path
+    await lc.close()
+
+    // Tamper the picker
+    const reg = JSON.parse(fs.readFileSync(pickerPath, 'utf-8'))
+    reg.vaults[0].displayName = 'TAMPERED'
+    fs.writeFileSync(pickerPath, JSON.stringify(reg))
+
+    // Open should still work and use canonical identity.displayName
+    const lc2 = newLifecycle()
+    const result = await lc2.open({ path: vaultPath, password: 'test-password-12' })
+    expect(result.status).toBe('opened')
+    if (result.status === 'opened') {
+      expect(result.vault.displayName).toBe('AuthTestVault') // not 'TAMPERED'
+    }
+    await lc2.close()
+  }, 30_000)
+})
+
 describe('VaultLifecycle.appendAuditEvent', () => {
   it('appends events to the active vault via the public API', async () => {
     const lc = newLifecycle()

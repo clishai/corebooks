@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import type { VaultWorkspace } from './types.js'
 import { DEFAULT_VAULT_WORKSPACE } from './defaults.js'
+import { appendAuditEvent } from './audit.js'
 
 export const CURRENT_WORKSPACE_VERSION = 1
 
@@ -11,6 +12,7 @@ export function readWorkspace(vaultPath: string): VaultWorkspace {
   const file = path.join(vaultPath, WORKSPACE_FILE)
   if (!fs.existsSync(file)) {
     writeWorkspace(vaultPath, DEFAULT_VAULT_WORKSPACE)
+    appendAuditEvent(vaultPath, { actor: 'system', event: 'workspace.reset-from-defaults', data: { reason: 'corrupt-or-missing' } })
     return structuredClone(DEFAULT_VAULT_WORKSPACE)
   }
   try {
@@ -19,6 +21,7 @@ export function readWorkspace(vaultPath: string): VaultWorkspace {
     throw new Error('shape mismatch')
   } catch {
     writeWorkspace(vaultPath, DEFAULT_VAULT_WORKSPACE)
+    appendAuditEvent(vaultPath, { actor: 'system', event: 'workspace.reset-from-defaults', data: { reason: 'corrupt-or-missing' } })
     return structuredClone(DEFAULT_VAULT_WORKSPACE)
   }
 }
