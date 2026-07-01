@@ -43,13 +43,6 @@ export default function VaultTab() {
   const [historyOpen, setHistoryOpen] = useState(false)
   const [log, setLog] = useState<LifecycleEvent[]>([])
 
-  // Biometric state
-  const [biometricAvailable, setBiometricAvailable] = useState<boolean>(false)
-  const [biometricBusy, setBiometricBusy] = useState<boolean>(false)
-  const [biometricError, setBiometricError] = useState<string | null>(null)
-  // Tracks whether biometric unlock is currently stored on disk for this vault.
-  const [biometricEnabled, setBiometricEnabled] = useState<boolean>(false)
-
   // Close vault state
   const [closing, setClosing] = useState(false)
 
@@ -68,12 +61,6 @@ export default function VaultTab() {
         setCurrentVault(sorted[0] ?? null)
       })
       .catch(() => setCurrentVault(null))
-  }, [])
-
-  useEffect(() => {
-    if (!vault) return
-    vault.isBiometricAvailable().then(setBiometricAvailable).catch(() => setBiometricAvailable(false))
-    vault.hasBiometric().then(setBiometricEnabled).catch(() => setBiometricEnabled(false))
   }, [])
 
   useEffect(() => {
@@ -164,32 +151,6 @@ export default function VaultTab() {
     }
   }
 
-  async function handleEnableBiometric() {
-    setBiometricBusy(true)
-    setBiometricError(null)
-    try {
-      await vault!.enableBiometric()
-      setBiometricEnabled(true)
-    } catch (e) {
-      setBiometricError(e instanceof Error ? e.message : 'Failed to enable biometric unlock')
-    } finally {
-      setBiometricBusy(false)
-    }
-  }
-
-  async function handleDisableBiometric() {
-    setBiometricBusy(true)
-    setBiometricError(null)
-    try {
-      await vault!.disableBiometric()
-      setBiometricEnabled(false)
-    } catch (e) {
-      setBiometricError(e instanceof Error ? e.message : 'Failed to disable biometric unlock')
-    } finally {
-      setBiometricBusy(false)
-    }
-  }
-
   return (
     <div className="space-y-6">
       {/* Vault identity */}
@@ -229,52 +190,6 @@ export default function VaultTab() {
         >
           {closing ? 'Closing…' : 'Close vault…'}
         </button>
-      </div>
-
-      {/* Biometric unlock */}
-      <div>
-        <h3 className="text-sm font-semibold text-chalk mb-2">Auto-unlock on launch</h3>
-        {biometricAvailable ? (
-          <>
-            <div className="flex items-center gap-2 mb-3">
-              <span className={`inline-block w-2 h-2 rounded-full ${biometricEnabled ? 'bg-green-400' : 'bg-ash/40'}`} />
-              <span className={`text-sm font-medium ${biometricEnabled ? 'text-green-400' : 'text-ash'}`}>
-                {biometricEnabled ? 'Active — vault opens automatically on launch' : 'Inactive — password required on every launch'}
-              </span>
-            </div>
-            <p className="text-sm text-ash mb-3">
-              When active, corebooks opens your vault automatically on launch using a key stored on
-              this device. No password prompt appears. Disable this if you want a password required
-              every time the app starts.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {biometricEnabled ? (
-                <button
-                  onClick={() => void handleDisableBiometric()}
-                  disabled={biometricBusy}
-                  className="px-3 py-1.5 bg-raised border border-rim rounded text-xs text-ash hover:text-chalk hover:border-neon/50 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  {biometricBusy ? 'Working…' : 'Disable auto-unlock'}
-                </button>
-              ) : (
-                <button
-                  onClick={() => void handleEnableBiometric()}
-                  disabled={biometricBusy}
-                  className="px-3 py-1.5 bg-neon hover:bg-neon-dim text-void text-xs font-semibold rounded transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  {biometricBusy ? 'Working…' : 'Enable auto-unlock'}
-                </button>
-              )}
-            </div>
-            {biometricError && (
-              <p className="text-xs text-red-400 mt-2">{biometricError}</p>
-            )}
-          </>
-        ) : (
-          <p className="text-sm text-ash">
-            Auto-unlock is not available on this device.
-          </p>
-        )}
       </div>
 
       {/* Vault password — placeholder for a future task */}

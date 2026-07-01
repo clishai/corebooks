@@ -54,11 +54,6 @@ declare global {
         chooseDirectory(): Promise<string | null>
         showInExplorer(vaultPath: string): Promise<void>
         migrateLegacy(args: { path: string; password: string }): Promise<{ recoveryPhrase: string }>
-        enableBiometric(): Promise<void>
-        disableBiometric(): Promise<void>
-        isBiometricAvailable(): Promise<boolean>
-        hasBiometric(): Promise<boolean>
-        openWithBiometric(args: { path: string }): Promise<OpenResult | { status: 'biometric-unavailable' }>
         listImports(): Promise<Array<{ name: string; path: string; size: number; mtime: number }>>
         listVaultFiles(): Promise<VaultFileEntry[]>
         moveFile(srcPath: string, targetFolder: string): Promise<string>

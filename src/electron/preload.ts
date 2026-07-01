@@ -18,11 +18,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     chooseDirectory: () => ipcRenderer.invoke('vault:chooseDirectory'),
     showInExplorer: (p: string) => ipcRenderer.invoke('vault:showInExplorer', p),
     migrateLegacy: (args: unknown) => ipcRenderer.invoke('vault:migrateLegacy', args),
-    enableBiometric: () => ipcRenderer.invoke('vault:enableBiometric'),
-    disableBiometric: () => ipcRenderer.invoke('vault:disableBiometric'),
-    isBiometricAvailable: () => ipcRenderer.invoke('vault:isBiometricAvailable'),
-    hasBiometric: () => ipcRenderer.invoke('vault:hasBiometric'),
-    openWithBiometric: (args: unknown) => ipcRenderer.invoke('vault:openWithBiometric', args),
     listImports: () => ipcRenderer.invoke('vault:listImports'),
     listVaultFiles: () => ipcRenderer.invoke('vault:listVaultFiles'),
     moveFile: (srcPath: string, targetFolder: string) =>
