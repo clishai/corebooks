@@ -283,6 +283,103 @@ export class VaultLifecycle {
   }
 
   /**
+   * Returns true if a biometric key is stored on disk for the currently-open
+   * vault. Returns false if no vault is open or no key is stored. Does not
+   * decrypt or call safeStorage — cheap to call from a settings UI mount.
+   */
+  hasBiometricKey(): boolean {
+    if (!this.state) return false
+    return this.cfg.biometric.hasBiometricKey(this.state.vault.id)
+  }
+
+  /**
+   * Open a vault using the biometric-stored key (skips password prompt).
+   * Returns { status: 'biometric-unavailable' } if no key is stored on disk,
+   * so the caller can fall through to password-based open.
+   * K is zeroed in all error paths before returning.
+   */
+  async openWithBiometric(args: { path: string }): Promise<OpenResult | { status: 'biometric-unavailable' }> {
+    const vaultPath = args.path
+
+    // Detect legacy vault
+    const corebooksPath = path.join(vaultPath, '.corebooks')
+    if (fs.existsSync(corebooksPath) && fs.statSync(corebooksPath).isFile()) {
+      return { status: 'legacy-needs-migration' }
+    }
+
+    let identity
+    try {
+      identity = readIdentity(vaultPath)
+    } catch {
+      return { status: 'identity-mismatch' }
+    }
+
+    // Load K from biometric store — returns null if not stored
+    const K = this.cfg.biometric.loadBiometricKey(identity.id)
+    if (!K) return { status: 'biometric-unavailable' }
+
+    // Verify lock file HMAC before using K
+    const lockFilePath = path.join(vaultPath, '.corebooks', 'lock.json')
+    if (!fs.existsSync(lockFilePath)) {
+      K.fill(0)
+      return { status: 'identity-mismatch' }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let lock: any
+    try {
+      lock = JSON.parse(fs.readFileSync(lockFilePath, 'utf-8'))
+    } catch {
+      K.fill(0)
+      return { status: 'lock-tampered' }
+    }
+    if (!verifyHmac(lock, identity.id)) {
+      K.fill(0)
+      return { status: 'lock-tampered' }
+    }
+
+    // Settings check
+    try {
+      readSettings(vaultPath)
+    } catch (err) {
+      if (String(err).includes('VaultSettingsMissing') || String(err).includes('VaultSettingsInvalid')) {
+        K.fill(0)
+        return { status: 'needs-settings-confirmation', defaults: structuredClone(DEFAULT_VAULT_SETTINGS) }
+      }
+      K.fill(0)
+      throw err
+    }
+
+    // Acquire process lock
+    const lockResult = acquireLock(vaultPath)
+    if (lockResult.status === 'busy') {
+      K.fill(0)
+      return { status: 'busy', lockedByPid: lockResult.lockedByPid }
+    }
+    if (lockResult.status === 'reclaimed') {
+      appendAuditEvent(vaultPath, {
+        actor: 'system',
+        event: 'vault.lock-reclaimed',
+        data: { previousPid: lockResult.previousPid >= 0 ? lockResult.previousPid : null },
+      })
+    }
+
+    let db: DbHandle
+    try {
+      db = await this.cfg.dbFactory.open({ filePath: path.join(vaultPath, 'corebooks.db'), key: K })
+    } catch (err) {
+      K.fill(0)
+      releaseLock(vaultPath)
+      throw err
+    }
+
+    const vault: ActiveVault = { id: identity.id, path: vaultPath, displayName: identity.displayName, apiPort: 0 }
+    this.state = { vault, key: K, db }
+    appendAuditEvent(vaultPath, { actor: 'system', event: 'vault.opened', data: { via: 'biometric' } })
+    this.updatePicker(vault)
+    return { status: 'opened', vault }
+  }
+
+  /**
    * Store the currently-open vault's K in the BiometricStore (OS keychain via
    * Electron safeStorage). Throws NoActiveVault if no vault is open, or
    * BiometricUnavailable if the OS keychain is not accessible.

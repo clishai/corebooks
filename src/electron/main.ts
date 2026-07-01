@@ -23,19 +23,41 @@ let recurringIntervalId: ReturnType<typeof setInterval> | null = null
 const vaultWatcher = new VaultWatcher()
 
 // ── BiometricBackend backed by Electron safeStorage ──────────────────────────
-// The in-memory Map stores encrypted key blobs keyed by vault ID label.
-// NOTE: This is process-lifetime only — biometric keys are NOT persisted to
-// disk in this implementation. Persistence (write encrypted blob to userData)
-// is a follow-up.
+// biometricAvailable is cached at app startup (app.whenReady) so that the
+// VaultTab mount can read it without triggering a live safeStorage call, which
+// on macOS can pop the OS keychain access dialog at the wrong moment.
+// biometricDir is set in app.whenReady() after app.getPath() is available.
+let biometricAvailable = false
+let biometricDir = ''
+
 const electronItems = new Map<string, Buffer>()
 
 const electronBackend: BiometricBackend = {
-  isEncryptionAvailable: () => safeStorage.isEncryptionAvailable(),
+  isEncryptionAvailable: () => biometricAvailable,
   encryptString: (plain) => safeStorage.encryptString(plain),
   decryptString: (encrypted) => safeStorage.decryptString(encrypted),
-  put: (label, value) => { electronItems.set(label, value) },
-  get: (label) => electronItems.get(label) ?? null,
-  remove: (label) => { electronItems.delete(label) },
+  put: (label, value) => {
+    electronItems.set(label, value)
+    if (biometricDir) fs.writeFileSync(path.join(biometricDir, `${label}.enc`), value, { mode: 0o600 })
+  },
+  get: (label) => {
+    if (electronItems.has(label)) return electronItems.get(label) ?? null
+    if (biometricDir) {
+      const f = path.join(biometricDir, `${label}.enc`)
+      if (fs.existsSync(f)) {
+        const blob = fs.readFileSync(f)
+        electronItems.set(label, blob)
+        return blob
+      }
+    }
+    return null
+  },
+  remove: (label) => {
+    electronItems.delete(label)
+    if (biometricDir) {
+      try { fs.unlinkSync(path.join(biometricDir, `${label}.enc`)) } catch { /* file may not exist */ }
+    }
+  },
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -99,6 +121,12 @@ async function createWindow(): Promise<void> {
 // ── App ready ────────────────────────────────────────────────────────────────
 
 app.whenReady().then(async () => {
+  // Cache safeStorage availability once at startup — avoids live call on
+  // VaultTab mount which can trigger the OS keychain dialog at the wrong time.
+  biometricAvailable = safeStorage.isEncryptionAvailable()
+  biometricDir = path.join(app.getPath('userData'), 'biometric')
+  fs.mkdirSync(biometricDir, { recursive: true })
+
   // lifecycle must be created after app is ready (app.getPath requires it)
   const lifecycle = new VaultLifecycle({
     dbFactory: {
@@ -235,7 +263,18 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('vault:enableBiometric', async () => lifecycle.enableBiometricForActiveVault())
   ipcMain.handle('vault:disableBiometric', async () => lifecycle.disableBiometricForActiveVault())
-  ipcMain.handle('vault:isBiometricAvailable', () => safeStorage.isEncryptionAvailable())
+  ipcMain.handle('vault:isBiometricAvailable', () => biometricAvailable)
+
+  ipcMain.handle('vault:hasBiometric', () => lifecycle.hasBiometricKey())
+
+  ipcMain.handle('vault:openWithBiometric', async (_e, args: { path: string }) => {
+    const result = await lifecycle.openWithBiometric(args)
+    if (result.status === 'opened') {
+      if (mainWindow) vaultWatcher.start(result.vault.path, mainWindow)
+      mainWindow?.webContents.send('vault:ready')
+    }
+    return result
+  })
 
   // ── IPC: vault file operations ───────────────────────────────────────────
 

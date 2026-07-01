@@ -19,6 +19,11 @@ export interface BiometricStore {
    */
   loadBiometricKey(vaultId: VaultId): Buffer | null
   removeBiometricKey(vaultId: VaultId): void
+  /**
+   * True if a biometric key exists for this vault. Does not decrypt or
+   * touch safeStorage — cheap to call from a settings UI mount.
+   */
+  hasBiometricKey(vaultId: VaultId): boolean
 }
 
 function labelFor(vaultId: VaultId): string {
@@ -41,6 +46,9 @@ export function createBiometricStore(backend: BiometricBackend): BiometricStore 
     },
     removeBiometricKey(vaultId) {
       backend.remove(labelFor(vaultId))
+    },
+    hasBiometricKey(vaultId) {
+      return backend.get(labelFor(vaultId)) !== null
     },
   }
 }

@@ -57,6 +57,8 @@ declare global {
         enableBiometric(): Promise<void>
         disableBiometric(): Promise<void>
         isBiometricAvailable(): Promise<boolean>
+        hasBiometric(): Promise<boolean>
+        openWithBiometric(args: { path: string }): Promise<OpenResult | { status: 'biometric-unavailable' }>
         listImports(): Promise<Array<{ name: string; path: string; size: number; mtime: number }>>
         listVaultFiles(): Promise<VaultFileEntry[]>
         moveFile(srcPath: string, targetFolder: string): Promise<string>

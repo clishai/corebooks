@@ -47,8 +47,7 @@ export default function VaultTab() {
   const [biometricAvailable, setBiometricAvailable] = useState<boolean>(false)
   const [biometricBusy, setBiometricBusy] = useState<boolean>(false)
   const [biometricError, setBiometricError] = useState<string | null>(null)
-  // Tracks whether biometric was enabled in this app session. Persistence
-  // across restarts is a follow-up — see note rendered below the buttons.
+  // Tracks whether biometric unlock is currently stored on disk for this vault.
   const [biometricEnabled, setBiometricEnabled] = useState<boolean>(false)
 
   // Close vault state
@@ -74,6 +73,7 @@ export default function VaultTab() {
   useEffect(() => {
     if (!vault) return
     vault.isBiometricAvailable().then(setBiometricAvailable).catch(() => setBiometricAvailable(false))
+    vault.hasBiometric().then(setBiometricEnabled).catch(() => setBiometricEnabled(false))
   }, [])
 
   useEffect(() => {
@@ -256,9 +256,6 @@ export default function VaultTab() {
                 Disable
               </button>
             </div>
-            {biometricEnabled && (
-              <p className="text-xs text-ash mt-1">Biometric unlock is active until the app is restarted.</p>
-            )}
             {biometricError && (
               <p className="text-xs text-red-400 mt-2">{biometricError}</p>
             )}
