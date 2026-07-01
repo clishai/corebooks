@@ -282,6 +282,14 @@ export class VaultLifecycle {
     appendAuditEvent(this.state.vault.path, { actor: 'human', event, data })
   }
 
+  // ── Auto-unlock / biometric methods ─────────────────────────────────────
+  // These methods are intentionally NOT wired to any IPC or UI.
+  // The device-key auto-unlock approach was removed because it silently opened
+  // vaults on launch with no visible authentication step, which felt like a
+  // security violation to users. The plan is to replace this with real OS
+  // biometrics (Touch ID / Windows Hello) in a future release. Do not re-wire
+  // these to IPC without a proper design conversation first.
+
   /**
    * Returns true if a biometric key is stored on disk for the currently-open
    * vault. Returns false if no vault is open or no key is stored. Does not
