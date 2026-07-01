@@ -103,15 +103,6 @@ export default function VaultPickerPage() {
     setError(null)
     setOpening(true)
     try {
-      // Try biometric unlock first — skips password prompt if key is stored on disk
-      if (window.electronAPI?.vault.openWithBiometric) {
-        const bioResult = await window.electronAPI.vault.openWithBiometric({ path: vaultPath })
-        if (bioResult.status !== 'biometric-unavailable') {
-          handleOpenResult(bioResult as OpenResult, vaultPath)
-          return
-        }
-      }
-      // Fall through to password-based open
       const result = await window.electronAPI?.vault.open({ path: vaultPath })
       handleOpenResult(result, vaultPath)
     } catch (e) {

@@ -356,9 +356,38 @@ app.whenReady().then(async () => {
     await lifecycle.close()
   })
 
+  // ── Biometric startup auto-open ──────────────────────────────────────────────
+  // Attempt to open the most recently used vault with its biometric key.
+  // If successful, currentApiPort is set before the window loads, so the
+  // renderer sees a non-null apiBaseUrl and skips the vault picker entirely.
+  // Only runs once at startup — after an explicit vault close the user must
+  // use their password.
+  let autoOpenedVaultPath: string | null = null
+  {
+    const pickerFile = path.join(app.getPath('userData'), 'picker.json')
+    if (fs.existsSync(pickerFile)) {
+      try {
+        const reg = JSON.parse(fs.readFileSync(pickerFile, 'utf-8')) as { vaults?: Array<{ path: string; lastOpened: string }> }
+        const sorted = (reg.vaults ?? []).slice().sort(
+          (a, b) => new Date(b.lastOpened).getTime() - new Date(a.lastOpened).getTime(),
+        )
+        if (sorted.length > 0 && sorted[0]) {
+          const result = await lifecycle.openWithBiometric({ path: sorted[0].path })
+          if (result.status === 'opened') {
+            autoOpenedVaultPath = result.vault.path
+          }
+        }
+      } catch { /* Auto-open failed — proceed with normal picker flow */ }
+    }
+  }
+
   // ── Window ───────────────────────────────────────────────────────────────
 
   await createWindow()
+
+  if (autoOpenedVaultPath && mainWindow) {
+    vaultWatcher.start(autoOpenedVaultPath, mainWindow)
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) void createWindow()

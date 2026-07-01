@@ -241,20 +241,23 @@ export default function VaultTab() {
               typing your password. Your password is wrapped using OS-protected key material.
             </p>
             <div className="flex flex-wrap gap-2">
-              <button
-                onClick={() => void handleEnableBiometric()}
-                disabled={biometricBusy}
-                className="px-3 py-1.5 bg-neon hover:bg-neon-dim text-void text-xs font-semibold rounded transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                {biometricBusy ? 'Working…' : 'Enable biometric unlock'}
-              </button>
-              <button
-                onClick={() => void handleDisableBiometric()}
-                disabled={biometricBusy}
-                className="px-3 py-1.5 bg-raised border border-rim rounded text-xs text-ash hover:text-chalk hover:border-neon/50 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                Disable
-              </button>
+              {biometricEnabled ? (
+                <button
+                  onClick={() => void handleDisableBiometric()}
+                  disabled={biometricBusy}
+                  className="px-3 py-1.5 bg-raised border border-rim rounded text-xs text-ash hover:text-chalk hover:border-neon/50 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {biometricBusy ? 'Working…' : 'Disable biometric unlock'}
+                </button>
+              ) : (
+                <button
+                  onClick={() => void handleEnableBiometric()}
+                  disabled={biometricBusy}
+                  className="px-3 py-1.5 bg-neon hover:bg-neon-dim text-void text-xs font-semibold rounded transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {biometricBusy ? 'Working…' : 'Enable biometric unlock'}
+                </button>
+              )}
             </div>
             {biometricError && (
               <p className="text-xs text-red-400 mt-2">{biometricError}</p>
