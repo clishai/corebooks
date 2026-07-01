@@ -233,12 +233,19 @@ export default function VaultTab() {
 
       {/* Biometric unlock */}
       <div>
-        <h3 className="text-sm font-semibold text-chalk mb-2">Biometric unlock</h3>
+        <h3 className="text-sm font-semibold text-chalk mb-2">Auto-unlock on launch</h3>
         {biometricAvailable ? (
           <>
+            <div className="flex items-center gap-2 mb-3">
+              <span className={`inline-block w-2 h-2 rounded-full ${biometricEnabled ? 'bg-green-400' : 'bg-ash/40'}`} />
+              <span className={`text-sm font-medium ${biometricEnabled ? 'text-green-400' : 'text-ash'}`}>
+                {biometricEnabled ? 'Active — vault opens automatically on launch' : 'Inactive — password required on every launch'}
+              </span>
+            </div>
             <p className="text-sm text-ash mb-3">
-              Allow your OS biometric (Touch ID, Windows Hello, etc.) to unlock this vault without
-              typing your password. Your password is wrapped using OS-protected key material.
+              When active, corebooks opens your vault automatically on launch using a key stored on
+              this device. No password prompt appears. Disable this if you want a password required
+              every time the app starts.
             </p>
             <div className="flex flex-wrap gap-2">
               {biometricEnabled ? (
@@ -247,7 +254,7 @@ export default function VaultTab() {
                   disabled={biometricBusy}
                   className="px-3 py-1.5 bg-raised border border-rim rounded text-xs text-ash hover:text-chalk hover:border-neon/50 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                 >
-                  {biometricBusy ? 'Working…' : 'Disable biometric unlock'}
+                  {biometricBusy ? 'Working…' : 'Disable auto-unlock'}
                 </button>
               ) : (
                 <button
@@ -255,7 +262,7 @@ export default function VaultTab() {
                   disabled={biometricBusy}
                   className="px-3 py-1.5 bg-neon hover:bg-neon-dim text-void text-xs font-semibold rounded transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                 >
-                  {biometricBusy ? 'Working…' : 'Enable biometric unlock'}
+                  {biometricBusy ? 'Working…' : 'Enable auto-unlock'}
                 </button>
               )}
             </div>
@@ -265,7 +272,7 @@ export default function VaultTab() {
           </>
         ) : (
           <p className="text-sm text-ash">
-            Biometric unlock is not available on this device or OS configuration.
+            Auto-unlock is not available on this device.
           </p>
         )}
       </div>
