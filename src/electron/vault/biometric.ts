@@ -40,9 +40,16 @@ export function createBiometricStore(backend: BiometricBackend): BiometricStore 
     },
     loadBiometricKey(vaultId) {
       if (!backend.isEncryptionAvailable()) return null
-      const encrypted = backend.get(labelFor(vaultId))
+      const label = labelFor(vaultId)
+      const encrypted = backend.get(label)
       if (!encrypted) return null
-      return Buffer.from(backend.decryptString(encrypted), 'hex')
+      try {
+        return Buffer.from(backend.decryptString(encrypted), 'hex')
+      } catch {
+        // Blob is stale or encrypted with a different key — remove it
+        backend.remove(label)
+        return null
+      }
     },
     removeBiometricKey(vaultId) {
       backend.remove(labelFor(vaultId))

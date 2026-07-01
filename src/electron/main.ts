@@ -1,4 +1,5 @@
 import { app, BrowserWindow, ipcMain, shell, dialog, safeStorage } from 'electron'
+import { getOrCreateDeviceKey, encryptWithDeviceKey, decryptWithDeviceKey } from './deviceKey.js'
 import { fileURLToPath } from 'node:url'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -22,20 +23,27 @@ let recurringIntervalId: ReturnType<typeof setInterval> | null = null
 
 const vaultWatcher = new VaultWatcher()
 
-// ── BiometricBackend backed by Electron safeStorage ──────────────────────────
-// biometricAvailable is cached at app startup (app.whenReady) so that the
-// VaultTab mount can read it without triggering a live safeStorage call, which
-// on macOS can pop the OS keychain access dialog at the wrong moment.
-// biometricDir is set in app.whenReady() after app.getPath() is available.
-let biometricAvailable = false
+// ── BiometricBackend backed by a local device key (AES-256-GCM) ──────────────
+// Uses a 32-byte random key stored in userData/device.key instead of
+// safeStorage. This eliminates all OS keychain prompts on macOS for unsigned
+// apps — safeStorage.isEncryptionAvailable() itself triggers the dialog.
+// deviceKey and biometricDir are set in app.whenReady() once app.getPath()
+// is available.
+let deviceKey: Buffer | null = null
 let biometricDir = ''
 
 const electronItems = new Map<string, Buffer>()
 
 const electronBackend: BiometricBackend = {
-  isEncryptionAvailable: () => biometricAvailable,
-  encryptString: (plain) => safeStorage.encryptString(plain),
-  decryptString: (encrypted) => safeStorage.decryptString(encrypted),
+  isEncryptionAvailable: () => true, // device key always available; no OS keychain
+  encryptString: (plain) => {
+    if (!deviceKey) throw new Error('BiometricNotReady')
+    return encryptWithDeviceKey(Buffer.from(plain, 'utf8'), deviceKey)
+  },
+  decryptString: (encrypted) => {
+    if (!deviceKey) throw new Error('BiometricNotReady')
+    return decryptWithDeviceKey(encrypted, deviceKey).toString('utf8')
+  },
   put: (label, value) => {
     electronItems.set(label, value)
     if (biometricDir) fs.writeFileSync(path.join(biometricDir, `${label}.enc`), value, { mode: 0o600 })
@@ -121,9 +129,9 @@ async function createWindow(): Promise<void> {
 // ── App ready ────────────────────────────────────────────────────────────────
 
 app.whenReady().then(async () => {
-  // Cache safeStorage availability once at startup — avoids live call on
-  // VaultTab mount which can trigger the OS keychain dialog at the wrong time.
-  biometricAvailable = safeStorage.isEncryptionAvailable()
+  // Initialize device key for biometric storage — generates userData/device.key
+  // on first launch (32 random bytes, mode 0o600). No OS keychain involved.
+  deviceKey = getOrCreateDeviceKey(app.getPath('userData'))
   biometricDir = path.join(app.getPath('userData'), 'biometric')
   fs.mkdirSync(biometricDir, { recursive: true })
 
@@ -263,7 +271,7 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('vault:enableBiometric', async () => lifecycle.enableBiometricForActiveVault())
   ipcMain.handle('vault:disableBiometric', async () => lifecycle.disableBiometricForActiveVault())
-  ipcMain.handle('vault:isBiometricAvailable', () => biometricAvailable)
+  ipcMain.handle('vault:isBiometricAvailable', () => true)
 
   ipcMain.handle('vault:hasBiometric', () => lifecycle.hasBiometricKey())
 
