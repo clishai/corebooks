@@ -8,46 +8,52 @@
 
 **corebooks** is a privacy-first alternative to cloud accounting platforms. Your financial data lives on your machine — never in someone else's cloud. Each set of books lives in a **vault**: a plain folder you own, name, and control. You can have as many vaults as you have companies, clients, or projects.
 
-This is a project by a college accounting major. The goal is to build the ultimate community-led accounting tool, one that any business owner can download, run, and own completely. Advances in AI and the open-source toolbelt have made it possible for non-technical people to build the software they've always wanted, rather than being stuck with expensive, closed-source SaaS.
+This is a project by a college accounting major. The goal is to build the ultimate community-led accounting tool — one that any business owner can download, run, and own completely. Advances in open-source tooling have made it possible for non-technical people to build the software they've always wanted, rather than being stuck with expensive, closed-source SaaS.
 
 ---
 
 ## Status
 
-🚧 **Active Development** — approaching v1.0
+**v0.8.0 — Public Beta**
 
-The accounting engine, database, REST API, browser-based UI, and Electron desktop app are all functional. The app uses JetBrains Mono Light throughout for a cypherpunk aesthetic and is fully navigable with spring-animated page transitions. It includes:
-- **Vault-based storage** — each company's books live in a named folder you own; pick or create a vault on every launch; rename a vault from within the app and the folder renames on disk
-- **Vault file sync** — drop files into your vault's `imports/`, `statements/`, `receipts/`, or `exports/` folders and the app detects them instantly (chokidar cross-platform watcher); misplaced files get a guided notification
-- **Ollama AI (optional)** — built-in AI panel powered by a local Ollama instance; no API keys, no cloud; configure endpoint and model in Settings → AI; toolbar status dot shows connection in real time
-- Multi-step onboarding wizard (business name, business type, account template suggestions)
-- Chart of accounts with current/non-current classification, live balances, inline editing, configurable column visibility, and an account template library (42 common accounts)
-- Journal entry creation with draft saving, auto-save, and payment method tracking
-- Recurring transaction templates (weekly / monthly / quarterly / annually) with auto-post option
-- **Period close workflow** — generates closing entries that zero out Revenue and Expense accounts into Retained Earnings; user reviews the draft before posting; closed periods are locked
-- Trial Balance, Balance Sheet (Current/Non-current sections), and Income Statement with per-account breakdowns
-- **Reconciliation** — clear posted entries against bank statement line items to verify books match
-- **Bank feed import** — drag CSV/OFX files into `imports/` or use the Bank Feed page to create draft-only categorisation rules; imports always produce drafts for review before posting
-- Global search command palette (press `/`) searching across accounts, entries, and reports
+The accounting engine, database, REST API, and Electron desktop app are all functional and in daily use. This is pre-release software. The core workflows are solid; rough edges exist and features are still being added. Not yet code-signed — see installation notes below.
+
+**What works today:**
+
+- **Vault-based storage** — each company's books live in a named folder you own; pick or create a vault on every launch, with a password required each time
+- **Vault encryption** — every vault database is encrypted at rest with SQLCipher (AES-256). A password adds a second layer: the database key is wrapped with Argon2id + AES-256-GCM and stored in vault metadata. A 12-word BIP-39 recovery phrase is generated as a fallback
+- **Vault file sync** — drop files into `imports/`, `statements/`, `receipts/`, or `exports/` inside the vault folder and the app detects them instantly; misplaced files get a guided notification
+- Chart of accounts with current/non-current classification, live balances, inline editing, and an account template library (42 common accounts)
+- Journal entry creation with draft auto-save and payment method tracking
+- Recurring transaction templates (weekly / monthly / quarterly / annually)
+- **Period close** — generates closing entries that zero Revenue and Expense into Retained Earnings; user reviews the draft before posting; closed periods are locked
+- Trial Balance, Balance Sheet (current/non-current sections), and Income Statement with per-account breakdowns
+- **Reconciliation** — clear posted entries against bank statement line items
+- **CSV import** — drag CSV files into `imports/` or use the Bank Feed page; imports always create drafts for review before posting
+- Global search command palette searching across accounts, entries, and reports
 - Configurable keyboard shortcuts with live rebinding and conflict detection
-- Bulk operations on entries and accounts (reverse, delete, set classification)
-- Multi-user roles (Viewer / Bookkeeper / Admin) in PostgreSQL mode — SQLite stays single-user with no login required
-- **Vault encryption** — every vault database is encrypted at rest with SQLCipher (AES-256). Optional vault password adds a second layer: the database key is wrapped with Argon2id + AES-256-GCM and stored in the vault metadata. A 12-word BIP-39 recovery phrase is generated as a fallback. Non-password vaults unlock transparently via your OS keychain (macOS Keychain, Windows DPAPI, Linux libsecret).
+- Multi-user roles (Viewer / Bookkeeper / Admin) in PostgreSQL mode — SQLite is single-user with no login required
 - Encrypted data export (AES-256-GCM + PBKDF2)
-- Settings covering general reminders, account columns, payment methods, keyboard shortcuts, AI configuration, user management (PostgreSQL), database stats, JSON export, and data wipe
 - Feature flag system gating optional modules (AR/AP, Inventory) as they ship
+
+**Known rough edges / coming soon:**
+
+- Vault password change and recovery phrase regeneration from inside the app
+- OFX/QFX bank statement parsing (CSV works today)
+- Code signing (unsigned builds require a one-time right-click → Open on macOS)
+- Windows and Linux installers are built but less tested than macOS
 
 ---
 
 ## Getting Started (Developer Setup)
 
-CoreBooks runs on your own computer. No account, subscription, or internet connection required.
+corebooks runs on your own computer. No account, subscription, or internet connection required.
 
 ### What you need
 
-- **Node.js** version 20 or newer — download it at [nodejs.org](https://nodejs.org) (choose the "LTS" version)
+- **Node.js** v20 or newer — download at [nodejs.org](https://nodejs.org) (choose the LTS version)
 
-That is it. No separate database software needed — corebooks uses SQLite, a lightweight database stored inside your vault folder.
+No separate database software needed — corebooks uses SQLite, stored inside your vault folder.
 
 ### Installation
 
@@ -58,9 +64,9 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:5173` in your browser. Both the API server and the UI start together with `npm run dev`.
+Open `http://localhost:5173` in your browser. Both the API server and UI start together with `npm run dev`.
 
-When you open corebooks for the first time (as a desktop app), you will be prompted to create your first vault — a folder on your machine where your books will live. Give it a name like "My Business" and pick a location. You can create additional vaults later for separate companies, clients, or projects.
+When you open corebooks as a desktop app for the first time, you will be prompted to create your first vault. Give it a name like "My Business" and pick a location. You can create additional vaults later for separate companies, clients, or projects.
 
 ### Updating
 
@@ -69,41 +75,69 @@ git pull
 npm install
 ```
 
-If the database schema changed in this update (rare — check the release notes), run:
+### Build the desktop app locally
 
 ```bash
-npx prisma migrate deploy
+npm run package
 ```
 
-### Build the desktop app locally (contributors)
-
-`npm run package` compiles everything and produces a platform installer in `release/`. You will see an "unidentified developer" or "unknown publisher" warning when you open it — code signing is deferred until the v1.0 public release. To bypass: right-click → Open on macOS, or More info → Run anyway on Windows.
+Produces a platform installer in `release/`. You will see an "unidentified developer" warning on macOS — right-click → Open to bypass it once. Code signing is deferred until a stable v1.0 release.
 
 ---
 
 ## For Businesses / Multi-user Setup
 
-By default, corebooks uses **SQLite**, a zero-configuration database stored in a single file on your computer. This is ideal for individual users or small teams on one machine.
+By default corebooks uses **SQLite** — a zero-configuration database stored in a single file inside your vault. This is ideal for individuals or small teams on one machine.
 
-If your business needs **multiple employees to access corebooks simultaneously** from different computers, you can connect to a **PostgreSQL** database on a shared server. PostgreSQL is free, open-source software designed for exactly this.
+If multiple employees need to access corebooks simultaneously from different computers, connect to a **PostgreSQL** database on a shared server. PostgreSQL is free, open-source software.
 
-Think of it this way: SQLite is a notebook you keep at your desk. PostgreSQL is a shared filing cabinet your whole team can access at the same time. The switch only makes sense if you have a server that is always on and reachable by your staff.
-
-When connected to PostgreSQL, corebooks activates session-based authentication with three role levels: **Viewer** (read-only), **Bookkeeper** (create and post entries), and **Admin** (full access, user management). Admins can add users and promote others to Admin with password confirmation. All of this is managed in **Settings → Users**. A guided database setup wizard is available in **Settings → Database**.
+When connected to PostgreSQL, corebooks activates session-based authentication with three role levels: **Viewer** (read-only), **Bookkeeper** (create and post entries), and **Admin** (full access, user management). Admins can add users and promote others from **Settings → Users**.
 
 ---
 
-## Vision
+## Architecture
 
 corebooks is designed like an onion. Each layer wraps the one before it without compromising the core.
 
 | Layer | What It Does |
 |---|---|
 | **Core (Layer 1)** | Pure double-entry accounting engine. Chart of accounts, journal entries, general ledger, trial balance, financial statements. Zero external dependencies. |
-| **Database (Layer 2)** | Persistence with SQLite (default) or PostgreSQL (business) via Prisma. Amounts stored as integer cents — the mapper layer is the only cent↔dollar boundary. |
-| **API (Layer 3)** | Fastify REST API. Routes delegate to repositories; no accounting logic lives in routes. |
-| **UI (Layer 4)** | React 19 + Tailwind v4 browser-based interface. Cypherpunk dark theme, JetBrains Mono, spring-animated page transitions. |
-| **Desktop App (Layer 5)** | Electron wrapper — vault picker on launch, named vault folders, SQLCipher database encryption, `safeStorage` key management, optional vault password with BIP-39 recovery, cross-platform file watcher. Builds to .dmg / .exe / .AppImage. |
+| **Database (Layer 2)** | Persistence via Prisma. SQLite (default, SQLCipher-encrypted) or PostgreSQL (multi-user). Amounts stored as integer cents — the mapper layer is the only cent↔dollar boundary. |
+| **API (Layer 3)** | Fastify REST API. Routes delegate to repositories; no accounting logic in routes. |
+| **UI (Layer 4)** | React 19 + Tailwind v4. Cypherpunk dark theme, JetBrains Mono, spring-animated page transitions. |
+| **Desktop (Layer 5)** | Electron wrapper — vault picker on every launch, SQLCipher encryption, vault password + BIP-39 recovery, cross-platform file watcher. Builds to .dmg / .exe / .AppImage. |
+
+---
+
+## Security & Privacy
+
+### Local mode (SQLite — the default)
+
+Your vault is a plain folder on your machine. The database (`corebooks.db`) lives inside it and is not reachable from the network — the Fastify API server binds to `127.0.0.1` only. The vault can be backed up by any tool that copies folders (Time Machine, iCloud Drive, rsync).
+
+**At-rest encryption:** Every vault database is encrypted with SQLCipher (AES-256-CBC). A 32-byte vault key K is generated on creation and stored in `userData` on your device. Stealing the database file without also accessing your machine gains nothing.
+
+**Vault password:** Adding a password wraps K with Argon2id (64 MiB, 3 iterations, 4 lanes) + AES-256-GCM. The wrapped key is stored in the vault's `.corebooks` metadata file alongside a 12-word BIP-39 recovery phrase. The recovery phrase lets you reset a forgotten password without losing data — write it on paper and keep it separate from your computer.
+
+**Encrypted backups:** Settings → Database includes an **Encrypted Export** option using AES-256-GCM with PBKDF2-SHA256 key derivation (600,000 iterations). The output is a self-describing `.enc.json` file — algorithm, KDF parameters, salt, and IV are stored alongside the ciphertext.
+
+### Multi-user mode (PostgreSQL)
+
+**SSL is required.** Add `?sslmode=require` to your `DATABASE_URL`:
+
+```
+DATABASE_URL="postgresql://user:password@your-server:5432/corebooks?sslmode=require"
+```
+
+corebooks warns in the terminal and Settings UI if SSL is not detected.
+
+### What corebooks does not do
+
+- No telemetry, analytics, or error reporting. The app never phones home.
+- No cloud storage. All data lives where you put it.
+- No account, email, or registration required.
+
+---
 
 ## Who This Is For
 
@@ -115,85 +149,29 @@ corebooks is designed like an onion. Each layer wraps the one before it without 
 
 ## Tech Stack
 
-- **Language:** TypeScript
-- **Database:** SQLite by default (PostgreSQL available for multi-user setups)
-- **ORM:** Prisma
-- **API:** Fastify
+- **Language:** TypeScript (strict mode)
+- **Database:** SQLite by default (PostgreSQL for multi-user)
+- **ORM:** Prisma 7
+- **API:** Fastify 5
 - **Frontend:** React 19 + Tailwind v4
-- **Runtime:** Node.js
-- **Desktop:** Electron (complete — builds to .dmg / .exe / .AppImage via `npm run package`)
-
-## Security & Privacy
-
-Corebooks is designed with a clear threat model for each of its two operating modes:
-
-### Local mode (SQLite —> the default)
-
-Your vault is a plain folder on your machine. The database (`corebooks.db`) lives inside it.
-Neither the folder nor the database is reachable from the network — the Fastify API server
-binds to `127.0.0.1` only (loopback). The vault can be backed up by any tool that copies
-folders (Time Machine, iCloud Drive, Dropbox, rsync). No special export step required.
-
-**At-rest encryption:** Every vault database (`corebooks.db`) is encrypted with SQLCipher
-(AES-256-CBC). On first launch, corebooks generates a 256-bit key and stores it in your
-OS credential vault — macOS Keychain, Windows DPAPI, or Linux libsecret — via Electron's
-`safeStorage` API. The key is tied to your OS login, so stealing the database file without
-also compromising your account gains nothing.
-
-**Vault password (optional):** You can add a password to any vault in Settings → Vault. The
-database key is then wrapped with Argon2id (64 MiB, 3 iterations, 4 lanes) and
-AES-256-GCM, and stored alongside a 12-word BIP-39 recovery phrase in the vault's
-`.corebooks` metadata file. The recovery phrase lets you reset a forgotten password without
-losing your data. Write it on paper and keep it separate from your computer.
-
-**Encrypted backups:** The Settings → Database page has an **Encrypted Export** option.
-It encrypts your full data backup with AES-256-GCM using a passphrase you choose.
-Key derivation uses PBKDF2-SHA256 at 600 000 iterations (OWASP 2023 guidance).
-The output is a self-describing `.enc.json` file — the algorithm, KDF parameters,
-salt, and IV are all stored alongside the ciphertext so any compliant tool can decrypt it.
-There is no recovery if you lose the passphrase.
-
-### Multi-user mode (PostgreSQL)
-
-When you connect corebooks to a PostgreSQL server, your data travels over the network.
-
-**SSL is required.** Add `?sslmode=require` (or `sslmode=verify-full` for certificate
-validation) to your `DATABASE_URL`:
-
-```
-DATABASE_URL="postgresql://user:password@your-server:5432/corebooks?sslmode=require"
-```
-
-corebooks will warn you in the terminal and in the Settings UI if SSL is not detected.
-Without SSL, credentials and financial data travel in plaintext and can be intercepted
-by anyone on the same network.
-
-**OS-level encryption:** Encrypt the disk on your PostgreSQL server (LUKS on Linux,
-FileVault on macOS, BitLocker on Windows) to protect data at rest. This is standard
-practice for any server holding sensitive data.
-
-### What corebooks does not do
-
-- It does not phone home. There are no analytics, telemetry, or error reporting calls.
-- It does not store anything in the cloud. All data is yours and lives where you put it.
-- It does not require an account, email, or any form of registration.
+- **Desktop:** Electron — builds to .dmg / .exe / .AppImage
 
 ---
 
 ## Potential Features
 
-These are areas where community contributions would be most valuable. None are scoped or scheduled — they're open invitations. If you want to work on one, open an issue first so we can align on design before you build.
+Community contributions are welcome on any of these. Open an issue first to align on design.
 
 | Feature | Description |
 |---|---|
-| **Accounts Receivable / Payable** | Customer and vendor entities, invoice tracking, payment matching, aging reports (30/60/90 day buckets). Payments auto-generate journal entries through the existing entry engine. |
-| **Inventory Management** | Item catalog, quantities on hand, receive-goods and sell-goods flows, COGS accounting. Gated to product businesses via the feature flag system. |
-| **Import from other accounting software** | Parse and import data from QuickBooks, Wave, FreshBooks, or CSV exports. Map external account structures to corebooks chart of accounts. |
-| **PostgreSQL migration wizard** | Guided in-app flow to switch from SQLite to a shared PostgreSQL server: validate connection, migrate schema, copy data, confirm, restart. Plain-language UI — no technical jargon. |
-| **Bank feed OFX/QFX parsing** | The bank feed page and import modal exist; CSV import works today. OFX/QFX format parsing is the next step to support direct bank statement downloads. |
-| **AI-assisted categorisation** | Ollama AI infrastructure is in place (toolbar button, side panel, Settings → AI tab). Next: use the connected model to suggest account mappings during import. No API keys required — local inference only. |
-| **Plugin API** | Webhook and plugin interface so third-party tools (Stripe, Shopify, payroll providers) can push source documents and drafts into corebooks. |
-| **Multi-currency** | Record transactions in foreign currencies with exchange rate tracking and unrealised gain/loss accounts. |
+| **Accounts Receivable / Payable** | Customer and vendor entities, invoice tracking, payment matching, aging reports. |
+| **Inventory** | Item catalog, quantities on hand, COGS accounting. Gated behind feature flag until mature. |
+| **OFX/QFX bank statement parsing** | CSV import works today; OFX/QFX is the natural next step for direct bank downloads. |
+| **Import from other software** | Parse and import from QuickBooks, Wave, FreshBooks, or CSV exports. |
+| **PostgreSQL migration wizard** | Guided in-app flow to switch from SQLite to a shared PostgreSQL server. |
+| **Plugin API** | Webhook interface so tools like Stripe, Shopify, and payroll providers can push source documents and drafts. |
+| **Multi-currency** | Foreign currency transactions with exchange rate tracking and unrealised gain/loss. |
+| **AI-assisted categorisation** | Local-only AI (no API keys) to suggest account mappings during import. Draft-only — AI may never post to the ledger. |
 
 ---
 
